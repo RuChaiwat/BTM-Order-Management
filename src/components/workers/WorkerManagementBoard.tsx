@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { ROLE_LABELS } from '../../lib/roles'
 import { createClient } from '../../lib/supabase/client'
+import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
 
 interface WorkerRow {
   user_id: string
@@ -159,15 +160,26 @@ function AddUserModal({ warehouseCode, onClose, onCreated }: { warehouseCode: st
     <Modal title="Add user" subtitle="เพิ่มผู้ใช้งาน">
       <div style={{ padding: '16px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="field">
-          <label className="field-label">User ID</label>
-          <input className="field-input" value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })} placeholder="e.g. P020" style={{ border: '1px solid var(--color-border)' }} />
+          <label className="field-label">
+            User ID <span className="field-hint">used to sign in — max {USER_ID_MAX_LENGTH} characters</span>
+          </label>
+          <input
+            className="field-input"
+            value={form.user_id}
+            maxLength={USER_ID_MAX_LENGTH}
+            onChange={(e) => setForm({ ...form, user_id: e.target.value.toUpperCase() })}
+            placeholder="e.g. P020"
+            style={{ border: '1px solid var(--color-border)' }}
+          />
         </div>
         <div className="field">
           <label className="field-label">Name</label>
           <input className="field-input" value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <div className="field">
-          <label className="field-label">Email</label>
+          <label className="field-label">
+            Email <span className="field-hint">optional — contact only, not used to sign in</span>
+          </label>
           <input className="field-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <div className="field">
@@ -193,7 +205,7 @@ function AddUserModal({ warehouseCode, onClose, onCreated }: { warehouseCode: st
         <button
           className="modal-footer-btn btn-primary"
           style={{ minWidth: 140, border: 0 }}
-          disabled={busy || !form.user_id || !form.email || !form.password || !form.name_en}
+          disabled={busy || !form.user_id || !form.password || !form.name_en}
           onClick={submit}
         >
           {busy ? 'Creating…' : 'Create user'}

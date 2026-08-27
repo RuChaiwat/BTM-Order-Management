@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
+import { toAuthEmail, isValidUserId, USER_ID_MAX_LENGTH } from '@/lib/authEmail'
 
 const VALID_ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'planner_admin', 'zone_controller', 'picker', 'viewer']
 
-/** Create a new user: Supabase Auth account + matching employees_users row, in one call. */
+/** Create a new user: Supabase Auth account + matching employees_users row, in one call.
+ * Login is by User ID (§7), not email — `email` here is optional contact info only; the
+ * Supabase Auth account itself uses a synthetic derived address (see src/lib/authEmail.ts). */
 export async function POST(request: Request) {
   let caller
   try {
@@ -17,8 +20,11 @@ export async function POST(request: Request) {
   const body = await request.json()
   const { user_id, email, password, name_en, name_th, role, warehouse_code, zone_scope, employee_id, shift_label } = body
 
-  if (!user_id || !email || !password || !name_en || !role) {
-    return NextResponse.json({ error: 'user_id, email, password, name_en and role are required' }, { status: 400 })
+  if (!user_id || !password || !name_en || !role) {
+    return NextResponse.json({ error: 'user_id, password, name_en and role are required' }, { status: 400 })
+  }
+  if (!isValidUserId(user_id)) {
+    return NextResponse.json({ error: `user_id must be 1-${USER_ID_MAX_LENGTH} characters (letters, numbers, - or _)` }, { status: 400 })
   }
   if (!VALID_ROLES.includes(role)) {
     return NextResponse.json({ error: `role must be one of ${VALID_ROLES.join(', ')}` }, { status: 400 })
@@ -27,7 +33,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient()
 
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
-    email,
+    email: toAuthEmail(user_id),
     password,
     email_confirm: true,
   })
@@ -43,7 +49,7 @@ export async function POST(request: Request) {
       employee_id: employee_id ?? null,
       name_en,
       name_th: name_th ?? null,
-      email,
+      email: email || null,
       role,
       warehouse_code: warehouse_code ?? null,
       zone_scope: zone_scope ?? [],

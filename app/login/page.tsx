@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { toAuthEmail, isValidUserId, USER_ID_MAX_LENGTH } from '@/lib/authEmail'
 
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
   const [lang, setLang] = useState<'th' | 'en'>('th')
-  const [email, setEmail] = useState('')
+  const [userId, setUserId] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [warehouses, setWarehouses] = useState<{ warehouse_code: string; name: string }[]>([])
@@ -34,11 +35,15 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    if (!isValidUserId(userId)) {
+      setError(`User ID must be 1-${USER_ID_MAX_LENGTH} characters (letters, numbers, - or _)`)
+      return
+    }
     setLoading(true)
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: toAuthEmail(userId), password })
     setLoading(false)
     if (signInError) {
-      setError(signInError.message)
+      setError('Incorrect User ID or password')
       return
     }
     router.push('/dashboard')
@@ -109,15 +114,17 @@ export default function LoginPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="field">
               <label className="field-label">
-                Email <span className="field-hint">/ อีเมล</span>
+                User ID <span className="field-hint">/ รหัสผู้ใช้</span>
               </label>
               <input
-                type="email"
+                type="text"
                 required
+                maxLength={USER_ID_MAX_LENGTH}
                 autoComplete="username"
+                placeholder="e.g. U0001"
                 className="field-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={userId}
+                onChange={(e) => setUserId(e.target.value.toUpperCase())}
                 style={{ border: '1px solid #E5E7EB' }}
               />
             </div>

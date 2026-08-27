@@ -337,7 +337,7 @@ create index idx_admin_verifications_order on admin_verifications(order_id);
 create table status_history (
   id uuid primary key default gen_random_uuid(),
   entity_type text not null,
-  entity_id uuid not null,
+  entity_id text not null, -- uuid for orders/batches, or a business key like 'U0001' for employees_users
   old_status text,
   new_status text not null,
   changed_by text references employees_users(user_id),
@@ -351,7 +351,7 @@ create table audit_logs (
   user_id text references employees_users(user_id),
   action text not null,
   entity_type text not null,
-  entity_id uuid,
+  entity_id text, -- uuid for orders/batches, or a business key like 'U0001'/'DAMAGED' for employees_users/reason_master
   before jsonb,
   after jsonb,
   created_at timestamptz not null default now()

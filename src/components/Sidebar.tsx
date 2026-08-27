@@ -10,9 +10,11 @@ interface SidebarProps {
   /** nav item id to highlight — screens sometimes highlight an item that isn't their own route (matches the source mockups) */
   activeId: number
   user: AppUser
+  /** live counts keyed by nav item id, computed server-side in AppLayout — replaces any static item.badge */
+  badges?: Record<number, string>
 }
 
-export function Sidebar({ activeId, user }: SidebarProps) {
+export function Sidebar({ activeId, user, badges }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -32,13 +34,14 @@ export function Sidebar({ activeId, user }: SidebarProps) {
             {group.items.map((item) => {
               if (!canAccessMenuItem(user.role, item.id)) return null
               const isActive = item.id === activeId
+              const badge = badges?.[item.id] ?? item.badge
               const content = (
                 <>
                   <span className="nav-item-label">
                     {item.id}. {item.en}
                     <span className="nav-item-th">{item.th}</span>
                   </span>
-                  {item.badge && <span className="nav-item-badge">{item.badge}</span>}
+                  {badge && <span className="nav-item-badge">{badge}</span>}
                 </>
               )
               const className = `nav-item${isActive ? ' is-active' : ''}${item.path ? '' : ' is-disabled'}`

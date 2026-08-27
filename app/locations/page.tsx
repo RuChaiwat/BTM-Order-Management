@@ -1,0 +1,72 @@
+import { AppLayout } from '@/components/AppLayout'
+import { TopBar } from '@/components/TopBar'
+import { UploadForm } from '@/components/UploadForm'
+import { createClient } from '@/lib/supabase/server'
+
+export default async function LocationMasterPage() {
+  const supabase = await createClient()
+  const { data: locations, count } = await supabase
+    .from('locations')
+    .select('bin_code, warehouse_code, zone_code, aisle, side, bay, level, block, pick_sequence, active', { count: 'exact' })
+    .order('pick_sequence', { ascending: true })
+    .limit(50)
+
+  return (
+    <AppLayout activeNavId={14}>
+      <TopBar title="Location Master" subtitle="ข้อมูลตำแหน่งจัดเก็บ · Bin → Zone → Pick Sequence" />
+      <div className="page-body">
+        <UploadForm
+          endpoint="/api/imports/locations"
+          label="Import Location Master"
+          hint="Upload Bin Code master (.csv or .xlsx) — required columns: Bin Code, Warehouse Code, Zone Code (optional: Zone Name, Aisle, Side, Side Pair, Direction, Bay, Level, Block, Pick Sequence, Active Flag)"
+        />
+
+        <div className="card" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
+            <span className="card-title">Locations</span>
+            <span className="card-subtitle">{count ?? 0} bin codes · showing first 50 by Pick Sequence</span>
+          </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>BIN CODE</th>
+                <th>WAREHOUSE</th>
+                <th>ZONE</th>
+                <th>AISLE</th>
+                <th>SIDE</th>
+                <th>BAY</th>
+                <th>LEVEL</th>
+                <th>BLOCK</th>
+                <th>PICK SEQ</th>
+                <th>ACTIVE</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(locations ?? []).map((l) => (
+                <tr key={`${l.warehouse_code}-${l.bin_code}`}>
+                  <td style={{ fontWeight: 700 }}>{l.bin_code}</td>
+                  <td>{l.warehouse_code}</td>
+                  <td>{l.zone_code}</td>
+                  <td>{l.aisle}</td>
+                  <td>{l.side}</td>
+                  <td>{l.bay}</td>
+                  <td>{l.level}</td>
+                  <td>{l.block}</td>
+                  <td>{l.pick_sequence}</td>
+                  <td>{l.active ? <span className="badge badge-success">Active</span> : <span className="badge badge-neutral">Inactive</span>}</td>
+                </tr>
+              ))}
+              {(!locations || locations.length === 0) && (
+                <tr>
+                  <td colSpan={10} style={{ color: 'var(--color-text-secondary)' }}>
+                    No locations imported yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AppLayout>
+  )
+}

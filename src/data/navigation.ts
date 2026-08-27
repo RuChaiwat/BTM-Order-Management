@@ -19,7 +19,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Order Core',
-    items: [{ id: 2, en: 'Order Pool / Import Status', th: 'พูลออเดอร์ / สถานะนำเข้า', badge: '1,248' }],
+    items: [{ id: 2, en: 'Order Pool / Import Status', th: 'พูลออเดอร์ / สถานะนำเข้า', path: '/orders' }],
   },
   {
     label: 'Consolidation',
@@ -33,11 +33,11 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Picking Control',
     items: [
-      { id: 7, en: 'Work Assignment', th: 'มอบหมายงาน', badge: '22', path: '/assignment' },
+      { id: 7, en: 'Work Assignment', th: 'มอบหมายงาน', path: '/assignment' },
       { id: 8, en: 'Picker Monitor', th: 'ติดตามผู้หยิบสินค้า' },
       { id: 9, en: 'Zone Dashboard', th: 'แดชบอร์ดโซน' },
       { id: 10, en: 'Control Tower', th: 'ศูนย์ควบคุม', path: '/control-tower' },
-      { id: 11, en: 'Backlog Monitor', th: 'งานคงค้าง', badge: '185' },
+      { id: 11, en: 'Backlog Monitor', th: 'งานคงค้าง' },
     ],
   },
   {
@@ -48,8 +48,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Administration',
     items: [
       { id: 13, en: 'User Management', th: 'จัดการผู้ใช้งาน', path: '/workers' },
-      { id: 14, en: 'Location Master', th: 'ข้อมูลตำแหน่งจัดเก็บ' },
-      { id: 15, en: 'Configuration / Audit', th: 'ตั้งค่า / ตรวจสอบ' },
+      { id: 14, en: 'Location Master', th: 'ข้อมูลตำแหน่งจัดเก็บ', path: '/locations' },
+      { id: 15, en: 'Configuration / Audit', th: 'ตั้งค่า / ตรวจสอบ', path: '/admin' },
     ],
   },
 ]

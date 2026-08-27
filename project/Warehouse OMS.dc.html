@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="stylesheet" href="ds/styles.css"><style>
+body{margin:0;background:#e6e4e2;font-family:"Source Serif 4",serif}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08)}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#201e1d;color:#f3f2f2;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 "Source Serif 4",serif;color:#201e1d}
+.dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#201e1d;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11.5px/1.3 "Source Serif 4",serif;color:rgba(0,0,0,.55)}
+.dv-card{max-width:100%;background:#f3f2f2;border:1px solid rgba(0,0,0,.08);box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.dv-opt:target .dv-oid{background:#0088b0;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.6 "Source Serif 4",serif;color:rgba(0,0,0,.5)}
+.dv-note{max-width:760px;font:14px/1.6 "Source Serif 4",serif;color:#201e1d}
+.stage{display:flex;align-items:flex-end;gap:0}
+.dot{background-image:radial-gradient(circle,rgba(0,0,0,.3) 30%,transparent 32%);background-size:4px 4px}
+</style></helmet>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Beautrium OMS — built to the v1.1 requirement</span></div>
+
+<div class="dv-note" style="margin:0 0 26px">
+<p style="margin:0 0 8px"><strong>Note on visual language.</strong> §15 of the requirement defines its own front-end standard — Beautrium red / black / gray, Noto Sans Thai, dark 240px navigation, light content canvas, 10–12px cards, semantic status colors, 8px grid. That conflicts with the Broadsheet design system attached to this project, so these screens follow the requirement and the mockups in §11/§16. Turn <a class="dv-oid" href="#t1">1</a> below is the earlier Broadsheet exploration, kept for reference.</p>
+<p style="margin:0">Navigation is the §15 menu in operational sequence, bilingual EN/TH. Productivity is tracked at Order level; Zone comes from Bin Code via Location Master. Screens are at 1440×900.</p>
+</div>
+
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Login · shared Order Core authentication</div>
+<div class="dv-card" style="width:1440px">
+<div style="display:flex;height:900px;font-family:'Noto Sans Thai',Arial,sans-serif;color:#1F2937">
+  <div style="width:620px;flex:none;background:#15181E;color:#fff;padding:56px 52px;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:44px;height:44px;border-radius:10px;background:#D71920;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px">B</div>
+      <div style="line-height:1.2"><div style="font-size:16px;font-weight:700;letter-spacing:.08em">BEAUTRIUM</div><div style="font-size:12.5px;color:#9CA3AF">Order Management System</div></div>
+    </div>
+    <div style="margin-top:auto">
+      <div style="font-size:11px;letter-spacing:.12em;color:#D71920;font-weight:700;margin-bottom:14px">ORDER CONSOLIDATION + PICKING PRODUCTIVITY</div>
+      <h2 style="font-size:34px;font-weight:700;line-height:1.25;margin:0 0 14px;max-width:22ch">One order core for consolidation and picking productivity</h2>
+      <p style="font-size:14px;color:#9CA3AF;max-width:46ch;margin:0;line-height:1.7">WMS is the source of truth for the pick Bin Code. Zone and pick sequence are joined from Location Master on import.</p>
+    </div>
+    <div style="margin-top:auto;font-size:11.5px;color:#6B7280;display:flex;gap:18px"><span>v1.1</span><span>Bangna DC · BKK West · BKK East</span></div>
+  </div>
+  <div style="flex:1;background:#F5F6F8;display:flex;align-items:center;justify-content:center">
+    <div style="width:400px;background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:32px;box-shadow:0 1px 3px rgba(16,24,40,.06)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+        <div><div style="font-size:22px;font-weight:700">Sign in</div><div style="font-size:12.5px;color:#6B7280">เข้าสู่ระบบ</div></div>
+        <div style="display:flex;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;font-size:12.5px">
+          <span style="padding:6px 12px;background:#D71920;color:#fff;font-weight:500">TH</span>
+          <span style="padding:6px 12px;color:#6B7280">EN</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div>
+          <label style="display:block;font-size:12px;color:#374151;font-weight:500;margin-bottom:6px">User ID <span style="color:#6B7280;font-weight:400">/ รหัสผู้ใช้</span></label>
+          <div style="height:44px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;display:flex;align-items:center;padding:0 12px;font-size:14px">U0001</div>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#374151;font-weight:500;margin-bottom:6px">Password <span style="color:#6B7280;font-weight:400">/ รหัสผ่าน</span></label>
+          <div style="height:44px;border:1px solid #2563EB;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:14px;box-shadow:0 0 0 3px rgba(37,99,235,.12)"><span style="letter-spacing:.2em">••••••••</span><span style="font-size:12px;color:#2563EB">Show</span></div>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#374151;font-weight:500;margin-bottom:6px">Warehouse <span style="color:#6B7280;font-weight:400">/ คลังสินค้า</span></label>
+          <div style="height:44px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:14px"><span>Bangna DC</span><span style="color:#6B7280;font-size:11px">▾</span></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12.5px">
+          <span style="display:flex;align-items:center;gap:8px;color:#374151"><span style="width:16px;height:16px;border:1px solid #D1D5DB;border-radius:4px;display:inline-block"></span>Remember this device</span>
+          <a href="#2a" style="color:#2563EB;text-decoration:none">Forgot password?</a>
+        </div>
+        <button style="height:46px;border:0;border-radius:8px;background:#D71920;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer" style-hover="background:#A50F15">Sign in / เข้าสู่ระบบ</button>
+        <div style="font-size:11.5px;color:#6B7280;text-align:center;line-height:1.6">Access is role-based. Menu visibility and action permission are granted separately by System Admin.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2b">
+<div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Home · Operations Dashboard with the §15 side menu</div>
+<div class="dv-card" style="width:1440px">
+<div style="display:flex;height:900px;background:#F5F6F8;font-family:'Noto Sans Thai',Arial,sans-serif;color:#1F2937;font-size:14px">
+  <dc-import name="OMS Nav" active="{{ 1 }}" hint-size="240px,900px"></dc-import>
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="height:64px;flex:none;background:#fff;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;gap:16px;padding:0 24px">
+      <div><div style="font-size:17px;font-weight:700;line-height:1.2">Operations Dashboard</div><div style="font-size:11.5px;color:#6B7280">ภาพรวมการดำเนินงาน · ข้อมูล ณ 10:30 น.</div></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px">
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 12px"><span style="color:#6B7280">Order Date</span><span style="font-weight:500">Yesterday · 26 Aug 2026</span><span style="color:#6B7280;font-size:11px">▾</span></div>
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 12px"><span style="font-weight:500">Bangna DC</span><span style="color:#6B7280;font-size:11px">▾</span></div>
+        <div style="height:36px;width:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative">🔔<span style="position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:9px;background:#DC2626;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;padding:0 4px">5</span></div>
+      </div>
+    </div>
+
+    <div style="flex:1;overflow:hidden;padding:20px 24px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;gap:0;background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:12px 16px;font-size:12.5px">
+        <span style="color:#6B7280;font-weight:700;letter-spacing:.06em;font-size:10.5px;margin-right:14px">FLOW</span>
+        <span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;background:#EFF6FF;color:#1D4ED8;font-weight:500">Import Orders <span style="color:#6B7280;font-weight:400">1,248</span></span>
+        <span style="color:#D1D5DB;padding:0 8px">→</span>
+        <span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;background:#F0FDF4;color:#15803D;font-weight:500">Pre-screen <span style="color:#6B7280;font-weight:400">1,102</span></span>
+        <span style="color:#D1D5DB;padding:0 8px">→</span>
+        <span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;background:#F5F3FF;color:#6D28D9;font-weight:500">Matching <span style="color:#6B7280;font-weight:400">842</span></span>
+        <span style="color:#D1D5DB;padding:0 8px">→</span>
+        <span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;background:#FFFBEB;color:#B45309;font-weight:500">Batch Split <span style="color:#6B7280;font-weight:400">62</span></span>
+        <span style="color:#D1D5DB;padding:0 8px">→</span>
+        <span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;background:#FEF2F2;color:#B91C1C;font-weight:500">Pick Report <span style="color:#6B7280;font-weight:400">48</span></span>
+        <span style="color:#D1D5DB;padding:0 8px">→</span>
+        <span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;background:#F3F4F6;color:#374151;font-weight:500">Assignment <span style="color:#6B7280;font-weight:400">22</span></span>
+        <span style="margin-left:auto;color:#6B7280">Last updated 10:30 · auto 60s</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px">
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">TOTAL ORDERS</div><div style="font-size:11px;color:#9CA3AF;margin-bottom:8px">ออเดอร์ทั้งหมด</div><div style="font-size:30px;font-weight:700;line-height:1">1,920</div><div style="font-size:11.5px;color:#6B7280;margin-top:6px">New 1,800 · Backlog 120</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">TOTAL PIECES (PLAN)</div><div style="font-size:11px;color:#9CA3AF;margin-bottom:8px">จำนวนชิ้นตามแผน</div><div style="font-size:30px;font-weight:700;line-height:1">119,560</div><div style="font-size:11.5px;color:#6B7280;margin-top:6px">Avg 62 pcs/order</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">PIECES PICKED</div><div style="font-size:11px;color:#9CA3AF;margin-bottom:8px">หยิบแล้ว (จริง)</div><div style="font-size:30px;font-weight:700;line-height:1;color:#16A34A">72,480</div><div style="font-size:11.5px;color:#16A34A;margin-top:6px">60.6% of plan</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">PICKER COMPLETED</div><div style="font-size:11px;color:#9CA3AF;margin-bottom:8px">ผู้หยิบปิดงานแล้ว</div><div style="font-size:30px;font-weight:700;line-height:1">642</div><div style="font-size:11.5px;color:#6B7280;margin-top:6px">100% 598 · Short 44</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">TOTAL BACKLOG</div><div style="font-size:11px;color:#9CA3AF;margin-bottom:8px">งานคงค้าง</div><div style="font-size:30px;font-weight:700;line-height:1;color:#F59E0B">185</div><div style="font-size:11.5px;color:#6B7280;margin-top:6px">Picking 135 · Verify 50</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">ACTIVE PICKERS</div><div style="font-size:11px;color:#9CA3AF;margin-bottom:8px">ผู้หยิบที่ทำงานอยู่</div><div style="font-size:30px;font-weight:700;line-height:1">78</div><div style="font-size:11.5px;color:#6B7280;margin-top:6px">4,320 pcs/hr avg</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:16px;flex:1;min-height:0">
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:14px"><span style="font-size:14px;font-weight:700">Zone Status</span><span style="font-size:11.5px;color:#6B7280">สถานะโซน · Orders Touching Zone (non-additive)</span><a href="#2b" style="margin-left:auto;font-size:12px;color:#2563EB;text-decoration:none">Zone Dashboard →</a></div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
+            <div style="border:1px solid #E5E7EB;border-radius:10px;padding:12px;border-top:3px solid #16A34A"><div style="font-size:12px;font-weight:700">Zone A</div><div style="font-size:22px;font-weight:700;line-height:1.3">620</div><div style="font-size:11px;color:#6B7280">orders touching</div><div style="font-size:11px;margin-top:6px;color:#16A34A;font-weight:500">On track · 82.3% SLA</div></div>
+            <div style="border:1px solid #E5E7EB;border-radius:10px;padding:12px;border-top:3px solid #16A34A"><div style="font-size:12px;font-weight:700">Zone B</div><div style="font-size:22px;font-weight:700;line-height:1.3">510</div><div style="font-size:11px;color:#6B7280">orders touching</div><div style="font-size:11px;margin-top:6px;color:#16A34A;font-weight:500">On track · 90.1% SLA</div></div>
+            <div style="border:1px solid #E5E7EB;border-radius:10px;padding:12px;border-top:3px solid #16A34A"><div style="font-size:12px;font-weight:700">Zone C</div><div style="font-size:22px;font-weight:700;line-height:1.3">430</div><div style="font-size:11px;color:#6B7280">orders touching</div><div style="font-size:11px;margin-top:6px;color:#16A34A;font-weight:500">On track · 94.2% SLA</div></div>
+            <div style="border:1px solid #E5E7EB;border-radius:10px;padding:12px;border-top:3px solid #F59E0B"><div style="font-size:12px;font-weight:700">Zone D</div><div style="font-size:22px;font-weight:700;line-height:1.3">280</div><div style="font-size:11px;color:#6B7280">orders touching</div><div style="font-size:11px;margin-top:6px;color:#B45309;font-weight:500">At risk · +1h 00m</div></div>
+            <div style="border:1px solid #E5E7EB;border-radius:10px;padding:12px;border-top:3px solid #16A34A"><div style="font-size:12px;font-weight:700">Zone E</div><div style="font-size:22px;font-weight:700;line-height:1.3">80</div><div style="font-size:11px;color:#6B7280">orders touching</div><div style="font-size:11px;margin-top:6px;color:#16A34A;font-weight:500">On track · 91.7% SLA</div></div>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin:20px 0 12px"><span style="font-size:14px;font-weight:700">Order Status Breakdown</span><span style="font-size:11.5px;color:#6B7280">Total 1,920 orders from Order Core</span></div>
+          <div style="display:flex;height:14px;border-radius:7px;overflow:hidden">
+            <span style="width:6.3%;background:#9CA3AF"></span><span style="width:4.1%;background:#2563EB"></span><span style="width:33.4%;background:#16A34A"></span><span style="width:2.6%;background:#F59E0B"></span><span style="width:53.6%;background:#A7F3D0"></span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-top:12px;font-size:12px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:2px;background:#9CA3AF"></span>Unassigned<span style="margin-left:auto;font-weight:700">120</span><span style="color:#6B7280">6.3%</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:2px;background:#2563EB"></span>In Progress<span style="margin-left:auto;font-weight:700">78</span><span style="color:#6B7280">4.1%</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:2px;background:#16A34A"></span>Picker Completed<span style="margin-left:auto;font-weight:700">642</span><span style="color:#6B7280">33.4%</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:2px;background:#F59E0B"></span>Waiting Verify<span style="margin-left:auto;font-weight:700">50</span><span style="color:#6B7280">2.6%</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:2px;background:#A7F3D0"></span>Final Closed<span style="margin-left:auto;font-weight:700">1,030</span><span style="color:#6B7280">53.6%</span></div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column">
+          <div style="font-size:14px;font-weight:700">Today's Picker Productivity</div>
+          <div style="font-size:11.5px;color:#6B7280;margin-bottom:12px">ผลิตภาพผู้หยิบสินค้า · pieces per hour</div>
+          <div style="display:flex;flex-direction:column;gap:11px;font-size:12.5px">
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:74px">P002 Anucha</span><span style="height:10px;border-radius:5px;background:#16A34A;width:100px"></span><span style="font-weight:700;margin-left:auto">2,215</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:74px">P006 Ploy</span><span style="height:10px;border-radius:5px;background:#16A34A;width:92px"></span><span style="font-weight:700;margin-left:auto">2,040</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:74px">P014 Nid</span><span style="height:10px;border-radius:5px;background:#16A34A;width:81px"></span><span style="font-weight:700;margin-left:auto">1,800</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:74px">P008 Wichai</span><span style="height:10px;border-radius:5px;background:#F59E0B;width:61px"></span><span style="font-weight:700;margin-left:auto">1,350</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:74px">P017 Somchai</span><span style="height:10px;border-radius:5px;background:#DC2626;width:41px"></span><span style="font-weight:700;margin-left:auto">900</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:74px">P010 Techin</span><span style="height:10px;border-radius:5px;background:#DC2626;width:31px"></span><span style="font-weight:700;margin-left:auto">687</span></div>
+          </div>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px dashed #E5E7EB;font-size:11.5px;color:#6B7280">Target 4,500 pcs/hr · green ≥ target, yellow within 30%, red below</div>
+          <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="background:#F9FAFB;border-radius:8px;padding:10px 12px"><div style="font-size:11px;color:#6B7280">Picking SLA</div><div style="font-size:19px;font-weight:700;color:#16A34A">86.5%</div><div style="font-size:10.5px;color:#6B7280">target ≥ 90%</div></div>
+            <div style="background:#F9FAFB;border-radius:8px;padding:10px 12px"><div style="font-size:11px;color:#6B7280">Avg cycle time</div><div style="font-size:19px;font-weight:700">00:43</div><div style="font-size:10.5px;color:#6B7280">target ≤ 60 min</div></div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column">
+          <div style="font-size:14px;font-weight:700">Action Required</div>
+          <div style="font-size:11.5px;color:#6B7280;margin-bottom:12px">รายการที่ต้องดำเนินการ</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px;border:1px solid #FECACA;background:#FEF2F2;border-radius:8px;padding:10px 12px"><span style="width:22px;height:22px;border-radius:6px;background:#DC2626;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none">!</span><div style="flex:1"><div style="font-size:12.5px;font-weight:500">Critical orders in Zone A</div><div style="font-size:11px;color:#6B7280">เกิน threshold วิกฤต</div></div><span style="font-size:17px;font-weight:700;color:#DC2626">11</span></div>
+            <div style="display:flex;align-items:center;gap:10px;border:1px solid #FED7AA;background:#FFFBEB;border-radius:8px;padding:10px 12px"><span style="width:22px;height:22px;border-radius:6px;background:#F59E0B;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none">⌛</span><div style="flex:1"><div style="font-size:12.5px;font-weight:500">Overdue orders</div><div style="font-size:11px;color:#6B7280">เกิน 1 ชั่วโมง</div></div><span style="font-size:17px;font-weight:700;color:#B45309">38</span></div>
+            <div style="display:flex;align-items:center;gap:10px;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px"><span style="width:22px;height:22px;border-radius:6px;background:#7C3AED;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none">◇</span><div style="flex:1"><div style="font-size:12.5px;font-weight:500">Batch split needed</div><div style="font-size:11px;color:#6B7280">ต้องแยกแบตช์</div></div><span style="font-size:17px;font-weight:700">12</span></div>
+            <div style="display:flex;align-items:center;gap:10px;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px"><span style="width:22px;height:22px;border-radius:6px;background:#2563EB;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none">✓</span><div style="flex:1"><div style="font-size:12.5px;font-weight:500">Waiting admin verification</div><div style="font-size:11px;color:#6B7280">รอตรวจสอบ</div></div><span style="font-size:17px;font-weight:700">50</span></div>
+            <div style="display:flex;align-items:center;gap:10px;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px"><span style="width:22px;height:22px;border-radius:6px;background:#6B7280;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none">✕</span><div style="flex:1"><div style="font-size:12.5px;font-weight:500">Invalid Bin Code in error queue</div><div style="font-size:11px;color:#6B7280">Location Master ยังไม่พร้อม</div></div><span style="font-size:17px;font-weight:700">7</span></div>
+          </div>
+          <div style="margin-top:auto;padding-top:12px;font-size:11.5px;color:#6B7280;line-height:1.6">Every KPI card drills down to the filtered order list. Filters persist while you stay inside the module.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2c">
+<div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Control Tower · §14.2, productivity and backlog focus</div>
+<div class="dv-card" style="width:1440px">
+<div style="display:flex;height:900px;background:#F5F6F8;font-family:'Noto Sans Thai',Arial,sans-serif;color:#1F2937;font-size:14px">
+  <dc-import name="OMS Nav" active="{{ 10 }}" hint-size="240px,900px"></dc-import>
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="height:64px;flex:none;background:#fff;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;gap:16px;padding:0 24px">
+      <div><div style="font-size:17px;font-weight:700;line-height:1.2">Control Tower</div><div style="font-size:11.5px;color:#6B7280">ศูนย์ควบคุม · ข้อมูล ณ 10:30 น.</div></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px">
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 12px"><span style="font-weight:500">27/08/2026</span><span style="color:#6B7280;font-size:11px">▾</span></div>
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 12px"><span style="font-weight:500">Today</span><span style="color:#6B7280;font-size:11px">▾</span></div>
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;padding:0 12px;color:#374151">Filters</div>
+      </div>
+    </div>
+
+    <div style="flex:1;overflow:hidden;padding:18px 24px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px">
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10px;letter-spacing:.06em;color:#6B7280;font-weight:700">TOTAL ORDERS</div><div style="font-size:28px;font-weight:700;line-height:1.2">1,920</div><div style="font-size:11px;color:#6B7280">New 1,800 · Backlog 120</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10px;letter-spacing:.06em;color:#6B7280;font-weight:700">TOTAL BACKLOG</div><div style="font-size:28px;font-weight:700;line-height:1.2;color:#F59E0B">185</div><div style="font-size:11px;color:#6B7280">Picking 135 · Verify 50</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10px;letter-spacing:.06em;color:#6B7280;font-weight:700">TOTAL PIECES (PLAN)</div><div style="font-size:28px;font-weight:700;line-height:1.2">119,560</div><div style="font-size:11px;color:#6B7280">unique order count</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10px;letter-spacing:.06em;color:#6B7280;font-weight:700">PIECES PICKED</div><div style="font-size:28px;font-weight:700;line-height:1.2;color:#16A34A">72,480</div><div style="font-size:11px;color:#16A34A">60.6% of plan</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10px;letter-spacing:.06em;color:#6B7280;font-weight:700">PICKER IN PROGRESS</div><div style="font-size:28px;font-weight:700;line-height:1.2">78</div><div style="font-size:11px;color:#6B7280">orders</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10px;letter-spacing:.06em;color:#6B7280;font-weight:700">PICKER COMPLETED</div><div style="font-size:28px;font-weight:700;line-height:1.2">642</div><div style="font-size:11px;color:#6B7280">100% 598 · short 44</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px">
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px;border-left:3px solid #F59E0B"><div style="font-size:10px;letter-spacing:.06em;color:#B45309;font-weight:700">WARNING ORDERS</div><div style="font-size:28px;font-weight:700;line-height:1.2;color:#B45309">56</div><div style="font-size:11px;color:#6B7280">2.9% of orders</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px;border-left:3px solid #EA580C"><div style="font-size:10px;letter-spacing:.06em;color:#C2410C;font-weight:700">OVERDUE ORDERS</div><div style="font-size:28px;font-weight:700;line-height:1.2;color:#C2410C">38</div><div style="font-size:11px;color:#6B7280">2.0% of orders</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px;border-left:3px solid #DC2626"><div style="font-size:10px;letter-spacing:.06em;color:#DC2626;font-weight:700">CRITICAL ORDERS</div><div style="font-size:28px;font-weight:700;line-height:1.2;color:#DC2626">11</div><div style="font-size:11px;color:#6B7280">0.6% of orders</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10px;letter-spacing:.06em;color:#6B7280;font-weight:700">PICKING SLA</div><div style="font-size:28px;font-weight:700;line-height:1.2;color:#2563EB">86.5%</div><div style="font-size:11px;color:#6B7280">target ≥ 90%</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10px;letter-spacing:.06em;color:#6B7280;font-weight:700">AVG CYCLE / ORDER</div><div style="font-size:28px;font-weight:700;line-height:1.2">00:43</div><div style="font-size:11px;color:#6B7280">target ≤ 60 min</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10px;letter-spacing:.06em;color:#6B7280;font-weight:700">PIECES PER HOUR</div><div style="font-size:28px;font-weight:700;line-height:1.2">4,320</div><div style="font-size:11px;color:#6B7280">78 active pickers</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:14px;flex:1;min-height:0">
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;min-height:0">
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px"><span style="font-size:14px;font-weight:700">Zone Overview</span><span style="font-size:11.5px;color:#6B7280">Orders Touching Zone — do not sum across zones</span></div>
+          <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr style="text-align:left;color:#6B7280;font-size:10.5px;letter-spacing:.05em">
+              <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ZONE</th>
+              <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ORDERS</th>
+              <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">BACKLOG P/V</th>
+              <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">IN PROGRESS</th>
+              <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">COMPLETED</th>
+              <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">SLA</th>
+              <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">EST. COMPLETION</th>
+            </tr></thead>
+            <tbody>
+              <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">A</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">620</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">72 / 18</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">25</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">220</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">82.3%</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FEF2F2;color:#B91C1C;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">DELAY +2h 10m</span></td></tr>
+              <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">B</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">510</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">40 / 12</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">18</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">198</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">90.1%</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F0FDF4;color:#15803D;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">ON TRACK +25m</span></td></tr>
+              <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">C</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">430</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">15 / 8</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">14</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">175</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">94.2%</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F0FDF4;color:#15803D;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">ON TRACK −1h 05m</span></td></tr>
+              <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">D</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">280</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">8 / 6</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">10</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">122</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">88.4%</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FFFBEB;color:#B45309;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">AT RISK +1h 00m</span></td></tr>
+              <tr><td style="padding:9px 6px;font-weight:700">E</td><td style="padding:9px 6px">80</td><td style="padding:9px 6px">0 / 6</td><td style="padding:9px 6px">5</td><td style="padding:9px 6px">45</td><td style="padding:9px 6px">91.7%</td><td style="padding:9px 6px"><span style="background:#F0FDF4;color:#15803D;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">ON TRACK −35m</span></td></tr>
+            </tbody>
+          </table>
+          <div style="display:flex;align-items:baseline;gap:8px;margin:18px 0 10px"><span style="font-size:14px;font-weight:700">Top Overdue Orders</span><span style="font-size:11.5px;color:#6B7280">ordered by elapsed time</span><a href="#2c" style="margin-left:auto;font-size:12px;color:#2563EB;text-decoration:none">View all →</a></div>
+          <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr style="text-align:left;color:#6B7280;font-size:10.5px;letter-spacing:.05em">
+              <th style="padding:7px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ORDER NO.</th><th style="padding:7px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ZONES</th><th style="padding:7px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">PICKER</th><th style="padding:7px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ASSIGNED</th><th style="padding:7px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ELAPSED</th><th style="padding:7px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">STATUS</th>
+            </tr></thead>
+            <tbody>
+              <tr><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0456</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">A, C</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">P010 Techin</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">07:45</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">02:45</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FEF2F2;color:#B91C1C;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">Critical</span></td></tr>
+              <tr><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0450</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">A</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">P005 Maneerat</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">08:00</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">02:30</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FEF2F2;color:#B91C1C;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">Critical</span></td></tr>
+              <tr><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0433</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">A, B, D</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">P002 Anucha</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">07:50</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6">02:20</td><td style="padding:8px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FFFBEB;color:#B45309;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">Overdue</span></td></tr>
+              <tr><td style="padding:8px 6px;color:#2563EB">ORD260827-0412</td><td style="padding:8px 6px">D</td><td style="padding:8px 6px">P017 Somchai</td><td style="padding:8px 6px">08:10</td><td style="padding:8px 6px">02:05</td><td style="padding:8px 6px"><span style="background:#FFFBEB;color:#B45309;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">Overdue</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;min-height:0">
+          <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:14px"><span style="font-size:14px;font-weight:700">Zone Performance</span><span style="font-size:11.5px;color:#6B7280">pieces per hour · target 4,500</span></div>
+            <div style="position:relative;height:132px;display:flex;align-items:flex-end;gap:14px;padding-top:10px">
+              <div style="position:absolute;left:0;right:0;bottom:calc(18px + 84%*0.78);border-top:1px dashed #2563EB"></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"><span style="font-size:11px;font-weight:700">3,250</span><span style="width:100%;height:66px;background:#DC2626;border-radius:4px 4px 0 0"></span><span style="font-size:11px;color:#6B7280">Zone A</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"><span style="font-size:11px;font-weight:700">4,860</span><span style="width:100%;height:98px;background:#16A34A;border-radius:4px 4px 0 0"></span><span style="font-size:11px;color:#6B7280">Zone B</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"><span style="font-size:11px;font-weight:700">4,980</span><span style="width:100%;height:101px;background:#16A34A;border-radius:4px 4px 0 0"></span><span style="font-size:11px;color:#6B7280">Zone C</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"><span style="font-size:11px;font-weight:700">3,780</span><span style="width:100%;height:77px;background:#F59E0B;border-radius:4px 4px 0 0"></span><span style="font-size:11px;color:#6B7280">Zone D</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"><span style="font-size:11px;font-weight:700">4,520</span><span style="width:100%;height:92px;background:#16A34A;border-radius:4px 4px 0 0"></span><span style="font-size:11px;color:#6B7280">Zone E</span></div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;flex:1;min-height:0;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px"><span style="font-size:14px;font-weight:700">Alerts &amp; Notifications</span><span style="font-size:11.5px;color:#6B7280">การแจ้งเตือน</span></div>
+            <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px">
+              <div style="display:flex;gap:10px"><span style="width:8px;height:8px;border-radius:50%;background:#DC2626;margin-top:5px;flex:none"></span><div style="flex:1">11 Critical orders in Zone A<div style="font-size:11px;color:#6B7280">ต้องแก้ไขทันที</div></div><span style="color:#6B7280;font-size:11px">10:28</span></div>
+              <div style="display:flex;gap:10px"><span style="width:8px;height:8px;border-radius:50%;background:#DC2626;margin-top:5px;flex:none"></span><div style="flex:1">38 Overdue orders (เกิน 1 ชั่วโมง)</div><span style="color:#6B7280;font-size:11px">10:26</span></div>
+              <div style="display:flex;gap:10px"><span style="width:8px;height:8px;border-radius:50%;background:#F59E0B;margin-top:5px;flex:none"></span><div style="flex:1">Zone A trending to miss cut-off (delay 2h 10m)</div><span style="color:#6B7280;font-size:11px">10:20</span></div>
+              <div style="display:flex;gap:10px"><span style="width:8px;height:8px;border-radius:50%;background:#F59E0B;margin-top:5px;flex:none"></span><div style="flex:1">Picker P010 has one order over 2 hours</div><span style="color:#6B7280;font-size:11px">10:18</span></div>
+              <div style="display:flex;gap:10px"><span style="width:8px;height:8px;border-radius:50%;background:#2563EB;margin-top:5px;flex:none"></span><div style="flex:1">Verification backlog 50 orders · รอนานกว่า 30 นาที</div><span style="color:#6B7280;font-size:11px">10:15</span></div>
+              <div style="display:flex;gap:10px"><span style="width:8px;height:8px;border-radius:50%;background:#7C3AED;margin-top:5px;flex:none"></span><div style="flex:1">Weekly productivity export to Google Sheets succeeded</div><span style="color:#6B7280;font-size:11px">06:00</span></div>
+            </div>
+            <div style="margin-top:auto;padding-top:12px;font-size:11.5px;color:#6B7280">Total Backlog = Picking Backlog + Verification Backlog, always shown separately.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2d">
+<div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Work Assignment · workload meter and confirmation (timer starts on confirm)</div>
+<div class="dv-card" style="width:1440px">
+<div style="position:relative;display:flex;height:900px;background:#F5F6F8;font-family:'Noto Sans Thai',Arial,sans-serif;color:#1F2937;font-size:14px;overflow:hidden">
+  <dc-import name="OMS Nav" active="{{ 7 }}" hint-size="240px,900px"></dc-import>
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="height:64px;flex:none;background:#fff;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;gap:16px;padding:0 24px">
+      <div><div style="font-size:17px;font-weight:700;line-height:1.2">Work Assignment</div><div style="font-size:11.5px;color:#6B7280">มอบหมายงาน · Assignment Batch #AB-260827-014</div></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px">
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 12px"><span style="color:#6B7280">Scan order</span><span style="color:#9CA3AF">| ORD…</span></div>
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;padding:0 12px">Zone: All ▾</div>
+      </div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:20px 24px;display:grid;grid-template-columns:1fr 380px;gap:16px">
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;min-height:0">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <span style="font-size:14px;font-weight:700">Unassigned Order Pool</span>
+          <span style="font-size:11.5px;color:#6B7280">120 orders · New + Backlog</span>
+          <span style="margin-left:auto;display:flex;gap:6px">
+            <span style="font-size:11.5px;background:#EFF6FF;color:#1D4ED8;border-radius:20px;padding:4px 10px">Zone A ✕</span>
+            <span style="font-size:11.5px;background:#F5F3FF;color:#6D28D9;border-radius:20px;padding:4px 10px">Consolidation BATCH-260827-004 ✕</span>
+            <span style="font-size:11.5px;color:#2563EB;padding:4px 4px">Clear</span>
+          </span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr style="text-align:left;color:#6B7280;font-size:10.5px;letter-spacing:.05em">
+            <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;width:28px"><span style="display:inline-block;width:15px;height:15px;border:1px solid #D1D5DB;border-radius:4px"></span></th>
+            <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ORDER NO.</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">STORE</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ORDER DATE</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ZONES TOUCHED</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">UNIQUE SKU</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">PLANNED PCS</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">SOURCE</th>
+          </tr></thead>
+          <tbody>
+            <tr style="background:#FEF2F2"><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="display:inline-block;width:15px;height:15px;border-radius:4px;background:#D71920;color:#fff;font-size:10px;text-align:center;line-height:15px">✓</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0512</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">ST-104</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">26 Aug</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">A, C</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">14</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">96</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F5F3FF;color:#6D28D9;border-radius:5px;padding:2px 7px;font-size:11px">Consolidation</span></td></tr>
+            <tr style="background:#FEF2F2"><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="display:inline-block;width:15px;height:15px;border-radius:4px;background:#D71920;color:#fff;font-size:10px;text-align:center;line-height:15px">✓</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0514</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">ST-104</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">26 Aug</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">A</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">11</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">72</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F5F3FF;color:#6D28D9;border-radius:5px;padding:2px 7px;font-size:11px">Consolidation</span></td></tr>
+            <tr style="background:#FEF2F2"><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="display:inline-block;width:15px;height:15px;border-radius:4px;background:#D71920;color:#fff;font-size:10px;text-align:center;line-height:15px">✓</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0518</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">ST-217</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">26 Aug</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">A, B</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">9</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">84</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F3F4F6;color:#374151;border-radius:5px;padding:2px 7px;font-size:11px">Single</span></td></tr>
+            <tr style="background:#FEF2F2"><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="display:inline-block;width:15px;height:15px;border-radius:4px;background:#D71920;color:#fff;font-size:10px;text-align:center;line-height:15px">✓</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0521</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">ST-311</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">26 Aug</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">C</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">7</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">60</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F3F4F6;color:#374151;border-radius:5px;padding:2px 7px;font-size:11px">Single</span></td></tr>
+            <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="display:inline-block;width:15px;height:15px;border:1px solid #D1D5DB;border-radius:4px"></span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0524</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">ST-311</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">26 Aug</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">B, D</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">18</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">132</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F3F4F6;color:#374151;border-radius:5px;padding:2px 7px;font-size:11px">Single</span></td></tr>
+            <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="display:inline-block;width:15px;height:15px;border:1px solid #D1D5DB;border-radius:4px"></span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0529</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">ST-402</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">26 Aug</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">A, C, E</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">22</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">148</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F5F3FF;color:#6D28D9;border-radius:5px;padding:2px 7px;font-size:11px">Consolidation</span></td></tr>
+            <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="display:inline-block;width:15px;height:15px;border:1px solid #D1D5DB;border-radius:4px"></span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0533</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">ST-402</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">25 Aug</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">D</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">5</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">40</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FFFBEB;color:#B45309;border-radius:5px;padding:2px 7px;font-size:11px">Backlog D-2</span></td></tr>
+            <tr><td style="padding:9px 6px"><span style="display:inline-block;width:15px;height:15px;border:1px solid #D1D5DB;border-radius:4px"></span></td><td style="padding:9px 6px;color:#2563EB">ORD260827-0537</td><td style="padding:9px 6px">ST-508</td><td style="padding:9px 6px">26 Aug</td><td style="padding:9px 6px">B</td><td style="padding:9px 6px">12</td><td style="padding:9px 6px;font-weight:700">88</td><td style="padding:9px 6px"><span style="background:#F3F4F6;color:#374151;border-radius:5px;padding:2px 7px;font-size:11px">Single</span></td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:auto;padding-top:14px;display:flex;align-items:center;font-size:12px;color:#6B7280"><span>Rows per page 10 ▾ · 1–8 of 120</span><span style="margin-left:auto;display:flex;gap:6px"><span style="width:26px;height:26px;border:1px solid #E5E7EB;border-radius:6px;display:flex;align-items:center;justify-content:center">‹</span><span style="width:26px;height:26px;border-radius:6px;background:#D71920;color:#fff;display:flex;align-items:center;justify-content:center">1</span><span style="width:26px;height:26px;border:1px solid #E5E7EB;border-radius:6px;display:flex;align-items:center;justify-content:center">2</span><span style="width:26px;height:26px;border:1px solid #E5E7EB;border-radius:6px;display:flex;align-items:center;justify-content:center">›</span></span></div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;min-height:0">
+        <div style="font-size:14px;font-weight:700">Assignment Summary</div>
+        <div style="font-size:11.5px;color:#6B7280;margin-bottom:14px">สรุปการมอบหมายงาน</div>
+        <div style="margin-bottom:6px;font-size:12px;color:#374151;font-weight:500">Planned pieces <span style="color:#6B7280;font-weight:400">/ จำนวนชิ้นตามแผน</span></div>
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:34px;font-weight:700;color:#B45309">312</span><span style="font-size:12.5px;color:#6B7280">of 300 target · 4 orders</span></div>
+        <div style="height:10px;border-radius:5px;background:#F3F4F6;overflow:hidden;margin:10px 0 8px;display:flex"><span style="width:82%;background:#F59E0B"></span><span style="width:5%;background:#FDE68A"></span></div>
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#6B7280;margin-bottom:8px"><span>Low &lt;270</span><span>Target 270–300</span><span>Acceptable 301–330</span><span>Over &gt;330</span></div>
+        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400E;line-height:1.55">Acceptable Over — 12 pieces above target. Thresholds are configuration-driven (§12.1).</div>
+
+        <div style="margin-top:16px;font-size:12px;color:#374151;font-weight:500;margin-bottom:6px">Assign to picker <span style="color:#DC2626">*</span></div>
+        <div style="height:44px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;gap:10px;padding:0 12px"><span style="width:26px;height:26px;border-radius:50%;background:#F3F4F6;flex:none"></span><span style="font-size:13px;flex:1">P002 · Anucha T. <span style="color:#6B7280">(idle 6m)</span></span><span style="color:#6B7280;font-size:11px">▾</span></div>
+
+        <div style="margin-top:16px;font-size:12px;color:#374151;font-weight:500;margin-bottom:8px">Zones touched</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px">
+          <span style="background:#EFF6FF;color:#1D4ED8;border-radius:20px;padding:4px 10px">Zone A · 168 pcs</span>
+          <span style="background:#EFF6FF;color:#1D4ED8;border-radius:20px;padding:4px 10px">Zone B · 60 pcs</span>
+          <span style="background:#EFF6FF;color:#1D4ED8;border-radius:20px;padding:4px 10px">Zone C · 84 pcs</span>
+        </div>
+        <div style="font-size:11.5px;color:#6B7280;margin-top:8px;line-height:1.55">Cross-zone assignment is allowed. Productivity stays at Order level; zones are line-level contribution.</div>
+
+        <div style="margin-top:16px;font-size:12px;color:#374151;font-weight:500;margin-bottom:8px">Selected orders</div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px">
+          <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid #F3F4F6"><span>ORD260827-0512</span><span style="color:#6B7280">96 pcs</span></div>
+          <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid #F3F4F6"><span>ORD260827-0514</span><span style="color:#6B7280">72 pcs</span></div>
+          <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid #F3F4F6"><span>ORD260827-0518</span><span style="color:#6B7280">84 pcs</span></div>
+          <div style="display:flex;justify-content:space-between"><span>ORD260827-0521</span><span style="color:#6B7280">60 pcs</span></div>
+        </div>
+        <div style="margin-top:auto;padding-top:16px;display:flex;flex-direction:column;gap:8px">
+          <button style="height:46px;border:0;border-radius:8px;background:#D71920;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer" style-hover="background:#A50F15">Confirm Assignment · เริ่มจับเวลา</button>
+          <button style="height:40px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;color:#374151;font-family:inherit;font-size:13px;cursor:pointer" style-hover="background:#F9FAFB">Clear selection</button>
+          <div style="font-size:11px;color:#6B7280;text-align:center">Timer starts only on Admin confirm. Pickers do not scan to accept work.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center">
+    <div style="width:520px;background:#fff;border-radius:12px;box-shadow:0 20px 48px rgba(16,24,40,.24);overflow:hidden">
+      <div style="padding:22px 24px 0"><div style="font-size:18px;font-weight:700">Confirm assignment?</div><div style="font-size:12.5px;color:#6B7280">ยืนยันการมอบหมายงาน</div></div>
+      <div style="padding:16px 24px 0;font-size:13.5px;color:#374151;line-height:1.7">
+        4 orders · 312 planned pieces to <strong>P002 Anucha T.</strong> The Order timer and cycle-time KPI start at confirm; admin waiting time before this point is not counted in picker productivity.
+      </div>
+      <div style="margin:16px 24px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;font-size:12.5px">
+        <div><span style="color:#6B7280">Assignment Batch</span><div style="font-weight:700">AB-260827-014</div></div>
+        <div><span style="color:#6B7280">Workload level</span><div style="font-weight:700;color:#B45309">Acceptable Over (312)</div></div>
+        <div><span style="color:#6B7280">Linked consolidation</span><div style="font-weight:700">BATCH-260827-004</div></div>
+        <div><span style="color:#6B7280">Zones touched</span><div style="font-weight:700">A, B, C</div></div>
+      </div>
+      <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end">
+        <button style="height:44px;min-width:110px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;color:#374151;font-family:inherit;font-size:14px;cursor:pointer">Cancel</button>
+        <button style="height:44px;min-width:190px;border:0;border-radius:8px;background:#D71920;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">Confirm &amp; start timer</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2e">
+<div class="dv-olabel"><a class="dv-oid" href="#2e">2e</a>Admin verification · short pick review, reject needs a reason</div>
+<div class="dv-card" style="width:1440px">
+<div style="position:relative;display:flex;height:900px;background:#F5F6F8;font-family:'Noto Sans Thai',Arial,sans-serif;color:#1F2937;font-size:14px;overflow:hidden">
+  <dc-import name="OMS Nav" active="{{ 8 }}" hint-size="240px,900px"></dc-import>
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="height:64px;flex:none;background:#fff;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;gap:16px;padding:0 24px">
+      <div><div style="font-size:17px;font-weight:700;line-height:1.2">Waiting Admin Verification</div><div style="font-size:11.5px;color:#6B7280">รอตรวจสอบ · 50 orders · verification backlog</div></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px">
+        <span style="background:#FFFBEB;color:#B45309;border-radius:20px;padding:6px 12px;font-weight:500">Oldest wait 34m</span>
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;padding:0 12px">Picker: All ▾</div>
+      </div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:20px 24px;display:grid;grid-template-columns:1fr 440px;gap:16px">
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;min-height:0">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:14px;font-weight:700">Verification queue</span><span style="font-size:11.5px;color:#6B7280">sorted by wait time</span></div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr style="text-align:left;color:#6B7280;font-size:10.5px;letter-spacing:.05em">
+            <th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ORDER NO.</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">PICKER</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">CLOSED</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">CYCLE</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">PLAN / ACTUAL</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">RESULT</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">WAIT</th>
+          </tr></thead>
+          <tbody>
+            <tr style="background:#FEF2F2"><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6;font-weight:700;color:#B91C1C">ORD260827-0498</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">P002 Anucha</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">10:04</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">00:38</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">96 / 90</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FFFBEB;color:#B45309;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">Short 6</span></td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">34m</td></tr>
+            <tr><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0495</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">P006 Ploy</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">10:08</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">00:41</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">84 / 84</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F0FDF4;color:#15803D;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">100%</span></td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">30m</td></tr>
+            <tr><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0491</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">P014 Nid</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">10:12</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">00:52</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">132 / 120</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FFFBEB;color:#B45309;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">Short 12</span></td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">26m</td></tr>
+            <tr><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0489</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">P008 Wichai</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">10:15</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">00:47</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">60 / 60</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F0FDF4;color:#15803D;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">100%</span></td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">23m</td></tr>
+            <tr><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6;color:#2563EB">ORD260827-0486</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">P017 Somchai</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">10:19</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">01:12</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">148 / 131</td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FFFBEB;color:#B45309;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">Short 17</span></td><td style="padding:10px 6px;border-bottom:1px solid #F3F4F6">19m</td></tr>
+            <tr><td style="padding:10px 6px;color:#2563EB">ORD260827-0480</td><td style="padding:10px 6px">P010 Techin</td><td style="padding:10px 6px">10:24</td><td style="padding:10px 6px">00:29</td><td style="padding:10px 6px">40 / 40</td><td style="padding:10px 6px"><span style="background:#F0FDF4;color:#15803D;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">100%</span></td><td style="padding:10px 6px">14m</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px dashed #E5E7EB;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div style="background:#F9FAFB;border-radius:8px;padding:12px 14px"><div style="font-size:11px;color:#6B7280">Verification backlog</div><div style="font-size:21px;font-weight:700;color:#F59E0B">50</div><div style="font-size:10.5px;color:#6B7280">orders waiting</div></div>
+          <div style="background:#F9FAFB;border-radius:8px;padding:12px 14px"><div style="font-size:11px;color:#6B7280">Short pick rate</div><div style="font-size:21px;font-weight:700">6.9%</div><div style="font-size:10.5px;color:#6B7280">44 of 642 completed</div></div>
+          <div style="background:#F9FAFB;border-radius:8px;padding:12px 14px"><div style="font-size:11px;color:#6B7280">Rejected today</div><div style="font-size:21px;font-weight:700">3</div><div style="font-size:10.5px;color:#6B7280">correction in progress</div></div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;min-height:0">
+        <div style="display:flex;align-items:flex-start;gap:8px"><div><div style="font-size:15px;font-weight:700">ORD260827-0498</div><div style="font-size:11.5px;color:#6B7280">ST-104 · order date 26 Aug · zones A, C</div></div><span style="margin-left:auto;background:#FFFBEB;color:#B45309;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500">Picker Completed Short</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 16px;font-size:12.5px">
+          <div style="background:#F9FAFB;border-radius:8px;padding:10px 12px"><span style="color:#6B7280;font-size:11px">Assigned → completed</span><div style="font-weight:700">09:26 → 10:04 (00:38)</div></div>
+          <div style="background:#F9FAFB;border-radius:8px;padding:10px 12px"><span style="color:#6B7280;font-size:11px">Actual pcs / hour</span><div style="font-weight:700">142 pcs/hr</div></div>
+        </div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:8px">Short pick detail <span style="color:#6B7280;font-weight:400">/ รายละเอียดหยิบขาด</span></div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="text-align:left;color:#6B7280;font-size:10.5px"><th style="padding:6px 4px;border-bottom:1px solid #E5E7EB;font-weight:700">SKU</th><th style="padding:6px 4px;border-bottom:1px solid #E5E7EB;font-weight:700">BIN</th><th style="padding:6px 4px;border-bottom:1px solid #E5E7EB;font-weight:700">PLAN</th><th style="padding:6px 4px;border-bottom:1px solid #E5E7EB;font-weight:700">ACTUAL</th><th style="padding:6px 4px;border-bottom:1px solid #E5E7EB;font-weight:700">SHORT</th><th style="padding:6px 4px;border-bottom:1px solid #E5E7EB;font-weight:700">REASON</th></tr></thead>
+          <tbody>
+            <tr><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">A001</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">B015</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">5</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">5</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">0</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6;color:#6B7280">—</td></tr>
+            <tr><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">A001</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">R020</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">10</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">6</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6;color:#B45309;font-weight:700">4</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">Stock not found</td></tr>
+            <tr><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">A118</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">C-21-4</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">8</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">6</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6;color:#B45309;font-weight:700">2</td><td style="padding:8px 4px;border-bottom:1px solid #F3F4F6">Damaged</td></tr>
+            <tr><td style="padding:8px 4px">A204</td><td style="padding:8px 4px">C-23-1</td><td style="padding:8px 4px">73</td><td style="padding:8px 4px">73</td><td style="padding:8px 4px">0</td><td style="padding:8px 4px;color:#6B7280">—</td></tr>
+          </tbody>
+        </table>
+        <div style="font-size:11.5px;color:#6B7280;margin-top:10px;line-height:1.6">Same SKU from two Bin Codes stays two lines — WMS assigned two real pick locations.</div>
+        <div style="margin-top:14px;background:#F9FAFB;border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.6"><span style="color:#6B7280">Picker remark</span><div>ของหมดในบิน R020 แจ้งหัวหน้ากะแล้ว</div></div>
+        <div style="margin-top:auto;padding-top:16px;display:flex;gap:10px">
+          <button style="flex:1;height:46px;border:0;border-radius:8px;background:#16A34A;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">Final Close Short</button>
+          <button style="flex:1;height:46px;border:1px solid #FCA5A5;border-radius:8px;background:#fff;color:#DC2626;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">Reject for correction</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center">
+    <div style="width:520px;background:#fff;border-radius:12px;box-shadow:0 20px 48px rgba(16,24,40,.24)">
+      <div style="padding:22px 24px 0"><div style="font-size:18px;font-weight:700">Reject ORD260827-0498 for correction?</div><div style="font-size:12.5px;color:#6B7280">ส่งกลับเพื่อแก้ไข</div></div>
+      <div style="padding:14px 24px 0;font-size:13.5px;color:#374151;line-height:1.7">The order returns to <strong>Correction in Progress</strong> and stays in the picker's queue. A reason is required and is written to the audit trail with your user ID.</div>
+      <div style="padding:16px 24px 0">
+        <div style="font-size:12px;font-weight:500;margin-bottom:6px">Reason <span style="color:#DC2626">*</span></div>
+        <div style="height:44px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:13.5px"><span>Short quantity not verified at bin</span><span style="color:#6B7280;font-size:11px">▾</span></div>
+        <div style="font-size:12px;font-weight:500;margin:14px 0 6px">Remark to picker</div>
+        <div style="min-height:76px;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;font-size:13.5px;color:#374151;line-height:1.6">กรุณาตรวจนับที่บิน R020 อีกครั้งและถ่ายรูปแนบ</div>
+      </div>
+      <div style="padding:18px 24px 22px;display:flex;gap:10px;justify-content:flex-end">
+        <button style="height:44px;min-width:110px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;color:#374151;font-family:inherit;font-size:14px;cursor:pointer">Cancel</button>
+        <button style="height:44px;min-width:170px;border:0;border-radius:8px;background:#DC2626;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">Reject &amp; notify picker</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2f">
+<div class="dv-olabel"><a class="dv-oid" href="#2f">2f</a>Worker management · users, roles, scope, permission matrix, audit</div>
+<div class="dv-card" style="width:1440px">
+<div style="display:flex;height:900px;background:#F5F6F8;font-family:'Noto Sans Thai',Arial,sans-serif;color:#1F2937;font-size:14px">
+  <dc-import name="OMS Nav" active="{{ 13 }}" hint-size="240px,900px"></dc-import>
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="height:64px;flex:none;background:#fff;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;gap:16px;padding:0 24px">
+      <div><div style="font-size:17px;font-weight:700;line-height:1.2">User Management</div><div style="font-size:11.5px;color:#6B7280">จัดการผู้ใช้งาน · role, scope and permissions</div></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px">
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;padding:0 12px;color:#6B7280">Search name, user ID, email</div>
+        <div style="height:36px;border:1px solid #E5E7EB;border-radius:8px;display:flex;align-items:center;padding:0 12px">All roles ▾</div>
+        <button style="height:36px;border:0;border-radius:8px;background:#D71920;color:#fff;font-family:inherit;font-size:13px;font-weight:700;padding:0 16px;cursor:pointer" style-hover="background:#A50F15">+ Add user</button>
+      </div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">TOTAL USERS</div><div style="font-size:11px;color:#9CA3AF">ผู้ใช้งานทั้งหมด</div><div style="font-size:26px;font-weight:700;margin-top:6px">78</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">ACTIVE</div><div style="font-size:11px;color:#9CA3AF">ใช้งานอยู่</div><div style="font-size:26px;font-weight:700;margin-top:6px;color:#16A34A">62</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">PICKERS ON SHIFT</div><div style="font-size:11px;color:#9CA3AF">ผู้หยิบสินค้าเข้ากะ</div><div style="font-size:26px;font-weight:700;margin-top:6px">41</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">ROLES</div><div style="font-size:11px;color:#9CA3AF">บทบาททั้งหมด</div><div style="font-size:26px;font-weight:700;margin-top:6px">7</div></div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px"><div style="font-size:10.5px;letter-spacing:.06em;color:#6B7280;font-weight:700">PENDING APPROVAL</div><div style="font-size:11px;color:#9CA3AF">รออนุมัติ</div><div style="font-size:26px;font-weight:700;margin-top:6px;color:#F59E0B">6</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:300px 1fr 340px;gap:14px;flex:1;min-height:0">
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;min-height:0">
+          <div style="font-size:14px;font-weight:700">Permission Matrix</div>
+          <div style="font-size:11.5px;color:#6B7280;margin-bottom:12px">สิทธิ์การเข้าถึงตามบทบาท</div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr style="color:#6B7280;font-size:10px"><th style="padding:6px 2px;text-align:left;border-bottom:1px solid #E5E7EB;font-weight:700">MODULE</th><th style="padding:6px 2px;border-bottom:1px solid #E5E7EB;font-weight:700">ADM</th><th style="padding:6px 2px;border-bottom:1px solid #E5E7EB;font-weight:700">SUP</th><th style="padding:6px 2px;border-bottom:1px solid #E5E7EB;font-weight:700">PLN</th><th style="padding:6px 2px;border-bottom:1px solid #E5E7EB;font-weight:700">ZC</th><th style="padding:6px 2px;border-bottom:1px solid #E5E7EB;font-weight:700">PCK</th><th style="padding:6px 2px;border-bottom:1px solid #E5E7EB;font-weight:700">VW</th></tr></thead>
+            <tbody>
+              <tr><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6">Operations Dashboard</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td></tr>
+              <tr><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6">Order Pool / Import</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#9CA3AF">◐</td></tr>
+              <tr><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6">Matching Analysis</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#9CA3AF">◐</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#9CA3AF">◐</td></tr>
+              <tr><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6">Batch release</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td></tr>
+              <tr><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6">Work Assignment</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td></tr>
+              <tr><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6">Admin verification</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td></tr>
+              <tr><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6">Zone Dashboard</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#9CA3AF">◐</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#9CA3AF">◐</td></tr>
+              <tr><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6">Own work / short pick</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td></tr>
+              <tr><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6">Configuration / Audit</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#9CA3AF">◐</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;border-bottom:1px solid #F3F4F6;text-align:center;color:#D1D5DB">○</td></tr>
+              <tr><td style="padding:7px 2px">User Management</td><td style="padding:7px 2px;text-align:center;color:#16A34A">●</td><td style="padding:7px 2px;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;text-align:center;color:#D1D5DB">○</td><td style="padding:7px 2px;text-align:center;color:#D1D5DB">○</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:auto;padding-top:12px;font-size:11px;color:#6B7280;line-height:1.6">● full · ◐ view only · ○ hidden. Menu visibility and action permission are separate settings.</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;min-height:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:14px;font-weight:700">User List</span><span style="font-size:11.5px;color:#6B7280">รายชื่อผู้ใช้งาน</span><span style="margin-left:auto;font-size:11.5px;color:#6B7280">78 users</span></div>
+          <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr style="text-align:left;color:#6B7280;font-size:10.5px;letter-spacing:.05em"><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">USER ID</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">NAME</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">ROLE</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">SCOPE</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">PCS/HR (7D)</th><th style="padding:8px 6px;border-bottom:1px solid #E5E7EB;font-weight:700">STATUS</th></tr></thead>
+            <tbody>
+              <tr style="background:#F9FAFB"><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">U0001</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Somsak P.<div style="font-size:11px;color:#6B7280">สมศักดิ์ พงษ์พันธ์</div></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#FEF2F2;color:#B91C1C;border-radius:5px;padding:2px 8px;font-size:11px">Supervisor</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Bangna DC · all zones</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#6B7280">—</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="color:#16A34A">● Active</span></td></tr>
+              <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">U0002</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Nattaporn K.<div style="font-size:11px;color:#6B7280">ณัฐพร กิจเจริญ</div></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#EFF6FF;color:#1D4ED8;border-radius:5px;padding:2px 8px;font-size:11px">Planner</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Bangna DC</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#6B7280">—</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="color:#16A34A">● Active</span></td></tr>
+              <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">P002</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Anucha T.<div style="font-size:11px;color:#6B7280">อนุชา ทองน้อย</div></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F0FDF4;color:#15803D;border-radius:5px;padding:2px 8px;font-size:11px">Picker</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Zones A, C</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">2,215</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="color:#16A34A">● On shift</span></td></tr>
+              <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">P006</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Ploy S.<div style="font-size:11px;color:#6B7280">พลอย ศิริกุล</div></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F0FDF4;color:#15803D;border-radius:5px;padding:2px 8px;font-size:11px">Picker</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Zone B</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">2,040</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="color:#16A34A">● On shift</span></td></tr>
+              <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">P010</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Techin P.<div style="font-size:11px;color:#6B7280">เตชินท์ พูลผล</div></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F0FDF4;color:#15803D;border-radius:5px;padding:2px 8px;font-size:11px">Picker</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Zone A</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700;color:#DC2626">687</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="color:#F59E0B">● Below avg</span></td></tr>
+              <tr><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;font-weight:700">U0014</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Weerachai T.<div style="font-size:11px;color:#6B7280">วีระชัย ทองนิยม</div></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="background:#F5F3FF;color:#6D28D9;border-radius:5px;padding:2px 8px;font-size:11px">Zone Controller</span></td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6">Zones C, D</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6;color:#6B7280">—</td><td style="padding:9px 6px;border-bottom:1px solid #F3F4F6"><span style="color:#16A34A">● Active</span></td></tr>
+              <tr><td style="padding:9px 6px;font-weight:700">U0021</td><td style="padding:9px 6px">Prasert M.<div style="font-size:11px;color:#6B7280">ประเสริฐ มณีวงศ์</div></td><td style="padding:9px 6px"><span style="background:#F3F4F6;color:#374151;border-radius:5px;padding:2px 8px;font-size:11px">Viewer</span></td><td style="padding:9px 6px">BKK West DC (read only)</td><td style="padding:9px 6px;color:#6B7280">—</td><td style="padding:9px 6px"><span style="color:#9CA3AF">● Inactive</span></td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:auto;padding-top:14px;display:flex;align-items:center;font-size:12px;color:#6B7280"><span>Rows per page 10 ▾ · 1–7 of 78</span><span style="margin-left:auto;display:flex;gap:6px"><span style="width:26px;height:26px;border:1px solid #E5E7EB;border-radius:6px;display:flex;align-items:center;justify-content:center">‹</span><span style="width:26px;height:26px;border-radius:6px;background:#D71920;color:#fff;display:flex;align-items:center;justify-content:center">1</span><span style="width:26px;height:26px;border:1px solid #E5E7EB;border-radius:6px;display:flex;align-items:center;justify-content:center">2</span><span style="width:26px;height:26px;border:1px solid #E5E7EB;border-radius:6px;display:flex;align-items:center;justify-content:center">›</span></span></div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;min-height:0">
+          <div style="display:flex;align-items:center"><div style="font-size:14px;font-weight:700">User Details</div><span style="margin-left:auto;color:#6B7280">✕</span></div>
+          <div style="font-size:11.5px;color:#6B7280;margin-bottom:14px">รายละเอียดผู้ใช้</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <div style="width:48px;height:48px;border-radius:50%;background:#F3F4F6;flex:none"></div>
+            <div><div style="font-size:15px;font-weight:700">Anucha T.</div><div style="font-size:11.5px;color:#6B7280">อนุชา ทองน้อย · P002</div><span style="display:inline-block;margin-top:4px;background:#F0FDF4;color:#15803D;border-radius:5px;padding:2px 8px;font-size:11px">Picker</span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px;margin-bottom:16px">
+            <div><span style="color:#6B7280;font-size:11px">Warehouse</span><div>Bangna DC</div></div>
+            <div><span style="color:#6B7280;font-size:11px">Zones (from Location Master)</span><div>A, C</div></div>
+            <div><span style="color:#6B7280;font-size:11px">Shift</span><div>A · 06:00–14:00</div></div>
+            <div><span style="color:#6B7280;font-size:11px">Last login</span><div>27 Aug 06:02</div></div>
+          </div>
+          <div style="background:#F9FAFB;border-radius:8px;padding:12px 14px;margin-bottom:16px">
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px">7-day productivity</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+              <div><span style="color:#6B7280">Pcs / hour</span><div style="font-size:17px;font-weight:700">2,215</div></div>
+              <div><span style="color:#6B7280">Orders / hour</span><div style="font-size:17px;font-weight:700">3.4</div></div>
+              <div><span style="color:#6B7280">Picking SLA</span><div style="font-size:17px;font-weight:700;color:#16A34A">93.1%</div></div>
+              <div><span style="color:#6B7280">Short pick rate</span><div style="font-size:17px;font-weight:700">4.2%</div></div>
+            </div>
+            <div style="font-size:10.5px;color:#6B7280;margin-top:8px">Credited to Picker Completed date. Older history from the weekly Google Sheets archive.</div>
+          </div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:8px">Audit Trail <span style="color:#6B7280;font-weight:400">/ ประวัติการดำเนินการ</span></div>
+          <div style="display:flex;flex-direction:column;gap:9px;font-size:12px">
+            <div style="display:flex;gap:9px"><span style="width:7px;height:7px;border-radius:50%;background:#16A34A;margin-top:5px;flex:none"></span><div><div>27 Aug 06:02 · Login</div><div style="color:#6B7280;font-size:11px">IP 10.10.1.23</div></div></div>
+            <div style="display:flex;gap:9px"><span style="width:7px;height:7px;border-radius:50%;background:#2563EB;margin-top:5px;flex:none"></span><div><div>26 Aug 16:45 · Zone scope changed A → A, C</div><div style="color:#6B7280;font-size:11px">by U0001 Somsak P.</div></div></div>
+            <div style="display:flex;gap:9px"><span style="width:7px;height:7px;border-radius:50%;background:#F59E0B;margin-top:5px;flex:none"></span><div><div>25 Aug 11:20 · Short pick reason overridden</div><div style="color:#6B7280;font-size:11px">ORD260825-0311 · by U0002</div></div></div>
+          </div>
+          <div style="margin-top:auto;padding-top:14px;display:flex;gap:8px">
+            <button style="flex:1;height:40px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-family:inherit;font-size:13px;cursor:pointer">Edit user</button>
+            <button style="flex:1;height:40px;border:1px solid #FCA5A5;border-radius:8px;background:#fff;color:#DC2626;font-family:inherit;font-size:13px;cursor:pointer">Deactivate</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+</div>
+
+<p class="dv-next">Try next: "add the Matching Analysis &amp; Batch Review screen" · "add the A4 Consolidation Pick Report with barcodes" · "add the PDA picker execution screens" · "make <a class="dv-oid" href="#2c">2c</a> a wall display for the floor"</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Warehouse order desk — first directions</span></div>
+
+<div class="dv-note" style="margin:0 0 26px">
+<p style="margin:0 0 8px"><strong>What I assumed.</strong> Desktop web is the supervisor surface (dashboard, worker management); the tablet is the floor surface (confirmation). Order lifecycle: Created → Picking → Packed → Staged → Confirmed. Offline is normal, not an error state — every screen carries a sync ledger showing what is still held on the device.</p>
+<p style="margin:0">Three dashboard directions below differ in navigation, layout and copy tone, plus a login and a tablet confirmation. Pick per-part: nav from one, layout from another.</p>
+</div>
+
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Dashboard · masthead nav, front-page layout, headline tone</div>
+<div class="dv-card" style="width:1280px">
+<div style="padding:22px 34px 34px">
+  <div style="display:flex;align-items:baseline;gap:20px">
+    <div style="font-size:19px;font-weight:600;letter-spacing:-.01em">Order Desk</div>
+    <nav style="display:flex;gap:18px;font-size:14px">
+      <a href="#1a" style="color:var(--color-accent);text-decoration:none;border-bottom:2px solid var(--color-accent);padding-bottom:2px">Dashboard</a>
+      <a href="#1a" style="color:inherit;text-decoration:none">Orders</a>
+      <a href="#1a" style="color:inherit;text-decoration:none">Workers</a>
+      <a href="#1a" style="color:inherit;text-decoration:none">Zones</a>
+      <a href="#1a" style="color:inherit;text-decoration:none">Sync ledger</a>
+    </nav>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:14px;font-size:13px">
+      <span class="tag tag-accent">Online · synced 14:02</span>
+      <span style="color:var(--color-neutral-700)">Supervisor · P. Chaiyaphum</span>
+    </div>
+  </div>
+
+  <div style="height:4px;background:var(--color-text);margin-top:16px"></div>
+  <div style="display:flex;gap:26px;padding:7px 0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700)">
+    <span>Wed 26 Aug 2026</span><span>DC Bangna</span><span>Shift A · 06:00–14:00</span><span style="margin-left:auto;color:var(--color-accent-2-700)">12 lines held offline</span>
+  </div>
+  <div style="height:1px;background:var(--color-text)"></div>
+
+  <h1 style="font-size:44px;margin:26px 0 6px;max-width:20ch;text-wrap:pretty">612 orders confirmed, 148 still open</h1>
+  <p style="font-size:15px;max-width:64ch;color:var(--color-neutral-800);margin:0 0 30px">Picking rate held at 84 lines an hour through the morning peak. Seven orders are blocked on stock exceptions in Zone C and need a decision before the 15:00 cut-off.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:34px;margin-bottom:36px">
+    <div>
+      <div class="cmyk-num" style="font-size:56px;font-weight:600"><span class="paper">84</span><span class="plate plate-c" aria-hidden="true">84</span><span class="plate plate-m" aria-hidden="true">84</span><span class="plate plate-y" aria-hidden="true">84</span></div>
+      <div style="font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:12px">Lines per hour</div>
+    </div>
+    <div>
+      <div class="cmyk-num" style="font-size:56px;font-weight:600"><span class="paper">148</span><span class="plate plate-c" aria-hidden="true">148</span><span class="plate plate-m" aria-hidden="true">148</span><span class="plate plate-y" aria-hidden="true">148</span></div>
+      <div style="font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:12px">Open orders</div>
+    </div>
+    <div>
+      <div class="cmyk-num" style="font-size:56px;font-weight:600"><span class="paper">22</span><span class="plate plate-c" aria-hidden="true">22</span><span class="plate plate-m" aria-hidden="true">22</span><span class="plate plate-y" aria-hidden="true">22</span></div>
+      <div style="font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:12px">Awaiting confirmation</div>
+    </div>
+    <div>
+      <div class="cmyk-num" style="font-size:56px;font-weight:600"><span class="paper">7</span><span class="plate plate-c" aria-hidden="true">7</span><span class="plate plate-m" aria-hidden="true">7</span><span class="plate plate-y" aria-hidden="true">7</span></div>
+      <div style="font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:12px">Exceptions</div>
+    </div>
+  </div>
+
+  <h6 style="margin:0 0 14px">Order lifecycle · today</h6>
+  <div class="stage" style="margin-bottom:38px">
+    <div style="flex:1;padding-right:20px"><div style="font-size:30px;font-weight:600">148</div><div style="font-size:13px;color:var(--color-neutral-700)">Created</div><div style="height:6px;background:var(--color-accent-300);margin-top:10px"></div></div>
+    <div style="flex:1;padding-right:20px"><div style="font-size:30px;font-weight:600">63</div><div style="font-size:13px;color:var(--color-neutral-700)">Picking</div><div style="height:6px;background:var(--color-accent-400);margin-top:10px"></div></div>
+    <div style="flex:1;padding-right:20px"><div style="font-size:30px;font-weight:600">41</div><div style="font-size:13px;color:var(--color-neutral-700)">Packed</div><div style="height:6px;background:var(--color-accent-500);margin-top:10px"></div></div>
+    <div style="flex:1;padding-right:20px"><div style="font-size:30px;font-weight:600">22</div><div style="font-size:13px;color:var(--color-neutral-700)">Staged</div><div style="height:6px;background:var(--color-accent-600);margin-top:10px"></div></div>
+    <div style="flex:1"><div style="font-size:30px;font-weight:600">612</div><div style="font-size:13px;color:var(--color-neutral-700)">Confirmed</div><div style="height:6px;background:var(--color-accent-800);margin-top:10px"></div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:48px">
+    <div>
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px"><h6 style="margin:0">Worker productivity · shift A</h6><a href="#1a" class="btn btn-ghost" style="margin-left:auto;font-size:13px">Open worker management</a></div>
+      <table class="table">
+        <thead><tr><th style="width:34px">#</th><th>Picker</th><th>Zone</th><th style="text-align:right">Lines/hr</th><th style="text-align:right">Orders</th><th>Device</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Somchai Pinyo</td><td>A · Ambient</td><td style="text-align:right;font-weight:600">112</td><td style="text-align:right">38</td><td><span class="tag tag-accent">Online</span></td></tr>
+          <tr><td>2</td><td>Nid Wongsa</td><td>B · Chilled</td><td style="text-align:right;font-weight:600">104</td><td style="text-align:right">31</td><td><span class="tag tag-accent">Online</span></td></tr>
+          <tr><td>3</td><td>Anucha Thongdee</td><td>C · Bulk</td><td style="text-align:right;font-weight:600">88</td><td style="text-align:right">27</td><td><span class="tag tag-neutral">Offline · 12 held</span></td></tr>
+          <tr><td>4</td><td>Ploy Sirikul</td><td>A · Ambient</td><td style="text-align:right;font-weight:600">76</td><td style="text-align:right">24</td><td><span class="tag tag-accent">Online</span></td></tr>
+          <tr><td>5</td><td>Wichai Kaewsai</td><td>D · Staging</td><td style="text-align:right;font-weight:600">61</td><td style="text-align:right">19</td><td><span class="tag tag-accent">Online</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h6 style="margin:0 0 14px;color:var(--color-accent-2-700)">Needs a decision</h6>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div><div style="font-size:15px;font-weight:600">SO-48120 · short 4 cases</div><div style="font-size:13px;color:var(--color-neutral-700)">Zone C · raised 13:41 by A. Thongdee</div></div>
+        <div><div style="font-size:15px;font-weight:600">SO-48097 · scan mismatch</div><div style="font-size:13px;color:var(--color-neutral-700)">Zone B · raised 13:12 by N. Wongsa</div></div>
+        <div><div style="font-size:15px;font-weight:600">SO-48066 · cold-chain hold</div><div style="font-size:13px;color:var(--color-neutral-700)">Zone B · raised 12:48, 2h 14m open</div></div>
+        <a href="#1a" class="btn btn-ghost" style="align-self:flex-start;font-size:13px;padding-inline:0">All 7 exceptions</a>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Dashboard · side menu, three-column console, functional tone</div>
+<div class="dv-card" style="width:1280px">
+<div style="display:flex;min-height:740px">
+  <aside style="width:216px;flex:none;background:var(--color-surface);padding:22px 18px;display:flex;flex-direction:column;gap:26px">
+    <div>
+      <div style="font-size:17px;font-weight:600">Order Desk</div>
+      <div style="font-size:12px;color:var(--color-neutral-700)">DC Bangna</div>
+    </div>
+    <nav style="display:flex;flex-direction:column;gap:2px;font-size:14px">
+      <a href="#1b" style="text-decoration:none;color:var(--color-bg);background:var(--color-accent);padding:8px 10px">Dashboard</a>
+      <a href="#1b" style="text-decoration:none;color:inherit;padding:8px 10px">Order queue <span style="float:right;color:var(--color-neutral-700)">148</span></a>
+      <a href="#1b" style="text-decoration:none;color:inherit;padding:8px 10px">Confirmations <span style="float:right;color:var(--color-neutral-700)">22</span></a>
+      <a href="#1b" style="text-decoration:none;color:inherit;padding:8px 10px">Exceptions <span style="float:right;color:var(--color-accent-2-700)">7</span></a>
+      <a href="#1b" style="text-decoration:none;color:inherit;padding:8px 10px">Workers</a>
+      <a href="#1b" style="text-decoration:none;color:inherit;padding:8px 10px">Zones &amp; waves</a>
+      <a href="#1b" style="text-decoration:none;color:inherit;padding:8px 10px">Reports</a>
+    </nav>
+    <div style="margin-top:auto;font-size:12px;color:var(--color-neutral-700);line-height:1.7">
+      <div style="font-weight:600;color:var(--color-text);font-size:13px">Sync ledger</div>
+      <div>Last sync 14:02</div>
+      <div style="color:var(--color-accent-2-700)">12 lines held on 1 device</div>
+      <button class="btn btn-secondary" style="margin-top:10px;width:100%;font-size:13px">Push now</button>
+    </div>
+  </aside>
+
+  <div style="flex:1;padding:22px 30px 30px;min-width:0">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
+      <input class="input" placeholder="Search order, SKU or picker" style="max-width:320px">
+      <div class="seg" style="margin-left:auto">
+        <label class="seg-opt"><input type="radio" name="1b-shift" checked>Shift A</label>
+        <label class="seg-opt"><input type="radio" name="1b-shift">Shift B</label>
+        <label class="seg-opt"><input type="radio" name="1b-shift">All day</label>
+      </div>
+      <span class="tag tag-accent">Online</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:24px;margin-bottom:32px">
+      <div><div style="font-size:34px;font-weight:600;line-height:1">148</div><div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:8px">Open</div></div>
+      <div><div style="font-size:34px;font-weight:600;line-height:1">63</div><div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:8px">Picking</div></div>
+      <div><div style="font-size:34px;font-weight:600;line-height:1">22</div><div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:8px">To confirm</div></div>
+      <div><div style="font-size:34px;font-weight:600;line-height:1">84</div><div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:8px">Lines/hr</div></div>
+      <div><div style="font-size:34px;font-weight:600;line-height:1;color:var(--color-accent-2-700)">7</div><div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:8px">Exceptions</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:40px">
+      <div>
+        <h6 style="margin:0 0 12px">Live order queue</h6>
+        <table class="table">
+          <thead><tr><th>Order</th><th>Stage</th><th>Picker</th><th>Lines</th><th>Age</th></tr></thead>
+          <tbody>
+            <tr style="background:color-mix(in srgb, var(--color-accent) 8%, transparent)"><td style="font-weight:600">SO-48120</td><td>Picking</td><td>A. Thongdee</td><td>34</td><td>41m</td></tr>
+            <tr><td>SO-48121</td><td>Created</td><td>—</td><td>12</td><td>8m</td></tr>
+            <tr><td>SO-48118</td><td>Packed</td><td>N. Wongsa</td><td>18</td><td>1h 02m</td></tr>
+            <tr><td>SO-48115</td><td>Staged</td><td>W. Kaewsai</td><td>7</td><td>1h 26m</td></tr>
+            <tr><td>SO-48111</td><td>Picking</td><td>S. Pinyo</td><td>52</td><td>1h 44m</td></tr>
+            <tr><td>SO-48097</td><td>Exception</td><td>N. Wongsa</td><td>23</td><td>2h 51m</td></tr>
+            <tr><td>SO-48066</td><td>Exception</td><td>P. Sirikul</td><td>9</td><td>3h 18m</td></tr>
+          </tbody>
+        </table>
+        <h6 style="margin:30px 0 12px">Picker output · lines per hour</h6>
+        <div style="display:flex;flex-direction:column;gap:11px;font-size:13.5px">
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:130px">Somchai Pinyo</span><span style="height:12px;width:100%;max-width:112px;background:var(--color-accent)"></span><span style="font-weight:600">112</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:130px">Nid Wongsa</span><span style="height:12px;width:104px;background:var(--color-accent)"></span><span style="font-weight:600">104</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:130px">Anucha Thongdee</span><span style="height:12px;width:88px;background:var(--color-accent-400)"></span><span style="font-weight:600">88</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:130px">Ploy Sirikul</span><span style="height:12px;width:76px;background:var(--color-accent-400)"></span><span style="font-weight:600">76</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:130px">Wichai Kaewsai</span><span style="height:12px;width:61px;background:var(--color-neutral-400)"></span><span style="font-weight:600">61</span></div>
+          <div style="font-size:12px;color:var(--color-neutral-700)">Shift target 80 · dotted line at target in build</div>
+        </div>
+      </div>
+
+      <div>
+        <h6 style="margin:0 0 12px">SO-48120 · tracking</h6>
+        <div style="font-size:13.5px;color:var(--color-neutral-800);margin-bottom:16px">34 lines · Zone C · cut-off 15:00</div>
+        <div style="display:flex;flex-direction:column;gap:0">
+          <div style="display:flex;gap:14px"><div style="width:9px;flex:none;display:flex;flex-direction:column;align-items:center"><span style="width:9px;height:9px;border-radius:50%;background:var(--color-accent)"></span><span style="flex:1;width:1px;background:var(--color-accent)"></span></div><div style="padding-bottom:18px"><div style="font-size:14px;font-weight:600">Created</div><div style="font-size:12.5px;color:var(--color-neutral-700)">13:00 · WMS import</div></div></div>
+          <div style="display:flex;gap:14px"><div style="width:9px;flex:none;display:flex;flex-direction:column;align-items:center"><span style="width:9px;height:9px;border-radius:50%;background:var(--color-accent)"></span><span style="flex:1;width:1px;background:var(--color-accent)"></span></div><div style="padding-bottom:18px"><div style="font-size:14px;font-weight:600">Assigned</div><div style="font-size:12.5px;color:var(--color-neutral-700)">13:06 · A. Thongdee</div></div></div>
+          <div style="display:flex;gap:14px"><div style="width:9px;flex:none;display:flex;flex-direction:column;align-items:center"><span style="width:9px;height:9px;border-radius:50%;background:var(--color-accent)"></span><span style="flex:1;width:1px;background:var(--color-accent)"></span></div><div style="padding-bottom:18px"><div style="font-size:14px;font-weight:600">Picking · 28 of 34</div><div style="font-size:12.5px;color:var(--color-neutral-700)">13:19 → now · device offline since 13:38</div><div style="font-size:12.5px;color:var(--color-accent-2-700)">12 scans held locally</div></div></div>
+          <div style="display:flex;gap:14px"><div style="width:9px;flex:none;display:flex;flex-direction:column;align-items:center"><span style="width:9px;height:9px;border-radius:50%;border:1.5px solid var(--color-neutral-400)"></span><span style="flex:1;width:1px;background:var(--color-neutral-300)"></span></div><div style="padding-bottom:18px"><div style="font-size:14px;color:var(--color-neutral-700)">Packed</div></div></div>
+          <div style="display:flex;gap:14px"><div style="width:9px;flex:none;display:flex;flex-direction:column;align-items:center"><span style="width:9px;height:9px;border-radius:50%;border:1.5px solid var(--color-neutral-400)"></span><span style="flex:1;width:1px;background:var(--color-neutral-300)"></span></div><div style="padding-bottom:18px"><div style="font-size:14px;color:var(--color-neutral-700)">Staged</div></div></div>
+          <div style="display:flex;gap:14px"><div style="width:9px;flex:none"><span style="display:block;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--color-neutral-400)"></span></div><div><div style="font-size:14px;color:var(--color-neutral-700)">Confirmed in WMS</div></div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px"><button class="btn btn-primary" style="font-size:13px">Confirm order</button><button class="btn btn-secondary" style="font-size:13px">Reassign</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Dashboard · wall board, exception-first, imperative tone</div>
+<div class="dv-card" style="width:1280px">
+<div style="padding:26px 36px 36px">
+  <div style="display:flex;align-items:flex-start;gap:24px;margin-bottom:8px">
+    <div>
+      <div style="font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-700)">Shift A · DC Bangna · 14:02</div>
+      <h2 style="font-size:36px;margin:6px 0 0">Clear 7 exceptions before 15:00</h2>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn btn-secondary" style="font-size:13px">Board</button>
+      <button class="btn btn-secondary" style="font-size:13px">Queue</button>
+      <button class="btn btn-secondary" style="font-size:13px">Workers</button>
+      <button class="btn btn-primary" style="font-size:13px">Sync · 12 held</button>
+    </div>
+  </div>
+  <div style="height:2px;background:var(--color-text);margin:18px 0 28px"></div>
+
+  <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:52px">
+    <div>
+      <h6 style="margin:0 0 16px;color:var(--color-accent-2-700)">Blocked now</h6>
+      <div style="display:flex;flex-direction:column;gap:0">
+        <div style="display:flex;align-items:baseline;gap:18px;padding:14px 0;border-bottom:1px solid var(--color-divider)">
+          <div class="cmyk-num" style="font-size:34px;font-weight:600"><span class="paper">4</span><span class="plate plate-c" aria-hidden="true">4</span><span class="plate plate-m" aria-hidden="true">4</span><span class="plate plate-y" aria-hidden="true">4</span></div>
+          <div style="flex:1"><div style="font-size:16px;font-weight:600">SO-48120 short 4 cases · Zone C</div><div style="font-size:13px;color:var(--color-neutral-700)">A. Thongdee · 13:41 · device offline</div></div>
+          <button class="btn btn-primary" style="font-size:13px">Substitute</button>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:18px;padding:14px 0;border-bottom:1px solid var(--color-divider)">
+          <div class="cmyk-num" style="font-size:34px;font-weight:600"><span class="paper">1</span><span class="plate plate-c" aria-hidden="true">1</span><span class="plate plate-m" aria-hidden="true">1</span><span class="plate plate-y" aria-hidden="true">1</span></div>
+          <div style="flex:1"><div style="font-size:16px;font-weight:600">SO-48097 scan mismatch · Zone B</div><div style="font-size:13px;color:var(--color-neutral-700)">N. Wongsa · 13:12</div></div>
+          <button class="btn btn-secondary" style="font-size:13px">Review scan</button>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:18px;padding:14px 0;border-bottom:1px solid var(--color-divider)">
+          <div class="cmyk-num" style="font-size:34px;font-weight:600"><span class="paper">9</span><span class="plate plate-c" aria-hidden="true">9</span><span class="plate plate-m" aria-hidden="true">9</span><span class="plate plate-y" aria-hidden="true">9</span></div>
+          <div style="flex:1"><div style="font-size:16px;font-weight:600">SO-48066 cold-chain hold · Zone B</div><div style="font-size:13px;color:var(--color-neutral-700)">P. Sirikul · 12:48 · 3h 18m open</div></div>
+          <button class="btn btn-secondary" style="font-size:13px">Release</button>
+        </div>
+      </div>
+      <a href="#1c" class="btn btn-ghost" style="margin-top:14px;padding-inline:0;font-size:13px">Show remaining 4</a>
+
+      <h6 style="margin:36px 0 14px">Flow, last six hours</h6>
+      <div style="display:flex;align-items:flex-end;gap:6px;height:120px">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px"><span style="height:38%;background:var(--color-accent-300)"></span><span style="height:24%;background:var(--color-accent-700)"></span><span style="font-size:11px;color:var(--color-neutral-700);text-align:center">08</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px"><span style="height:52%;background:var(--color-accent-300)"></span><span style="height:31%;background:var(--color-accent-700)"></span><span style="font-size:11px;color:var(--color-neutral-700);text-align:center">09</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px"><span style="height:61%;background:var(--color-accent-300)"></span><span style="height:44%;background:var(--color-accent-700)"></span><span style="font-size:11px;color:var(--color-neutral-700);text-align:center">10</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px"><span style="height:74%;background:var(--color-accent-300)"></span><span style="height:58%;background:var(--color-accent-700)"></span><span style="font-size:11px;color:var(--color-neutral-700);text-align:center">11</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px"><span style="height:66%;background:var(--color-accent-300)"></span><span style="height:49%;background:var(--color-accent-700)"></span><span style="font-size:11px;color:var(--color-neutral-700);text-align:center">12</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px"><span style="height:81%;background:var(--color-accent-300)"></span><span style="height:37%;background:var(--color-accent-700)"></span><span style="font-size:11px;color:var(--color-neutral-700);text-align:center">13</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px"><span style="height:44%;background:var(--color-accent-300)"></span><span style="height:12%;background:var(--color-accent-700)"></span><span style="font-size:11px;color:var(--color-neutral-700);text-align:center">14</span></div>
+      </div>
+      <div style="font-size:12px;color:var(--color-neutral-700);margin-top:8px">Light: orders created · dark: orders confirmed</div>
+    </div>
+
+    <div>
+      <h6 style="margin:0 0 16px">Floor</h6>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div style="background:var(--color-surface);padding:16px">
+          <div style="font-size:13px;font-weight:600">Somchai Pinyo</div>
+          <div style="font-size:12px;color:var(--color-neutral-700);margin-bottom:10px">Zone A · picking SO-48111</div>
+          <div style="font-size:30px;font-weight:600;line-height:1">112</div>
+          <div style="font-size:11.5px;color:var(--color-neutral-700)">lines/hr · 140% of target</div>
+        </div>
+        <div style="background:var(--color-surface);padding:16px">
+          <div style="font-size:13px;font-weight:600">Nid Wongsa</div>
+          <div style="font-size:12px;color:var(--color-neutral-700);margin-bottom:10px">Zone B · packing SO-48118</div>
+          <div style="font-size:30px;font-weight:600;line-height:1">104</div>
+          <div style="font-size:11.5px;color:var(--color-neutral-700)">lines/hr · 130% of target</div>
+        </div>
+        <div style="background:var(--color-surface);padding:16px;outline:2px solid var(--color-accent-2-500)">
+          <div style="font-size:13px;font-weight:600">Anucha Thongdee</div>
+          <div style="font-size:12px;color:var(--color-accent-2-700);margin-bottom:10px">Zone C · offline 24m</div>
+          <div style="font-size:30px;font-weight:600;line-height:1">88</div>
+          <div style="font-size:11.5px;color:var(--color-neutral-700)">lines/hr · 12 scans held</div>
+        </div>
+        <div style="background:var(--color-surface);padding:16px">
+          <div style="font-size:13px;font-weight:600">Ploy Sirikul</div>
+          <div style="font-size:12px;color:var(--color-neutral-700);margin-bottom:10px">Zone A · idle 6m</div>
+          <div style="font-size:30px;font-weight:600;line-height:1">76</div>
+          <div style="font-size:11.5px;color:var(--color-neutral-700)">lines/hr · 95% of target</div>
+        </div>
+      </div>
+
+      <h6 style="margin:32px 0 14px">Held offline</h6>
+      <div style="display:flex;flex-direction:column;gap:9px;font-size:13.5px">
+        <div style="display:flex;gap:12px;padding-bottom:9px;border-bottom:1px solid var(--color-divider)"><span style="width:96px;font-weight:600">SO-48120</span><span style="flex:1;color:var(--color-neutral-700)">12 pick scans · Zone C tablet</span><span>13:38</span></div>
+        <div style="display:flex;gap:12px;padding-bottom:9px;border-bottom:1px solid var(--color-divider)"><span style="width:96px;font-weight:600">SO-48115</span><span style="flex:1;color:var(--color-neutral-700)">1 stage confirm · pushed on reconnect</span><span>13:12</span></div>
+        <div style="display:flex;gap:12px"><span style="width:96px;font-weight:600">SO-48104</span><span style="flex:1;color:var(--color-neutral-700)">Resolved · synced 13:04</span><span>—</span></div>
+      </div>
+      <div style="margin-top:22px;font-size:13px;color:var(--color-neutral-800);max-width:44ch">Nothing is lost while a device is offline. Scans queue locally and post in order; the ledger above is the record of what has not yet reached the WMS.</div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Login · desktop, shift and device in the form</div>
+<div class="dv-card" style="width:900px">
+<div style="display:flex;min-height:560px">
+  <div style="flex:1;padding:44px 40px;display:flex;flex-direction:column">
+    <div style="font-size:19px;font-weight:600">Order Desk</div>
+    <div style="height:4px;background:var(--color-text);margin:14px 0 3px"></div>
+    <div style="height:1px;background:var(--color-text);margin-bottom:34px"></div>
+    <h2 style="font-size:30px;margin:0 0 8px">Sign in to your shift</h2>
+    <p style="font-size:14px;color:var(--color-neutral-800);max-width:40ch;margin:0 0 26px">Works offline. Your last shift and assigned zone are cached on this device.</p>
+    <div style="display:flex;flex-direction:column;gap:16px;max-width:340px">
+      <div class="field"><label>Employee ID</label><input class="input" value="TH-40218"></div>
+      <div class="field"><label>PIN</label><input class="input" type="password" value="123456"></div>
+      <div class="field"><label>Shift</label>
+        <div class="seg"><label class="seg-opt"><input type="radio" name="1d-s" checked>A</label><label class="seg-opt"><input type="radio" name="1d-s">B</label><label class="seg-opt"><input type="radio" name="1d-s">C</label></div>
+      </div>
+      <button class="btn btn-primary btn-block" style="min-height:44px">Start shift</button>
+      <a href="#1d" style="font-size:13px">Forgot PIN · ask your supervisor</a>
+    </div>
+    <div style="margin-top:auto;font-size:12px;color:var(--color-neutral-700)">Device WH-TAB-14 · last sync 14:02 · 12 lines held</div>
+  </div>
+  <div class="dot" style="width:300px;flex:none;background-color:var(--color-surface);display:flex;align-items:flex-end;padding:22px">
+    <div style="font-size:12px;color:var(--color-neutral-700);background:var(--color-bg);padding:6px 8px">Placeholder — DC photograph, printed as process plates</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1e">
+<div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>User confirmation · tablet 1024×768, offline</div>
+<div class="dv-card" style="width:1024px">
+<div style="position:relative;height:768px;overflow:hidden">
+  <div style="padding:20px 26px;filter:blur(0px)">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:6px">
+      <div style="font-size:17px;font-weight:600">SO-48120</div>
+      <span class="tag tag-neutral">Offline · 12 held</span>
+      <div style="margin-left:auto;font-size:13px;color:var(--color-neutral-700)">A. Thongdee · Zone C · 14:02</div>
+    </div>
+    <div style="height:3px;background:var(--color-text);margin:12px 0 2px"></div>
+    <div style="height:1px;background:var(--color-text);margin-bottom:22px"></div>
+    <h3 style="margin:0 0 18px">28 of 34 lines picked</h3>
+    <table class="table" style="font-size:15px">
+      <thead><tr><th>SKU</th><th>Description</th><th>Loc</th><th style="text-align:right">Qty</th><th style="text-align:right">Picked</th></tr></thead>
+      <tbody>
+        <tr><td>8850123001</td><td>Jasmine rice 5kg</td><td>C-14-2</td><td style="text-align:right">12</td><td style="text-align:right">12</td></tr>
+        <tr><td>8850123018</td><td>Palm sugar 1kg</td><td>C-16-1</td><td style="text-align:right">8</td><td style="text-align:right">8</td></tr>
+        <tr><td>8850123044</td><td>Fish sauce 700ml</td><td>C-21-4</td><td style="text-align:right">10</td><td style="text-align:right;color:var(--color-accent-2-700)">6 · short</td></tr>
+        <tr><td>8850123090</td><td>Coconut milk 400ml</td><td>C-23-1</td><td style="text-align:right">4</td><td style="text-align:right">2</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="dialog-backdrop" style="position:absolute">
+    <div class="dialog" style="width:min(560px,100%)">
+      <div class="dialog-title">Confirm 28 picked lines?</div>
+      <p class="dialog-body" style="margin:0">This device is offline. The confirmation is written locally and posted to the WMS when the connection returns — order tracking will show it as <em>pending sync</em> until then. Six short lines stay open as an exception for the supervisor.</p>
+      <div style="font-size:13px;color:var(--color-neutral-700)">Queued ahead of this: 12 pick scans since 13:38</div>
+      <div class="dialog-actions" style="gap:10px">
+        <button class="btn btn-secondary" style="min-height:48px;min-width:120px;font-size:15px">Keep picking</button>
+        <button class="btn btn-primary" style="min-height:48px;min-width:160px;font-size:15px">Confirm offline</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+</div>
+
+<p class="dv-next">Try next: "build out <a class="dv-oid" href="#1b">1b</a>'s side menu with <a class="dv-oid" href="#1a">1a</a>'s masthead numbers" · "make <a class="dv-oid" href="#1c">1c</a> a wall display for the floor" · "now the worker management screen"</p>
+</section>
+
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,856 @@
+Beautrium Order Management System
+Confidential - For solution design and development Page 1
+BEAUTRIUM ORDER MANANAGEMENT SYSTEM
+Business & System Requirement Specification
+Product Scope: Order Consolidation + Order Picking Productivity
+Product concept
+One Beautrium Order Mananagement System with a Shared Order Core and two Product Scope modules. Order Consolidation
+optimizes the picking approach; Order Picking Productivity controls assignment, execution, productivity, SLA and backlog.
+Document Information Details
+Document Type Business + System Requirement Specification
+Version 1.1 - Product Requirement Revision
+Prepared For Warehouse Operation / Development Team
+Product Scope 1) Order Consolidation 2) Order Picking Productivity
+Order Source WMS order file / future API
+Order Grain Order Header + Order Line (SKU + Bin Code + QTY)
+Zone Source Bin Code joined to Location Master
+Productivity Grain Order level
+Data Retention High-volume transactional data: rolling 7 days (Week -1) after successful weekly
+productivity export. Master/config/user data retained.
+Design Capacity Minimum 5,000 orders/day with growth buffer
+Status Development-ready product requirement; delivery sequencing is determined by the
+implementation team
+Key design principle
+• WMS is the source of truth for the actual pick Bin Code. The application does not decide Shelf vs Rack allocation.
+• The same imported WMS Order Header and Order Line dataset is the single source of truth for both Product Scope modules;
+duplicate application databases are not permitted.
+• Operational thresholds, matching limits, retention days and scheduled integrations must be configuration-driven and must not
+require code changes.
+• An Order can touch multiple Zones because different lines may have different Bin Codes; productivity remains tracked at Order
+level.
+
+-- 1 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 2
+0. Document Control & Contents
+Version Change Summary Owner / Approver
+1.1
+Reframed as Beautrium Order Mananagement System with two Product Scope
+modules; added Front-end/CSS standard, weekly Google Sheets productivity export,
+and Week -1 transaction retention.
+Warehouse Operation /
+Product Owner
+• 1. Executive Summary
+• 2. Objectives & Success Criteria
+• 3. Product Scope
+• 4. Core Architecture & Shared Components
+• 5. WMS Input / Order Core Data Model
+• 6. Location Master, Zone & Pick Sequence
+• 7. User Roles & Permissions
+• 8. End-to-End Business Workflow
+• 9. Order Consolidation
+• 10. Order Consolidation - Pre-screen, Matching & Batch Split Rules
+• 11. Order Consolidation - Consolidation Pick Report
+• 12. Order Picking Productivity - Assignment & Execution
+• 13. Order Picking Productivity - Status, Backlog & KPI Rules
+• 14. Zone Dashboard & Control Tower
+• 15. Front-end UX/UI & CSS Design Standard
+• 16. Mockup UX/UI
+• 17. Configuration & Master Data
+• 18. Functional Requirements
+• 19. Non-Functional Requirements
+• 20. Reports & Exports
+• 21. Data Model & Key Relationships
+• 22. API / Integration Concept
+• 23. Security, Audit & Data Integrity
+• 24. Acceptance Criteria / UAT
+• 25. Implementation Boundary
+• 26. Defined Business Rules & Technical Defaults
+• Appendix A - Field Dictionary
+• Appendix B - Status Matrix
+• Appendix C - Source / Baseline Notes
+
+-- 2 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 3
+1. Executive Summary
+Beautrium Order Mananagement System เป็น Product เดียวที่ใช้ Order dataset จาก WMS ร่วมกัน โดยมี 2 Product Scope ที่ทาหน้าที่ต่างกันแต่เชื่อมโยงกันบน
+Shared Order Core เดียว ได้แก่ Order Consolidation และ Order Picking Productivity เพื่อลดข้อมูลซ ้า ลด Logic ซ ้า และให้สถานะ Order
+เป็นแหล่งข้อมูลเดียวกันทั้งระบบ
+Product Scope Business Question Primary Functions
+Order Consolidation How should we pick to reduce walking? Pre-screen, SKU matching, batch split, pick sequence, consolidated
+pick report, pick & sort
+Order Picking Productivity Who is doing the picking work, how
+fast, and is operation on track?
+Assignment, workload control, order completion, KPI, backlog, Zone
+dashboard, Control Tower
+Critical data rule Every WMS order line already contains the real Bin Code to pick. If the same SKU must be picked from Shelf and
+Rack, WMS sends two lines; the system preserves both lines and joins each Bin Code to Location Master for Zone and Pick
+Sequence.
+The shared platform avoids duplicate import, duplicate user management, inconsistent order status and conflicting master data.
+Consolidation batches and productivity assignment batches remain separate entities because they have different business
+purposes, but they can be linked.
+2. Objectives & Success Criteria
+• Reduce repeated walking by grouping orders with similar SKU demand and producing one physical walking sequence.
+• Use yesterday as the default Order Date for Order Consolidation analysis while retaining historical dates for audit and reports.
+• Allow supervisors to understand daily matching potential, unmatched reasons and batch quality before releasing pick reports.
+• Track picker productivity at Order level while showing workload contribution by Zone based on actual WMS Bin Code.
+• Control assignment workload around configurable target pieces per hour/batch (initial benchmark around 300 pieces).
+• Provide Warning / Overdue / Critical monitoring, backlog handling, Short Pick, Admin verification and historical analysis.
+• Keep masters, thresholds, permissions and operational rules configurable without code changes.
+• Provide PC-first supervisor/admin UX and PDA/mobile-friendly execution screens for Order Picking Productivity.
+
+-- 3 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 4
+3. Product Scope
+Component Scope Key Deliverable
+Shared Order
+Core
+Authentication, users, WMS order import, order
+header/line, location master, configuration, audit One source of truth for both Product Scope modules
+Order
+Consolidation
+Pre-screen, P1-P4 matching, batch split/review, A4
+consolidated pick report, pick & sort support Matching analysis + operational consolidation pick report
+Order Picking
+Productivity
+Assignment, workload control, picker completion,
+admin verification, backlog, Zone Dashboard and
+Control Tower
+Order-level productivity + operational control dashboards
+Integration
+Services
+Google Sheets weekly export, scheduled
+housekeeping, future WMS API/PDA integrations Reliable data movement and retention control
+In Scope
+• Excel/CSV import and future WMS API
+• Order-line storage including Bin Code
+• Duplicate/upsert control
+• Consolidation matching and report generation
+• Location Master with Zone and Pick Sequence
+• Assignment and productivity tracking
+• Backlog / alerts / dashboards / exports
+• User / role / audit / configuration
+Out of Scope for current combined release
+• Stock movement or stock adjustment in WMS
+• Replenishment calculation/transaction
+• Changing WMS allocation or choosing Shelf vs Rack
+• Replacing core WMS
+• Automated labor forecasting in initial delivery stages
+4. Core Architecture & Shared Components
+Recommended logical architecture:
+WMS → Shared Order Core → Two Product Scope Modules WMS Import/API feeds a single Order Header / Order Line store. Order
+Consolidation reads the data for consolidation. Order Picking Productivity reads the same order entities for assignment, completion
+and productivity. Location Master enriches every order line with Zone and Pick Sequence.
+Shared Component Purpose
+Authentication / User / Role Single identity and permission model across all modules
+Order Import Service Validate, deduplicate, upsert and log WMS files
+Order Core Order Header + Order Line source for both delivery stages
+Location Master Bin → Zone / Aisle / Side / Bay / Level / Block / Pick Sequence
+Configuration Service Effective-dated parameters; no hard-coded thresholds
+Audit / Status History Trace all critical changes and operational decisions
+Reporting Service Excel export, A4 PDF/print rendering, historical query
+
+-- 4 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 5
+5. WMS Input / Order Core Data Model
+The order file is line-level. Bin Code is mandatory because it represents the actual WMS-directed pick location.
+Field Level Requirement / Rule
+Order No Header Required; unique within warehouse/source key
+Original Order Date Header Required; Order Consolidation only compares orders from the same date
+Store Code Header Required; distinct store count used in consolidation
+SKU Line Required
+Bin Code Line Required; actual pick location from WMS
+QTY Line Required; planned pieces for that SKU/Bin
+Priority / Cut-off Header Optional but recommended
+Cancel Status Header Optional but recommended
+Item Description Line Optional; useful on print report
+Barcode values Line/Master SKU barcode and Bin barcode if supplied; otherwise generated from code for print
+representation
+Example - same SKU from two physical locations:
+Order SKU Bin Code QTY
+ORD001 A001 B015 5
+ORD001 A001 R020 10
+Data interpretation ORD001 is one order and A001 is one unique SKU for matching, but there are two physical pick lines.
+Consolidated pick output must group by SKU + Bin Code, never by SKU alone.
+Duplicate / Update Control
+• Recommended unique import key: Warehouse + Order No + Original Order Date, or a guaranteed WMS key.
+• Order line unique key should include Order + SKU + Bin Code + source line identifier where available.
+• Re-upload must not duplicate QTY. Allowed updates should create change history.
+• Invalid Bin Code must go to Error Queue and cannot be released to a pick report until Location Master is resolved.
+6. Location Master, Zone & Pick Sequence
+Division is removed from the combined design. Zone is a property of physical Bin Code through Location Master.
+Location Master Field Rule
+Bin Code Primary business key from WMS
+Zone Code / Zone Name Report and workload grouping
+Aisle Physical walking hierarchy
+Side A-Z side identifier
+Side Pair AB, CD, EF ...
+
+-- 5 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 6
+Location Master Field Rule
+Side Direction Odd letter = RIGHT; even letter = LEFT
+Bay Natural numeric order
+Level Alphabetic/numeric order
+Block Natural numeric order
+Pick Sequence Composite numeric key used to sort physical walking
+Active Flag Inactive location cannot be used for released report
+Physical walking sort order
+Aisle → Side Pair → Bay → Right → Left → Level → Block Example A1-B-01-A-01 = 01-01-01-2-01-01, where side direction 1 =
+RIGHT and 2 = LEFT. The composite key is business-readable and easier to maintain than a pure running number.
+
+-- 6 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 7
+7. User Roles & Permissions
+Role Order Consolidation Order Picking Productivity Administration
+System Admin Full Full Users, masters, config, audit
+Warehouse Manager /
+Control Tower View / approve All dashboards / monitoring Read config/audit
+Supervisor Generate/review/release batch Assign / monitor / override / verify Operational config where
+authorized
+Planner / Admin Import / matching / report Create assignment / verify Limited operational master
+Zone Controller View matching impact by zone Zone dashboard / drilldown No master edit
+Picker View/print task if needed Own work / close order / short pick None
+Viewer Read only Read only None
+Permission principle Menu visibility and action permission are separate. A user may view a module but not approve, override,
+release or edit configuration.
+8. End-to-End Business Workflow
+1) Import WMS order lines and validate / deduplicate.
+2) Enrich each line from Location Master: Zone + physical Pick Sequence.
+3) Order Consolidation uses Order Date (default yesterday) to pre-screen eligible orders and generate matching candidates.
+4) Supervisor reviews P1-P4 candidates, batch splits and exceptions; approved batches produce A4 Consolidated Pick Reports.
+5) Picker performs Pick & Sort by report sequence. At Consolidation Area, WMS Picking-by-Order is used to confirm each order from
+the already-picked pool.
+6) Order Picking Productivity assigns orders/work packages to a picker and controls planned pieces against configurable workload
+target.
+7) Picker completes each Order; KPI stops at Picker Completed Time. Short Pick captures actual/short/reason.
+8) Admin verifies and Final Closes or Rejects for correction.
+9) Dashboards show Order productivity, Zone workload contribution, backlog, alerts and Control Tower status.
+
+-- 7 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 8
+9. Order Consolidation
+Purpose: reduce walking by combining orders with similar SKU demand, while preserving the existing WMS Order → SKU → QTY
+execution model.
+Operating model
+• System generates a Consolidated Pick Report only; no PDA allocation is required.
+• Picker picks total quantity by physical location according to Pick Sequence.
+• Picked goods move to Consolidation Area.
+• User opens existing WMS Picking-by-Order one order at a time and takes items from the consolidated pool instead of walking back
+to real locations.
+• WMS remains the final source of order confirmation/closure.
+Future automation may assign generated consolidation batches directly to PDA; this is an optional product enhancement and is not
+required for the report-based operating model defined here.
+10. Order Consolidation - Pre-screen, Matching & Batch Split Rules
+The backend uses Adaptive Pre-screen + Fixed Rule Matching. It may optimize candidate search strategy based on the daily order
+population, but business thresholds do not change automatically.
+10.1 Eligibility Pre-screen
+Rule Decision
+Order Date Compare only orders with the same Original Order Date
+Order > Maximum Unique SKU Exclude from consolidation; route to Single Order
+Cancelled / invalid / missing Bin Exclude / error queue
+Unique SKU Count Count SKU once per order even when same SKU appears in multiple bins
+Exact SKU Signature Same SKU set → P1 candidate directly
+Non-exact candidates Use SKU inverted index to avoid all-to-all comparisons
+10.2 Matching Priority
+Priority Match Rule Minimum Pieces Action
+P1 100% Perfect SKU match Config (initial >50) Create candidate
+P2 ≥ Config P2 threshold (initial 80%) Config (initial >50) Create candidate
+P3 ≥ Config P3 threshold (initial 50%) Config (initial ~80) Create candidate
+P4 ≥ Config P4 threshold (initial 30%) Config (initial >150) Create candidate
+P5 Does not qualify - Single Order
+Recommended symmetric pair match = Common Unique SKU / MAX(Unique SKU count of Order A, Order B). This prevents a 2-SKU
+order from being treated as a perfect match to a 10-SKU order.
+10.3 Configurable Batch Capacity
+Parameter Purpose
+Minimum Stores Minimum distinct stores required to release a batch
+Target Stores Preferred split size
+Maximum Stores Hard maximum distinct stores per batch
+
+-- 8 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 9
+Parameter Purpose
+Maximum Orders Optional independent cap because one store may contain multiple orders
+Maximum Unique SKU Eligibility/cap; no mandatory minimum Unique SKU
+Minimum Pieces by Priority Batch economics / workload threshold
+10.4 Batch Splitting
+Example If 20 stores are Perfect Match and Target Stores = 7 / Maximum Stores = 8, split to 7 + 7 + 6. Every resulting batch must
+independently pass the Minimum Pieces rule; redistribute stores to balance pieces where possible.
+• Orders selected into a released candidate must be locked against duplicate use.
+• Batch split should balance Store Count + Pieces, not Store Count alone.
+• If the final remainder cannot meet minimum criteria, keep it waiting for later matching or route to Single Order according to
+operational cut-off.
+
+-- 9 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 10
+11. Order Consolidation - Consolidation Pick Report
+The report is designed for A4 printing, compact layout, low visual clutter, and direct physical execution.
+Required Element Design Requirement
+Header Warehouse, Order Date, Batch No, Priority, generated time, supervisor, batch barcode
+Summary Stores, Orders, Unique SKU, Total Pieces, Zones covered
+Pick Lines Sorted by Location Master Pick Sequence
+Grouping key SKU + Bin Code; sum QTY across orders in batch
+Bin Barcode Mandatory printable barcode + human-readable Bin Code
+SKU Barcode Mandatory printable barcode + human-readable SKU
+Columns Seq, Zone, Aisle/Side, Bin, SKU, Description, Total Pick Qty, Stores, Orders
+Footer Pick instructions, consolidation instructions, page x/y
+Important A SKU appearing in B015 and R020 must produce two report rows even if it is the same SKU, because WMS has
+assigned two real pick locations.
+Mockup - A4 Consolidation Pick Report with Bin and SKU barcodes
+
+-- 10 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 11
+
+-- 11 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 12
+12. Order Picking Productivity - Assignment & Execution
+Productivity is tracked at Order level. An Order may touch one or more Zones through its lines; Zone is not an Order ownership field.
+12.1 Assignment Batch
+• Admin scans/selects Orders to create an Assignment Batch.
+• System sums planned pieces in real time.
+• Workload thresholds are configurable (initial benchmark around 300 pieces / one-hour work package).
+• Timer starts only when Admin confirms assignment. Picker does not scan to accept work.
+• Assignment batch may include Orders that touch multiple Zones; the previous cross-zone restriction is removed.
+• A Consolidation Batch may be linked as the source work package, and several consolidation/single orders may be included subject
+to workload rules.
+Workload Level Illustrative Default Display
+Low <270 pieces Yellow
+Target 270-300 Green
+Acceptable Over 301-330 Yellow
+Over Capacity >330 Red / warning
+All numeric values above must be configuration-driven.
+12.2 Picker Completion
+• Picker closes each Order by scan/button.
+• Complete 100% or Short Pick.
+• Short Pick captures Actual Picked Pieces, Short Pieces, Reason and Remark.
+• Picker Completed Time stops the Order-level picking KPI.
+• Admin waiting time is not included in Picker productivity.
+12.3 Consolidation interaction
+When orders are physically picked as a consolidation batch, all constituent orders can inherit the assignment start time. Each order
+records its own completion time when it is confirmed during consolidation / WMS order-by-order processing. Batch-level KPI is
+retained in parallel for fairness and operational analysis.
+
+-- 12 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 13
+13. Order Picking Productivity - Status, Backlog & KPI Rules
+Status Definition
+New Imported and available
+Assigned Assignment confirmed; timer started
+In Progress Picker working
+Warning Elapsed threshold reached (config)
+Overdue Overdue threshold reached
+Critical Critical threshold reached
+Picker Completed 100% Picker closed complete
+Picker Completed Short Picker closed with short pick
+Waiting Admin Verification Picker completed; admin pending
+Admin Rejected Returned for correction
+Correction in Progress Rework
+Final Closed 100% Admin confirmed complete
+Final Closed Short Admin confirmed short
+Picking Backlog Not Picker Completed by operational end-of-day
+Verification Backlog Picker completed but not admin confirmed
+Cancelled Cancelled by source/system rule
+KPI formulas
+KPI Formula / Rule
+Order Cycle Time Picker Completed Time - Assigned Time
+Actual Pieces / Hour Actual Picked Pieces / productive cycle hours
+Completed Orders / Hour Picker Completed Orders / productive hours
+Picking SLA Orders completed within configured SLA / completed orders
+100% Completion Rate 100% completed orders / picker-completed orders
+Short Pick Rate Short Pick orders / picker-completed orders
+Batch SLA Assignment/Consolidation batch completed within configured SLA
+Idle Time Next Assigned Time - previous batch completed time
+Backlog Rules
+• Backlog stores Original Order Date, Backlog Date, Completion Date and Backlog Age.
+• Productivity is credited to the date Picker Completed, even when the order began earlier.
+• Control Tower Total Backlog = Picking Backlog + Verification Backlog, with both types visible separately.
+
+-- 13 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 14
+14. Zone Dashboard & Control Tower
+Zone dashboard is location-driven while productivity remains Order-driven. An Order can appear in more than one Zone contribution
+if its lines are physically located in multiple Zones.
+14.1 Zone Dashboard
+KPI / View Definition
+Orders Touching Zone Distinct Orders with at least one line/Bin in the Zone; non-additive across Zones
+Planned Pieces Sum QTY for lines in the Zone
+Completed / Remaining Pieces Based on completion data available at line/order allocation level
+Unassigned / Assigned / In Progress Order states filtered to Orders touching the Zone
+Warning / Overdue / Critical Order alerts where the order touches the Zone
+Picker Completed Orders completed by picker
+Active Pickers Pickers whose current assignment contains work touching the Zone
+Picker Monitor Picker, current batch/orders, zones involved, times, pieces, productivity, status
+Dashboard interpretation Orders Touching Zone must not be summed across Zone cards to obtain Total Orders. The Control
+Tower Total Orders is the unique Order count from Order Core.
+14.2 Control Tower
+• Total Orders / Total Pieces / Completed / Remaining
+• Total Backlog split Picking vs Verification
+• Unassigned / Assigned / In Progress / Warning / Overdue / Critical / Picker Completed
+• Waiting Admin / Final Closed / Rejected
+• Overall SLA / Avg Cycle Time / Pieces per Hour / Active Pickers / Short Pick
+• Zone status cards with Green / Yellow / Red thresholds and drilldown
+• Daily/weekly trend and top delayed orders/pickers
+
+-- 14 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 15
+15. Front-end UX/UI & CSS Design Standard
+Front-end navigation must follow the operational sequence so users move naturally from Order Import → Consolidation Analysis →
+Pick Report → Work Assignment → Productivity Monitoring → Reporting / Administration.
+Menu Group Menu Primary Users
+Overview 1. Operations Dashboard Manager / Supervisor
+Order Core 2. Order Pool / Import Status Admin / Planner
+Consolidation 3. Matching Dashboard Supervisor / Planner
+Consolidation 4. Matching Analysis & Batch Review Supervisor / Planner
+Consolidation 5. Consolidation Pick Report Supervisor / Picker
+Consolidation 6. Consolidation History Supervisor / Viewer
+Picking Control 7. Work Assignment Admin / Supervisor
+Picking Control 8. Picker Monitor Admin / Zone Controller
+Picking Control 9. Zone Dashboard Zone Controller
+Picking Control 10. Control Tower Manager / Control Tower
+Picking Control 11. Backlog Monitor Admin / Manager
+Analytics 12. Productivity / SLA / Short Pick Manager / Supervisor
+Administration 13. User Management System Admin
+Administration 14. Location Master System Admin
+Administration 15. Configuration / Audit System Admin
+Global UX rules
+• Order Date defaults to Yesterday (D-1) on Order Consolidation screens. Database screens retain Week -1 transaction data; older
+productivity history is accessed from the weekly Google Sheets archive.
+• Use consistent colors: Green = ready/normal, Yellow/Orange = attention, Red = overdue/critical/error, Purple =
+matching/analysis, Blue = navigation/action.
+• KPI cards must be clickable for drilldown.
+• Filters should persist during navigation within a module.
+• Every destructive/override action requires confirmation and reason where applicable.
+• Tables support search, sort, pagination, export and visible filter chips.
+• Role-based menu hides irrelevant modules and actions.
+15.1 Visual Direction
+• Style: modern warehouse operations dashboard, clean/light content canvas, dark navigation, strong icon language, high
+information density without visual clutter.
+• Beautrium identity: primary Red / Black / Gray / White. Semantic operational colors are allowed for status and matching so
+meaning remains immediately visible.
+• Use one consistent icon library across the Product (Lucide, Material Symbols or equivalent SVG icon set). Do not mix unrelated
+icon styles.
+15.2 CSS Design Tokens
+Recommended CSS variables / design tokens:
+
+-- 15 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 16
+--btm-red: #D71920; --btm-red-dark: #A50F15; --nav-bg: #15181E; --page-bg: #F5F6F8; --surface: #FFFFFF; --text: #1F2937; --
+muted: #6B7280; --border: #E5E7EB; --info: #2563EB; --success: #16A34A; --warning: #F59E0B; --danger: #DC2626; --match-
+analysis: #7C3AED;
+• Typography: Noto Sans Thai, Arial, sans-serif. Base 14px; page title 24-28px/700; section heading 18-20px/700; table 12-14px;
+numeric KPI 28-36px/700.
+• Spacing: 8px base grid. Main page padding 24px desktop / 16px tablet; card gap 16px; card padding 16-20px.
+• Cards: background #FFFFFF, 1px border #E5E7EB, radius 10-12px, subtle shadow only for hierarchy. Avoid heavy gradients.
+• Buttons: primary action uses Beautrium red; secondary uses neutral white/gray; analysis actions may use info blue/purple;
+destructive actions use danger red only.
+• Status colors: Green = Normal/Ready/Completed, Yellow = Warning, Orange = Overdue/attention, Red = Critical/Error, Purple =
+Matching/analysis, Gray = Closed/Inactive.
+15.3 Layout / Responsive Rules
+• Desktop-first operating size: 1366×768 and 1440×900. Left navigation 220-240px expanded and 64-72px collapsed.
+• Top application bar: page title, Order Date, Warehouse filter, notifications and current user. Order Consolidation Order Date
+defaults to Yesterday.
+• KPI cards use 4-7 cards per row depending on viewport; cards wrap responsively. Tables must keep key identifiers frozen/sticky
+where practical.
+• Picker/PDA screens are responsive and touch-friendly with minimum 44×44px interactive targets, high-contrast status chips and
+minimal typing.
+• A4 print/report CSS uses @page size A4 portrait; 10-12mm margins; hide navigation/buttons when printing; barcode area must
+not scale below scanner-readable size.
+15.4 Reusable Front-end Components
+• AppShell, SideNav, TopBar, PageHeader, FilterBar, KPICard, StatusChip, DataTable, EmptyState, AlertBanner, ConfirmDialog,
+AuditDrawer, BarcodeCell, ExportStatusCard, DatePresetPicker.
+• All tables support server-side pagination for high volume, column sorting, search, visible filters, export where permitted and clear
+loading/error/empty states.
+• Accessibility: keyboard focus visible; no status conveyed by color alone; text/icon label is required; contrast target WCAG AA for
+normal text.
+16. Mockup UX/UI
+The following mockups are reference concepts; field labels and final counts must follow the production data model.
+Mockup 1 - Order Consolidation Dashboard: daily matching potential, priorities, trend and actions
+
+-- 16 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 17
+
+-- 17 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 18
+Mockup 2 - Matching Analysis & Batch Review: candidate approval, split preview, rules
+
+-- 18 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 19
+Mockup 3 - Shared User Management: role, scope, permissions and audit
+
+-- 19 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 20
+Order Picking Productivity dashboard concepts from the existing requirement are retained as visual references. Zone logic uses WMS
+Bin Code joined to Location Master and never uses Division-based ownership.
+Mockup 4 - Zone Dashboard reference (to be updated to Orders Touching Zone / location-based Zone)
+
+-- 20 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 21
+Mockup 5 - Control Tower reference: total operation, backlog, Zone colors, alerts
+
+-- 21 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 22
+17. Configuration & Master Data
+Configuration Scope / Example
+Minimum Stores Consolidation eligibility
+Target Stores Preferred batch split
+Maximum Stores Consolidation hard cap
+Maximum Orders Independent order cap
+Maximum Unique SKU Consolidation eligibility / cap
+Minimum Pieces P1/P2/P3/P4 Priority-specific release threshold
+Match % P2/P3/P4 Priority thresholds
+Assignment target pieces Initial benchmark 300
+Assignment tolerance Low/target/acceptable/over-cap ranges
+Warning / Overdue / Critical minutes Order SLA alert thresholds
+Admin verification warning/overdue Verification SLA
+Zone color thresholds Green/Yellow/Red
+Operational day cutoff Backlog calculation
+Report barcode symbology Code128/other implementation choice
+Weekly productivity export enabled Enable/disable scheduled Google Sheets export
+Weekly export day/time/timezone Schedule; default timezone Asia/Bangkok
+Google Drive folder / naming pattern Target folder and BTM_Productivity_YYYY-Www file naming
+Transaction retention days Default 7 days / Week -1; configurable
+Purge schedule Housekeeping execution schedule
+Purge export safety gate Enabled; do not purge covered week until export SUCCESS +
+reconciliation
+Configuration governance
+• Effective Date / Active Flag / Version
+• Changed By / Changed At / Change Reason
+• Old and new value audit
+• Changes apply only to new batches/orders after effective activation; in-progress entities retain the configuration version used at
+creation.
+18. Functional Requirements
+ID Requirement Priority
+FR-001 Single login and role-based menu/action permission Must
+FR-002 Import WMS line-level orders with Bin Code; show import summary Must
+FR-003 Deduplicate/upsert without duplicating QTY; change log allowed updates Must
+FR-004 Join every valid Bin Code to Location Master Zone and Pick Sequence Must
+FR-005 Default Order Consolidation Order Date to yesterday (D-1) Must
+
+-- 22 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 23
+ID Requirement Priority
+FR-006 Pre-screen order eligibility using configurable Maximum Unique SKU Must
+FR-007 Generate P1 exact SKU signature candidates without pairwise calculation Must
+FR-008 Generate P2-P4 using configured symmetric SKU match thresholds Must
+FR-009 Split matching groups to store/order capacity and balance pieces Must
+FR-010 Lock orders to prevent duplicate released consolidation membership Must
+FR-011 Generate A4 Consolidated Pick Report sorted by Pick Sequence Must
+FR-012 Report prints Bin barcode + SKU barcode and separates same SKU across different
+bins Must
+FR-013 Admin creates Assignment Batch and sees pieces accumulated real-time Must
+FR-014 Configurable workload colors/thresholds and authorized override Must
+FR-015 Timer starts only when Admin confirms assignment Must
+FR-016 Picker closes each Order; complete or short pick Must
+FR-017 Admin verifies / confirms / rejects; waiting time excluded from picker KPI Must
+FR-018 Track productivity at Order level Must
+FR-019 Zone dashboard derives Zone from Order Line Bin Code, not Division Must
+FR-020 Control Tower uses unique Total Orders and separately shows Zone touching
+workload Must
+FR-021 Separate Picking and Verification Backlog Must
+FR-022 Weekly Productivity Export to Google Sheets with reconciliation,
+retry and export status Must
+FR-023
+Scheduled purge keeps only rolling 7 days of high-volume
+transaction data; purge is blocked unless the required weekly export
+succeeded
+Must
+FR-024 Configuration changes do not require code deployment, including
+matching, workload, export schedule and retention days Must
+FR-025 Support linking consolidation batches to productivity
+assignment/work packages Should
+FR-026 Google Sheets export creates a new weekly spreadsheet in the
+configured Google Drive folder using order-level productivity data Must
+FR-027 System retains master data, user/role data and active configuration
+independently from the 7-day transaction purge Must
+
+-- 23 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 24
+19. Non-Functional Requirements
+Category Requirement
+Performance Common screens target <3 seconds under normal load; dashboard refresh target 15-60
+seconds; batch generation should run asynchronously when population is large.
+Capacity Minimum design for 5,000 orders/day and line volume growth; no all-to-all matching
+across full population.
+Retention Rolling 7 days online data with archive/growth strategy.
+Availability Business-hours availability; backup and recovery supported.
+Security HTTPS, RBAC, password/SSO option, audit logging.
+Data Integrity Transactional batch lock/assignment/close operations; unique constraints.
+Usability PC-first planning/monitoring; responsive PDA/mobile execution for picker.
+Browser Current Chrome / Edge; responsive web.
+Maintainability Configuration-driven thresholds and master data.
+Observability Application logs, import error logs, job monitoring, DB metrics and alerting.
+Print A4 report must render consistently with barcode quiet zones and readable text.
+Data Retention High-volume transactional database retains only rolling 7 days by default;
+purge is scheduled and export-gated.
+External Export Weekly Google Sheets export must be idempotent/re-runnable and reconcile
+control totals before success.
+Frontend Standard Central CSS/design-token layer; responsive desktop/PDA layouts; reusable
+component library; print-specific A4 stylesheet.
+Housekeeping Scheduled jobs must be observable with last run, next run, status, affected rows
+and failure alert.
+20. Reports & Exports
+• Daily Consolidation Matching Summary
+• Candidate / Excluded / Single Order Analysis
+• Consolidation Batch and Split History
+• Consolidated Pick Report A4
+• Daily Order Progress
+• Picker Productivity by Day / Shift / Zone Contribution
+• Assignment Batch Performance / Override
+• Warning / Overdue / Critical Detail
+• Short Pick Reason Analysis
+• Picking and Verification Backlog Aging
+• Admin Verification Time
+• Historical Weekly / Monthly Trend
+• Excel export with filter criteria and generated timestamp
+20.1 Weekly Productivity Export to Google Sheets
+Purpose: move completed productivity history out of the transactional database every week while keeping a business-readable
+historical archive.
+• Export grain: one row per Order productivity result; include Order No, Original Order Date, Store, Picker, Assigned Time, Picker
+Completed Time, Planned Pieces, Actual Pieces, Cycle Minutes, Pieces/Hour, Completion Result, Short Pick Reason, backlog
+indicators and relevant Zone contribution summary.
+
+-- 24 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 25
+• Default schedule: weekly after operational week close. Day/time, timezone, Drive folder and file naming are configuration values;
+default timezone = Asia/Bangkok.
+• Output method: Google Sheets API using a service account or organization-approved OAuth identity. Credentials are stored in
+secure environment/secret storage, never in source code or database plain text.
+• Output file: create a new spreadsheet per week named BTM_Productivity_YYYY-Www to avoid Google Sheets cell-limit growth in
+one long-running workbook.
+• Export control totals: row count, total planned pieces, total actual pieces, completed orders and short-pick orders must reconcile
+with database totals for the exported week.
+• Export status: PENDING → RUNNING → SUCCESS / FAILED. Failed exports retry automatically and generate an alert for
+authorized users.
+20.2 Transaction Data Retention / Week -1
+• Default transaction_retention_days = 7. This value is configurable and not hard-coded.
+• Purge applies to high-volume historical transaction tables such as imported order snapshots, order lines no longer active,
+matching candidates/history, completed assignment execution details and derived dashboard aggregates older than retention.
+• Purge does not delete active/in-progress orders, users, roles, Location Master, Zone data, configuration, reason masters, or
+records required to operate the current system.
+• Safety gate: data for a completed week cannot be purged until the corresponding weekly Google Sheets export status is SUCCESS
+and reconciliation passed.
+• Purge job records purge date, covered period, row counts by table, export reference, executed-by/system job ID and result in
+housekeeping audit log.
+21. Data Model & Key Relationships
+Entity Key Fields / Purpose
+orders order_id, order_no, original_date, store_code, planned_pieces, unique_sku, status
+order_lines line_id, order_id, sku, bin_code, qty, zone_code, pick_sequence
+locations bin_code, zone, aisle, side_pair, direction, bay, level, block, pick_sequence, active
+consolidation_batches consol_batch_id, order_date, priority, match_pct, stores, orders, sku, pieces, config_version, status
+consolidation_orders consol_batch_id, order_id, sequence
+assignment_batches assignment_batch_id, picker_id, admin_id, assigned_time, planned_pieces, workload_status, config_version
+assignment_orders assignment_batch_id, order_id, sequence, source_type/source_id
+picker_completions order_id, picker_completed_time, actual_pieces, result, short_reason, remark
+admin_verifications order_id, admin_id, decision, verified_time, reject_reason
+employees/users user_id, employee_id, name, role, scope, active
+configuration key, value, scope, effective_date, version, active
+status_history entity_type, entity_id, old/new status, user, timestamp, reason
+audit_logs user, action, entity, before/after, timestamp
+Recommended indexes: order_no + original_date; order status; order_lines(bin_code); order_lines(sku); zone_code; consolidation
+status/date; picker_id; assigned_time; picker_completed_time; assignment_batch_id.
+
+-- 25 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 26
+22. API / Integration Concept
+Interface Initial Future
+Order Import Excel/CSV upload WMS API / scheduled transfer
+Location Master Excel upload / DB master Master API
+Authentication Local / enterprise login option SSO / directory integration
+Consolidation Output Print/PDF + DB status PDA task API
+Picking Status Web/PDA action WMS event/API sync
+Notifications In-app LINE / Email / Teams where approved
+Weekly Productivity Archive Google Sheets API / Google Drive folder Scheduled weekly export with reconciliation
+and retry
+Suggested internal API domains
+• /orders, /imports, /locations, /matching, /consolidation-batches, /pick-reports, /assignment-batches, /picker-completions,
+/verifications, /dashboards, /configurations, /users, /audit
+23. Security, Audit & Data Integrity
+• RBAC at both menu and action level.
+• Warehouse/Zone access scope where required.
+• Override requires role + reason + audit.
+• Batch generation/release must use transaction/locking to prevent the same order from being released twice.
+• Configuration version must be recorded on created batches.
+• Import source file metadata and row-level error reason retained.
+• Admin verification decision, Short Pick and status changes are immutable history records even if current state changes.
+• Sensitive credentials must not be stored in plain text; use secure hashing/SSO as appropriate.
+24. Acceptance Criteria / UAT
+ID Scenario / Expected Result
+UAT-01 Import the same WMS file twice; no duplicated order/line QTY.
+UAT-02 One SKU appears in two Bin Codes in the same order; unique SKU count = 1 but report contains two physical pick lines.
+UAT-03 Unknown Bin Code is blocked from released pick report and appears in error queue.
+UAT-04 Exact same SKU signature creates P1 candidate without pairwise matching.
+UAT-05 Order above configured Maximum Unique SKU is excluded to Single Order.
+UAT-06 20-store perfect match splits to capacity-compliant batches and each meets min pieces.
+UAT-07 A4 report sorts by composite Pick Sequence and barcodes are scannable.
+UAT-08 Assignment pieces accumulate instantly and color follows configuration.
+UAT-09 Timer starts only at Confirm Assignment.
+UAT-10 Picker closes order; KPI stops at Picker Completed.
+UAT-11 Short Pick requires actual/short/reason and remark where configured.
+UAT-12 Admin confirmation makes Final Closed; reject returns to correction.
+
+-- 26 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 27
+ID Scenario / Expected Result
+UAT-13 Order with Shelf + Rack lines appears as one order productivity record and contributes pieces to both Zones.
+UAT-14 Control Tower Total Orders remains unique and is not equal to sum of Orders Touching Zone.
+UAT-15 Picking and Verification Backlog are separated correctly across day end.
+UAT-16 Role permission hides/blocks unauthorized menu/action.
+UAT-17 Configuration change is effective-dated and does not change in-progress batch rules.
+UAT-18 Historical search and Excel export works for weekly Google Sheets archive.
+
+-- 27 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 28
+25. Implementation Boundary
+Implementation
+Responsibility Requirement Boundary Required Outcome
+Product
+Requirement
+Business rules, shared order core, module behavior, UX/UI
+standard, integration rules, data retention and UAT criteria
+Requirements in this document
+remain the source of truth
+Programmer / AI
+Coding
+Technical decomposition, task sequence, code architecture
+within stated constraints, effort estimation and release
+packaging
+Implementation plan does not change
+business logic
+Quality / UAT Functional test, performance test, security test, print/barcode
+validation and reconciliation testing
+All Must requirements and acceptance
+criteria pass
+Deployment /
+Operations
+Environment setup, secrets, scheduled jobs, backup, monitoring
+and production support
+Stable production operation and
+recoverability
+Future
+Enhancement
+PDA consolidation tasks, WMS API automation, notifications,
+forecasting and advanced intelligence
+Added only without breaking
+approved Product behavior
+This document defines Product behavior, data rules, UX/UI standards, integrations, retention and acceptance criteria only.
+Task decomposition, coding sequence, effort estimation and release planning are implementation responsibilities of the Programmer /
+AI coding workflow and must not change the business rules defined in this document.
+• Implementation may be delivered incrementally as long as Shared Order Core remains the single source of truth and module
+behavior remains backward compatible with the approved Product Requirement.
+•
+•
+26. Defined Business Rules & Technical Defaults
+Item Defined Rule / Technical Default
+Operational day / Order date Order Consolidation defaults to D-1. Backlog and productivity use the
+operational date rules in this requirement.
+Assignment capacity Pieces target/tolerance and optional maximum order count are
+configuration-driven.
+Barcode symbology Code128 is the default for Bin and SKU barcodes unless an existing WMS
+barcode standard is supplied.
+Zone derivation Zone is derived from WMS Bin Code through Location Master. Division is not
+used.
+Multiple orders per store Allowed. Distinct Store and Order counts are tracked separately.
+Location stock choice Not performed by this Product. WMS-provided Bin Code is the authoritative
+physical pick location.
+Productivity grain Productivity is measured at Order level; Zone contribution is derived from
+Order Lines / Bin Code.
+Weekly productivity archive A new Google Spreadsheet is generated weekly in a configured Drive folder;
+export must reconcile row count and totals before status = SUCCESS.
+Database retention
+High-volume transaction data older than 7 days is purged only after the
+related weekly export is SUCCESS. Master/config/user records are excluded
+from purge.
+Implementation sequencing Programmer / AI coding team determines technical decomposition, coding
+sequence and release packaging; this is outside the Product Requirement.
+All values below are implementation defaults or configuration rules. The document contains no pending business question and does
+not require confirmation before development starts.
+
+-- 28 of 29 --
+
+Beautrium Order Management System
+Confidential - For solution design and development Page 29
+Appendix A. Field Dictionary - Core
+Field Type Concept Notes
+order_no string WMS order identifier
+original_order_date date Matching partition / historical key
+store_code string Store destination
+sku string Matching unique SKU basis
+bin_code string Actual WMS pick location
+qty decimal/int Planned pieces
+zone_code string derived From Location Master by Bin
+pick_sequence string/numeric composite Physical sort key
+consolidation_batch_id string Optimization batch
+assignment_batch_id string Productivity work package
+picker_completed_time datetime Stops order KPI
+actual_picked_pieces numeric Completion KPI
+short_reason master code Required for short pick
+Appendix B. Status Matrix
+Entity Representative Statuses
+Order New, Assigned, In Progress, Warning, Overdue, Critical, Picker Completed, Waiting Admin, Final
+Closed, Backlog, Cancelled
+Consolidation Batch Candidate, Review, Approved, Report Released, Picking, At Consolidation, Sorting, Completed,
+Cancelled
+Assignment Batch Draft, Assigned, In Progress, Completed, Over Capacity Override, Cancelled
+Import Uploaded, Validating, Completed, Completed with Errors, Failed
+Appendix C. Source / Baseline Notes
+This requirement consolidates the existing Picking Productivity & Operation Control Tower baseline with the latest Order
+Consolidation rules: Shared Order Core, no Division-to-Zone mapping, Zone derived from WMS Bin Code through Location Master,
+order-level productivity, multi-Zone order contribution, WMS Bin Code as the authoritative pick location, and physical Pick Sequence
+ordering.
+End of document
+
+-- 29 of 29 --
+

@@ -2,15 +2,18 @@ import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { ReasonMasterManager } from '@/components/admin/ReasonMasterManager'
 import { ConfigEditor } from '@/components/admin/ConfigEditor'
+import { HousekeepingPanel } from '@/components/admin/HousekeepingPanel'
 import { createClient } from '@/lib/supabase/server'
 
 export default async function AdminPage() {
   const supabase = await createClient()
 
-  const [{ data: reasons }, { data: configs }, { data: auditLogs }] = await Promise.all([
+  const [{ data: reasons }, { data: configs }, { data: auditLogs }, { data: exportJobs }, { data: purgeLog }] = await Promise.all([
     supabase.from('reason_master').select('reason_code, reason_type, label_en, label_th, active').order('reason_type').order('reason_code'),
     supabase.from('configuration').select('key, value, version').eq('active', true).order('key'),
     supabase.from('audit_logs').select('id, user_id, action, entity_type, entity_id, created_at').order('created_at', { ascending: false }).limit(30),
+    supabase.from('export_jobs').select('id, status, period_start, period_end, row_count, target_ref, finished_at, error_detail').order('created_at', { ascending: false }).limit(10),
+    supabase.from('purge_log').select('id, covered_period_start, table_name, rows_purged, result, created_at').order('created_at', { ascending: false }).limit(20),
   ])
 
   return (
@@ -19,6 +22,7 @@ export default async function AdminPage() {
       <div className="page-body">
         <ReasonMasterManager reasons={reasons ?? []} />
         <ConfigEditor configs={configs ?? []} />
+        <HousekeepingPanel exportJobs={exportJobs ?? []} purgeLog={purgeLog ?? []} />
 
         <div className="card" style={{ flex: 1, minHeight: 0 }}>
           <div className="card-title">Audit Trail</div>

@@ -34,15 +34,16 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Picking Control',
     items: [
       { id: 7, en: 'Work Assignment', th: 'มอบหมายงาน', path: '/assignment' },
-      { id: 8, en: 'Picker Monitor', th: 'ติดตามผู้หยิบสินค้า', path: '/verification' },
-      { id: 9, en: 'Zone Dashboard', th: 'แดชบอร์ดโซน' },
+      { id: 8, en: 'Pick Completion', th: 'บันทึกผลการหยิบ (หน้างาน)', path: '/pick-completion' },
+      { id: 16, en: 'Admin Verification', th: 'ตรวจสอบยืนยันโดยแอดมิน', path: '/verification' },
+      { id: 9, en: 'Zone Dashboard', th: 'แดชบอร์ดโซน', path: '/zone-dashboard' },
       { id: 10, en: 'Control Tower', th: 'ศูนย์ควบคุม', path: '/control-tower' },
-      { id: 11, en: 'Backlog Monitor', th: 'งานคงค้าง' },
+      { id: 11, en: 'Backlog Monitor', th: 'งานคงค้าง', path: '/backlog' },
     ],
   },
   {
     label: 'Analytics',
-    items: [{ id: 12, en: 'Productivity / SLA / Short Pick', th: 'ผลิตภาพ / SLA / หยิบขาด' }],
+    items: [{ id: 12, en: 'Productivity / SLA / Short Pick', th: 'ผลิตภาพ / SLA / หยิบขาด', path: '/productivity' }],
   },
   {
     label: 'Administration',

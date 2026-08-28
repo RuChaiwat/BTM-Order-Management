@@ -17,14 +17,18 @@ export const ROLE_LABELS: Record<string, string> = {
   viewer: 'Viewer',
 }
 
+// id 8 = Pick Completion (picker's own field/PDA screen); id 16 = Admin Verification
+// (office-only confirm/reject). Split from a single combined "Picker Monitor" menu item so the
+// two audiences — floor pickers vs. office admins — don't share a screen (see requirement
+// clarification: picker is at the work site, admin confirms in the office/WMS).
 export const ROLE_MENU_ACCESS: Record<string, number[]> = {
-  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-  warehouse_manager: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15],
-  supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15],
-  planner_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+  warehouse_manager: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 14, 15, 16],
+  supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16],
+  planner_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16],
   zone_controller: [1, 3, 8, 9, 10, 11, 12],
   picker: [1, 7, 8],
-  viewer: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12],
+  viewer: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 16],
 }
 
 export function canAccessMenuItem(role: string, navItemId: number): boolean {

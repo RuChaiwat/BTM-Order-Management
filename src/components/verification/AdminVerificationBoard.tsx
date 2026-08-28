@@ -1,8 +1,18 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
+
+interface ShortLine {
+  line_id: string
+  ordered_qty: number
+  picked_qty: number
+  short_reason_code: string | null
+  remark: string | null
+  sku: string
+  item_description: string | null
+}
 
 interface QueueOrder {
   order_id: string
@@ -11,46 +21,66 @@ interface QueueOrder {
   planned_pieces: number
   pickerName: string
   waitMinutes: number
+  shortLines: ShortLine[]
   completion?: { actual_pieces: number; result: string; remark: string | null; picker_completed_time: string } | null
 }
 
-interface ActiveOrder {
-  order_id: string
-  order_no: string
-  planned_pieces: number
-  pickerName: string
-}
-
-interface Reason {
-  reason_code: string
-  label_en: string
-}
-
-export function AdminVerificationBoard({ queue, active, shortPickReasons }: { queue: QueueOrder[]; active: ActiveOrder[]; shortPickReasons: Reason[] }) {
+/** §12.3 Admin Verification — office-only screen (picker is at the work site; this is the admin
+ * confirming the pick in the WMS). Queue is sorted by the order in which pickers finished
+ * (oldest first). Admin can confirm one order, or Confirm All to close out the whole queue. */
+export function AdminVerificationBoard({ queue }: { queue: QueueOrder[] }) {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState(queue[0]?.order_id ?? '')
   const [showReject, setShowReject] = useState(false)
-  const [reason, setReason] = useState(shortPickReasons[0]?.reason_code ?? '')
+  const [showConfirmAll, setShowConfirmAll] = useState(false)
   const [remark, setRemark] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const selected = queue.find((o) => o.order_id === selectedId) ?? queue[0]
 
+  async function postDecision(orderId: string, decision: 'final_close' | 'reject', rejectReason?: string) {
+    const res = await fetch('/api/admin-verifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId, decision, reject_reason: rejectReason }),
+    })
+    if (!res.ok) {
+      const body = await res.json()
+      throw new Error(body.error)
+    }
+  }
+
   async function verify(decision: 'final_close' | 'reject') {
     if (!selected) return
     setBusy(true)
     setError(null)
-    const res = await fetch('/api/admin-verifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: selected.order_id, decision, reject_reason: decision === 'reject' ? remark || 'Rejected for correction' : undefined }),
-    })
-    const body = await res.json()
+    try {
+      await postDecision(selected.order_id, decision, decision === 'reject' ? remark || 'Rejected for correction' : undefined)
+      setShowReject(false)
+      setRemark('')
+      router.refresh()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmAll() {
+    setBusy(true)
+    setError(null)
+    const failures: string[] = []
+    for (const o of queue) {
+      try {
+        await postDecision(o.order_id, 'final_close')
+      } catch (e) {
+        failures.push(`${o.order_no}: ${(e as Error).message}`)
+      }
+    }
     setBusy(false)
-    if (!res.ok) return setError(body.error)
-    setShowReject(false)
-    setRemark('')
+    setShowConfirmAll(false)
+    if (failures.length > 0) setError(failures.join('; '))
     router.refresh()
   }
 
@@ -58,14 +88,15 @@ export function AdminVerificationBoard({ queue, active, shortPickReasons }: { qu
     <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div className="page-body" style={{ display: 'grid', gridTemplateColumns: '1fr 440px', gap: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
-          <QuickPickerActions active={active} shortPickReasons={shortPickReasons} onDone={() => router.refresh()} />
-
           <div className="card" style={{ minHeight: 0 }}>
-            <div className="card-title">Verification queue</div>
-            <div className="card-subtitle" style={{ marginBottom: 12 }}>
-              sorted by wait time
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span className="card-title">Verification queue</span>
+              <span className="card-subtitle">sorted by picker completion time — oldest first</span>
+              <button className="btn btn-success btn-sm" style={{ marginLeft: 'auto' }} disabled={queue.length === 0 || busy} onClick={() => setShowConfirmAll(true)}>
+                Confirm All ({queue.length})
+              </button>
             </div>
-            <table className="table">
+            <table className="table" style={{ marginTop: 8 }}>
               <thead>
                 <tr>
                   <th>ORDER NO.</th>
@@ -76,24 +107,21 @@ export function AdminVerificationBoard({ queue, active, shortPickReasons }: { qu
                 </tr>
               </thead>
               <tbody>
-                {queue
-                  .slice()
-                  .sort((a, b) => b.waitMinutes - a.waitMinutes)
-                  .map((o) => (
-                    <tr key={o.order_id} className={o.order_id === selectedId ? 'row-flag' : undefined} onClick={() => setSelectedId(o.order_id)} style={{ cursor: 'pointer' }}>
-                      <td className="link">{o.order_no}</td>
-                      <td>{o.pickerName}</td>
-                      <td>
-                        {o.planned_pieces} / {o.completion?.actual_pieces ?? '—'}
-                      </td>
-                      <td>
-                        <span className={`badge badge-${o.completion?.result === '100_percent' ? 'success' : 'warning'}`}>
-                          {o.completion?.result === '100_percent' ? '100%' : `Short ${o.planned_pieces - (o.completion?.actual_pieces ?? 0)}`}
-                        </span>
-                      </td>
-                      <td>{o.waitMinutes}m</td>
-                    </tr>
-                  ))}
+                {queue.map((o) => (
+                  <tr key={o.order_id} className={o.order_id === selectedId ? 'row-flag' : undefined} onClick={() => setSelectedId(o.order_id)} style={{ cursor: 'pointer' }}>
+                    <td className="link">{o.order_no}</td>
+                    <td>{o.pickerName}</td>
+                    <td>
+                      {o.planned_pieces} / {o.completion?.actual_pieces ?? '—'}
+                    </td>
+                    <td>
+                      <span className={`badge badge-${o.completion?.result === '100_percent' ? 'success' : 'warning'}`}>
+                        {o.completion?.result === '100_percent' ? '100%' : `Short ${o.planned_pieces - (o.completion?.actual_pieces ?? 0)}`}
+                      </span>
+                    </td>
+                    <td>{o.waitMinutes}m</td>
+                  </tr>
+                ))}
                 {queue.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
@@ -130,6 +158,20 @@ export function AdminVerificationBoard({ queue, active, shortPickReasons }: { qu
                   <div style={{ fontWeight: 700 }}>{selected.waitMinutes}m</div>
                 </div>
               </div>
+              {selected.shortLines.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Short-picked items</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {selected.shortLines.map((l) => (
+                      <div key={l.line_id} style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>
+                        <strong>{l.sku}</strong> — {l.picked_qty} / {l.ordered_qty}
+                        {l.short_reason_code && <span style={{ color: '#6B7280' }}> · {l.short_reason_code}</span>}
+                        {l.remark && <div style={{ color: '#6B7280' }}>{l.remark}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {selected.completion?.remark && (
                 <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '12px 14px', fontSize: 12, lineHeight: 1.6, marginBottom: 16 }}>
                   <span style={{ color: '#6B7280' }}>Picker remark</span>
@@ -152,10 +194,24 @@ export function AdminVerificationBoard({ queue, active, shortPickReasons }: { qu
         </div>
       </div>
 
+      {showConfirmAll && (
+        <Modal title={`Confirm all ${queue.length} orders?`} subtitle="ยืนยันทั้งหมด">
+          <div className="modal-body">Every order in the verification queue will be marked Final Closed. This cannot be undone.</div>
+          <ModalFooter>
+            <button className="modal-footer-btn btn-secondary" onClick={() => setShowConfirmAll(false)}>
+              Cancel
+            </button>
+            <button className="modal-footer-btn btn-success" style={{ minWidth: 170, border: 0 }} disabled={busy} onClick={confirmAll}>
+              {busy ? 'Confirming…' : `Confirm all ${queue.length}`}
+            </button>
+          </ModalFooter>
+        </Modal>
+      )}
+
       {showReject && selected && (
         <Modal title={`Reject ${selected.order_no} for correction?`} subtitle="ส่งกลับเพื่อแก้ไข">
           <div className="modal-body" style={{ paddingTop: 14 }}>
-            The order returns to <strong>Correction in Progress</strong>. A reason is required and written to the audit trail.
+            The order returns to <strong>Correction in Progress</strong> for the picker to re-check. A reason is required and written to the audit trail.
           </div>
           <div style={{ padding: '16px 24px 0' }}>
             <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>
@@ -178,55 +234,6 @@ export function AdminVerificationBoard({ queue, active, shortPickReasons }: { qu
           </ModalFooter>
         </Modal>
       )}
-    </div>
-  )
-}
-
-function QuickPickerActions({ active, shortPickReasons, onDone }: { active: ActiveOrder[]; shortPickReasons: Reason[]; onDone: () => void }) {
-  const [orderId, setOrderId] = useState(active[0]?.order_id ?? '')
-  const [actualPieces, setActualPieces] = useState('')
-  const [busy, setBusy] = useState(false)
-  const order = useMemo(() => active.find((o) => o.order_id === orderId), [active, orderId])
-
-  async function complete() {
-    if (!order) return
-    setBusy(true)
-    const actual = Number(actualPieces || order.planned_pieces)
-    await fetch('/api/picker-completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        order_id: order.order_id,
-        actual_pieces: actual,
-        short_reason_code: actual < order.planned_pieces ? shortPickReasons[0]?.reason_code : undefined,
-      }),
-    })
-    setBusy(false)
-    setActualPieces('')
-    onDone()
-  }
-
-  if (active.length === 0) return null
-
-  return (
-    <div className="card">
-      <div className="card-title">Picker Monitor (quick action)</div>
-      <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        No dedicated PDA screen in this build yet — use this to mark an in-progress order as picker-completed for testing
-      </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
-        <select className="control" value={orderId} onChange={(e) => setOrderId(e.target.value)}>
-          {active.map((o) => (
-            <option key={o.order_id} value={o.order_id}>
-              {o.order_no} · {o.pickerName} · plan {o.planned_pieces}
-            </option>
-          ))}
-        </select>
-        <input className="control" placeholder={`Actual pcs (default ${order?.planned_pieces ?? ''})`} value={actualPieces} onChange={(e) => setActualPieces(e.target.value)} style={{ width: 180 }} />
-        <button className="btn btn-primary btn-sm" disabled={busy} onClick={complete}>
-          Mark completed
-        </button>
-      </div>
     </div>
   )
 }

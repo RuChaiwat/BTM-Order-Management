@@ -14,16 +14,18 @@ export async function AppLayout({ activeNavId, children }: AppLayoutProps) {
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
-  const [orderPool, assignable, backlog] = await Promise.all([
+  const [orderPool, assignable, backlog, verificationQueue] = await Promise.all([
     admin.from('orders').select('order_id', { count: 'exact', head: true }).eq('status', 'new'),
     admin.from('orders').select('order_id', { count: 'exact', head: true }).in('status', ['assigned', 'in_progress']),
     admin.from('order_alerts').select('order_id', { count: 'exact', head: true }).eq('is_picking_backlog', true),
+    admin.from('orders').select('order_id', { count: 'exact', head: true }).in('status', ['picker_completed_100', 'picker_completed_short']),
   ])
 
   const badges: Record<number, string> = {
     2: String(orderPool.count ?? 0),
     7: String(assignable.count ?? 0),
     11: String(backlog.count ?? 0),
+    16: String(verificationQueue.count ?? 0),
   }
 
   return (

@@ -34,7 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Picking Control',
     items: [
       { id: 7, en: 'Work Assignment', th: 'มอบหมายงาน', path: '/assignment' },
-      { id: 8, en: 'Picker Monitor', th: 'ติดตามผู้หยิบสินค้า' },
+      { id: 8, en: 'Picker Monitor', th: 'ติดตามผู้หยิบสินค้า', path: '/verification' },
       { id: 9, en: 'Zone Dashboard', th: 'แดชบอร์ดโซน' },
       { id: 10, en: 'Control Tower', th: 'ศูนย์ควบคุม', path: '/control-tower' },
       { id: 11, en: 'Backlog Monitor', th: 'งานคงค้าง' },

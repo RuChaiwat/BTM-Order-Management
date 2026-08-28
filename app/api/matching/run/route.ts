@@ -89,8 +89,32 @@ export async function POST(request: Request) {
       .single()
     if (batchError || !batch) continue
 
-    await admin.from('consolidation_orders').insert(group.orderIds.map((orderId, i) => ({ consol_batch_id: batch.consol_batch_id, order_id: orderId, sequence: i + 1 })))
-    await admin.from('orders').update({ consolidation_batch_id: batch.consol_batch_id }).in('order_id', group.orderIds)
+    const { error: linkError } = await admin
+      .from('consolidation_orders')
+      .insert(group.orderIds.map((orderId, i) => ({ consol_batch_id: batch.consol_batch_id, order_id: orderId, sequence: i + 1 })))
+    if (linkError) {
+      // don't leave a batch behind that claims orders it isn't actually linked to
+      await admin.from('consolidation_batches').delete().eq('consol_batch_id', batch.consol_batch_id)
+      await writeAudit(admin, {
+        userId: caller.user_id,
+        action: 'matching.link_failed',
+        entityType: 'consolidation_batches',
+        entityId: batch.consol_batch_id,
+        after: { error: linkError.message, order_ids: group.orderIds },
+      })
+      continue
+    }
+
+    const { error: updateError } = await admin.from('orders').update({ consolidation_batch_id: batch.consol_batch_id }).in('order_id', group.orderIds)
+    if (updateError) {
+      await writeAudit(admin, {
+        userId: caller.user_id,
+        action: 'matching.order_link_failed',
+        entityType: 'consolidation_batches',
+        entityId: batch.consol_batch_id,
+        after: { error: updateError.message, order_ids: group.orderIds },
+      })
+    }
     createdBatches.push(batch)
   }
 

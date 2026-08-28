@@ -3,14 +3,14 @@ import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { KpiCard } from '@/components/KpiCard'
 import { getSessionUser } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getControlTowerData } from '@/lib/queries/controlTower'
 
 export default async function ControlTowerPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const supabase = await createClient()
-  const data = await getControlTowerData(supabase, user.warehouse_code ?? 'DC002')
+  const admin = createAdminClient()
+  const data = await getControlTowerData(admin, user.warehouse_code ?? 'DC002')
   const totalBacklog = data.kpis.pickingBacklog + data.kpis.verificationBacklog
 
   return (

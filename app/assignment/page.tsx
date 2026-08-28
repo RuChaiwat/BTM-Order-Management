@@ -3,20 +3,26 @@ import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { WorkAssignmentBoard } from '@/components/assignment/WorkAssignmentBoard'
 import { getSessionUser } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function WorkAssignmentPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const warehouseCode = user.warehouse_code ?? 'DC002'
-  const supabase = await createClient()
+  const admin = createAdminClient()
 
-  const [{ data: pendingOrders }, { data: lines }, { data: pickers }, { data: zoneRows }] = await Promise.all([
-    supabase.from('orders').select('order_id, order_no, store_code, original_order_date, planned_pieces, unique_sku_count').eq('warehouse_code', warehouseCode).eq('status', 'new'),
-    supabase.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode),
-    supabase.from('employees_users').select('user_id, name_en, zone_scope').eq('warehouse_code', warehouseCode).eq('role', 'picker').eq('active', true),
-    supabase.from('locations').select('zone_code').eq('warehouse_code', warehouseCode).eq('active', true),
+  const [ordersRes, linesRes, pickersRes, zoneRowsRes] = await Promise.all([
+    admin.from('orders').select('order_id, order_no, store_code, original_order_date, planned_pieces, unique_sku_count').eq('warehouse_code', warehouseCode).eq('status', 'new'),
+    admin.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode),
+    admin.from('employees_users').select('user_id, name_en, zone_scope').eq('warehouse_code', warehouseCode).eq('role', 'picker').eq('active', true),
+    admin.from('locations').select('zone_code').eq('warehouse_code', warehouseCode).eq('active', true),
   ])
+  if (ordersRes.error) console.error('[assignment] orders error', ordersRes.error.message)
+  if (linesRes.error) console.error('[assignment] order_lines error', linesRes.error.message)
+  const pendingOrders = ordersRes.data
+  const lines = linesRes.data
+  const pickers = pickersRes.data
+  const zoneRows = zoneRowsRes.data
 
   const zonesByOrder = new Map<string, Set<string>>()
   for (const l of lines ?? []) {

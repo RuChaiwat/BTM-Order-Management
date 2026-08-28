@@ -19,8 +19,15 @@ export async function getMatchingDashboardData(db: SupabaseClient, warehouseCode
   return { batches, unmatchedPendingCount: pendingOrdersRes.count ?? 0 }
 }
 
+/**
+ * Uses the admin (service_role) client, not the caller's RLS-scoped session client — this is an
+ * internal operational report (A4 pick report), not per-user personalized data, so there's no
+ * reason to route it through RLS at all. requireRole-equivalent access control for this page
+ * happens at the menu/nav level (§7 role-based menu visibility) instead.
+ */
 export async function getBatchDetail(db: SupabaseClient, batchId: string) {
   const batchRes = await db.from('consolidation_batches').select('*').eq('consol_batch_id', batchId).single()
+  if (batchRes.error) console.error('[getBatchDetail] consolidation_batches error', batchRes.error.message)
   const batch = batchRes.data
   if (!batch) return null
 

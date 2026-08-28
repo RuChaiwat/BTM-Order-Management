@@ -2,7 +2,7 @@ import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { KpiCard } from '@/components/KpiCard'
 import { getSessionUser } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getDashboardData } from '@/lib/queries/dashboard'
 import { redirect } from 'next/navigation'
 
@@ -23,8 +23,8 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function OperationsDashboardPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const supabase = await createClient()
-  const data = await getDashboardData(supabase, user.warehouse_code ?? 'DC002')
+  const admin = createAdminClient()
+  const data = await getDashboardData(admin, user.warehouse_code ?? 'DC002')
 
   const totalBacklog = data.kpis.pickingBacklog + data.kpis.verificationBacklog
   const pctOfPlan = data.kpis.totalPlannedPieces > 0 ? Math.round((data.kpis.piecesPicked / data.kpis.totalPlannedPieces) * 1000) / 10 : 0

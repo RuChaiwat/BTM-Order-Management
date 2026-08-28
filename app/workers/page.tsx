@@ -4,15 +4,15 @@ import { TopBar } from '@/components/TopBar'
 import { KpiCard } from '@/components/KpiCard'
 import { WorkerManagementBoard } from '@/components/workers/WorkerManagementBoard'
 import { getSessionUser } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getWorkerData } from '@/lib/queries/workers'
 
 export default async function WorkerManagementPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const warehouseCode = user.warehouse_code ?? 'DC002'
-  const supabase = await createClient()
-  const { users } = await getWorkerData(supabase, warehouseCode)
+  const admin = createAdminClient()
+  const { users } = await getWorkerData(admin, warehouseCode)
 
   const active = users.filter((u) => u.active).length
   const pickersOnShift = users.filter((u) => u.role === 'picker' && u.active).length

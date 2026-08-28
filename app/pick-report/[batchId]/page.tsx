@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { getSessionUser } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getBatchDetail, buildPickReportLines } from '@/lib/queries/consolidation'
 import { Barcode } from '@/components/Barcode'
 import { PrintButton } from '@/components/PrintButton'
@@ -8,8 +8,8 @@ import { PrintButton } from '@/components/PrintButton'
 export default async function PickReportPage({ params }: { params: { batchId: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const supabase = await createClient()
-  const detail = await getBatchDetail(supabase, params.batchId)
+  const admin = createAdminClient()
+  const detail = await getBatchDetail(admin, params.batchId)
   if (!detail) notFound()
 
   const { batch, orders, lines } = detail

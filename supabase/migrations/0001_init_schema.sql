@@ -301,6 +301,8 @@ begin
     raise exception 'Order % has no lines in Zone % / Warehouse % — Assignment Batch must be confined to a single Zone and Warehouse (FR-030)',
       new.order_id, batch_zone, batch_warehouse;
   end if;
+
+  return new;
 end;
 $$ language plpgsql;
 

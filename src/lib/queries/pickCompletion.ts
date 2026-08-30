@@ -22,8 +22,21 @@ export async function getPickCompletionData(db: SupabaseClient, warehouseCode: s
 
   const orderIds = orders.map((o) => o.order_id)
   const linesRes = orderIds.length
-    ? await db.from('order_lines').select('line_id, order_id, sku, item_description, bin_code, qty, uom_code, zone_code, pick_sequence').in('order_id', orderIds)
-    : { data: [] as { line_id: string; order_id: string; sku: string; item_description: string | null; bin_code: string; qty: number; uom_code: string | null; zone_code: string | null; pick_sequence: string | null }[] }
+    ? await db.from('order_lines').select('line_id, order_id, sku, sku_barcode, item_description, bin_code, qty, uom_code, zone_code, pick_sequence').in('order_id', orderIds)
+    : {
+        data: [] as {
+          line_id: string
+          order_id: string
+          sku: string
+          sku_barcode: string | null
+          item_description: string | null
+          bin_code: string
+          qty: number
+          uom_code: string | null
+          zone_code: string | null
+          pick_sequence: string | null
+        }[],
+      }
   const lines = unwrap(linesRes).sort((a, b) => (a.pick_sequence ?? '').localeCompare(b.pick_sequence ?? ''))
 
   const reasonsRes = await db.from('reason_master').select('reason_code, label_en').eq('reason_type', 'short_pick').eq('active', true)

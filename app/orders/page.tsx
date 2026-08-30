@@ -20,7 +20,7 @@ export default async function OrderPoolPage() {
         <UploadForm
           endpoint="/api/imports/orders"
           label="Import WMS orders"
-          hint="Upload the Transfer Order export (.csv or .xlsx) — required columns: Transfer, Warehouse Code, Shipment Date, Store Code, Item No., Bin Code, Quantity"
+          hint="Upload the Transfer Order export (.csv or .xlsx) — required columns: Transfer, Warehouse Code, Shipment Date, Store Code, Item No., SKU Barcode, Bin Code, Quantity"
         />
 
         <div className="card">

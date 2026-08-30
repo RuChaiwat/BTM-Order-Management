@@ -7,7 +7,13 @@ import { parseSpreadsheet, col } from '@/lib/importers/parseSpreadsheet'
 /**
  * §5 WMS order import (Transfer Order export). Confirmed field mapping (§5, Appendix A):
  *   Transfer -> Order No, Warehouse Code -> Warehouse Code, Shipment Date -> Original Order Date,
- *   Item No. -> SKU, Bin Code -> Bin Code, Quantity -> QTY, Description -> Item Description.
+ *   Item No. -> SKU, Bin Code -> Bin Code, Quantity -> QTY, Description -> Item Description,
+ *   SKU Barcode -> Supplier Barcode.
+ *
+ * SKU Barcode is the barcode physically printed on the item by the supplier — distinct from Item
+ * No., which is Beautrium's internal code and is never printed on the item itself. The
+ * Consolidation Pick Report must scan against what's actually on the item, so this is required,
+ * not optional, the same as Bin Code.
  *
  * Known limitation: this runs as a sequence of PostgREST calls, not a single DB transaction — a
  * mid-import crash can leave a partially-imported batch. import_batches.status lets you see that
@@ -47,6 +53,7 @@ export async function POST(request: Request) {
     originalOrderDate: string
     storeCode: string
     sku: string
+    skuBarcode: string
     binCode: string
     qty: number
     uomCode: string
@@ -64,6 +71,7 @@ export async function POST(request: Request) {
     const originalOrderDate = col(row, 'Shipment Date', 'Original Order Date')
     const storeCode = col(row, 'Store Code')
     const sku = col(row, 'Item No.', 'Item No', 'SKU')
+    const skuBarcode = col(row, 'SKU Barcode', 'Supplier Barcode', 'Barcode')
     const binCode = col(row, 'Bin Code')
     const qtyRaw = col(row, 'Quantity', 'QTY')
     const qty = Number(qtyRaw)
@@ -74,6 +82,7 @@ export async function POST(request: Request) {
       !originalOrderDate && 'Shipment Date',
       !storeCode && 'Store Code',
       !sku && 'Item No.',
+      !skuBarcode && 'SKU Barcode',
       !binCode && 'Bin Code',
       (!qtyRaw || Number.isNaN(qty) || qty <= 0) && 'Quantity',
     ].filter(Boolean)
@@ -90,6 +99,7 @@ export async function POST(request: Request) {
       originalOrderDate: normalizeDate(originalOrderDate),
       storeCode,
       sku,
+      skuBarcode,
       binCode,
       qty,
       uomCode: col(row, 'Unit of Measure Code', 'UOM') || 'PCS',
@@ -165,6 +175,7 @@ export async function POST(request: Request) {
         {
           order_id: orderId,
           sku: line.sku,
+          sku_barcode: line.skuBarcode,
           bin_code: line.binCode,
           warehouse_code: line.warehouseCode,
           qty: line.qty,

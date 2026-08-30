@@ -16,6 +16,7 @@ interface OrderLine {
   line_id: string
   order_id: string
   sku: string
+  sku_barcode: string | null
   item_description: string | null
   bin_code: string
   qty: number
@@ -254,6 +255,7 @@ export function PickCompletionBoard({ orders, lines, shortPickReasons }: { order
                     </td>
                     <td>
                       {l.sku}
+                      {l.sku_barcode && <div style={{ fontSize: 11, color: '#6B7280' }}>Barcode: {l.sku_barcode}</div>}
                       {l.item_description && <div style={{ fontSize: 11, color: '#6B7280' }}>{l.item_description}</div>}
                     </td>
                     <td>{l.bin_code}</td>

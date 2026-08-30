@@ -86,7 +86,7 @@ export default async function PickReportPage({ params }: { params: { batchId: st
               </td>
               <td>{l.sku}</td>
               <td>
-                <Barcode value={l.sku} height={18} width={1} fontSize={8} />
+                <Barcode value={l.skuBarcode ?? l.sku} height={18} width={1} fontSize={8} />
               </td>
               <td>{l.description ?? ''}</td>
               <td style={{ fontWeight: 700 }}>{l.qty}</td>

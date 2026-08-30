@@ -41,8 +41,8 @@ export async function getBatchDetail(db: SupabaseClient, batchId: string) {
   const orders = unwrap(ordersDataRes)
 
   const linesRes = orderIds.length
-    ? await db.from('order_lines').select('order_id, sku, bin_code, qty, item_description, zone_code, pick_sequence').in('order_id', orderIds)
-    : { data: [] as { order_id: string; sku: string; bin_code: string; qty: number; item_description: string | null; zone_code: string | null; pick_sequence: string | null }[] }
+    ? await db.from('order_lines').select('order_id, sku, sku_barcode, bin_code, qty, item_description, zone_code, pick_sequence').in('order_id', orderIds)
+    : { data: [] as { order_id: string; sku: string; sku_barcode: string | null; bin_code: string; qty: number; item_description: string | null; zone_code: string | null; pick_sequence: string | null }[] }
   const lines = unwrap(linesRes)
 
   return { batch, orders, lines }
@@ -51,19 +51,29 @@ export async function getBatchDetail(db: SupabaseClient, batchId: string) {
 /** §11 grouping: SKU + Bin Code, summed across all orders in the batch, sorted by Pick Sequence.
  * Also tracks distinct Stores/Orders contributing to each line, per the report's column list. */
 export function buildPickReportLines(
-  lines: { order_id: string; sku: string; bin_code: string; qty: number; item_description: string | null; zone_code: string | null; pick_sequence: string | null }[],
+  lines: { order_id: string; sku: string; sku_barcode: string | null; bin_code: string; qty: number; item_description: string | null; zone_code: string | null; pick_sequence: string | null }[],
   orders: { order_id: string; store_code: string }[],
 ) {
   const storeByOrder = new Map(orders.map((o) => [o.order_id, o.store_code]))
   const grouped = new Map<
     string,
-    { sku: string; binCode: string; qty: number; description: string | null; zoneCode: string | null; pickSequence: string | null; orderIds: Set<string>; stores: Set<string> }
+    {
+      sku: string
+      skuBarcode: string | null
+      binCode: string
+      qty: number
+      description: string | null
+      zoneCode: string | null
+      pickSequence: string | null
+      orderIds: Set<string>
+      stores: Set<string>
+    }
   >()
   for (const l of lines) {
     const key = `${l.sku}|${l.bin_code}`
     const entry =
       grouped.get(key) ??
-      { sku: l.sku, binCode: l.bin_code, qty: 0, description: l.item_description, zoneCode: l.zone_code, pickSequence: l.pick_sequence, orderIds: new Set<string>(), stores: new Set<string>() }
+      { sku: l.sku, skuBarcode: l.sku_barcode, binCode: l.bin_code, qty: 0, description: l.item_description, zoneCode: l.zone_code, pickSequence: l.pick_sequence, orderIds: new Set<string>(), stores: new Set<string>() }
     entry.qty += Number(l.qty)
     entry.orderIds.add(l.order_id)
     const store = storeByOrder.get(l.order_id)

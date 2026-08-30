@@ -1,22 +1,32 @@
 import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
-import { MatchingBoard } from '@/components/matching/MatchingBoard'
+import { MatchingDateFilter } from '@/components/matching/MatchingDateFilter'
+import { MatchingDashboardBoard } from '@/components/matching/MatchingDashboardBoard'
 import { getSessionUser } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
-import { getMatchingDashboardData } from '@/lib/queries/consolidation'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getMatchingOverviewData } from '@/lib/queries/matchingOverview'
 
-export default async function MatchingPage() {
+function yesterday() {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
+export default async function MatchingDashboardPage({ searchParams }: { searchParams: { date?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const warehouseCode = user.warehouse_code ?? 'DC002'
-  const supabase = await createClient()
-  const { batches, unmatchedPendingCount } = await getMatchingDashboardData(supabase, warehouseCode)
+  const orderDate = searchParams.date || yesterday()
+  const admin = createAdminClient()
+  const data = await getMatchingOverviewData(admin, warehouseCode, orderDate)
 
   return (
     <AppLayout activeNavId={3}>
-      <TopBar title="Matching Dashboard & Batch Review" subtitle={`แดชบอร์ดการจับคู่ / ตรวจแบตช์ · ${warehouseCode}`} />
-      <MatchingBoard batches={batches} warehouseCode={warehouseCode} unmatchedPendingCount={unmatchedPendingCount} />
+      <TopBar title="Matching Dashboard" subtitle={`แดชบอร์ดการจับคู่ · ${warehouseCode}`}>
+        <MatchingDateFilter orderDate={orderDate} />
+      </TopBar>
+      <MatchingDashboardBoard data={data} />
     </AppLayout>
   )
 }

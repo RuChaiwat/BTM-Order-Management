@@ -1,15 +1,17 @@
 import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { UploadForm } from '@/components/UploadForm'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function OrderPoolPage() {
-  const supabase = await createClient()
+  const admin = createAdminClient()
 
-  const [{ data: orders }, { data: importBatches }] = await Promise.all([
-    supabase.from('orders').select('order_no, warehouse_code, original_order_date, store_code, status, planned_pieces, unique_sku_count').order('created_at', { ascending: false }).limit(50),
-    supabase.from('import_batches').select('import_id, file_name, uploaded_at, status, total_rows, success_rows, error_rows').order('uploaded_at', { ascending: false }).limit(10),
+  const [{ data: orders, error: ordersError }, { data: importBatches, error: importsError }] = await Promise.all([
+    admin.from('orders').select('order_no, warehouse_code, original_order_date, store_code, status, planned_pieces, unique_sku_count').order('created_at', { ascending: false }).limit(50),
+    admin.from('import_batches').select('import_id, file_name, uploaded_at, status, total_rows, success_rows, error_rows').order('uploaded_at', { ascending: false }).limit(10),
   ])
+  if (ordersError) console.error('[orders] orders error', ordersError.message)
+  if (importsError) console.error('[orders] import_batches error', importsError.message)
 
   return (
     <AppLayout activeNavId={2}>

@@ -1,15 +1,16 @@
 import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { UploadForm } from '@/components/UploadForm'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function LocationMasterPage() {
-  const supabase = await createClient()
-  const { data: locations, count } = await supabase
+  const admin = createAdminClient()
+  const { data: locations, count, error } = await admin
     .from('locations')
     .select('bin_code, warehouse_code, zone_code, aisle, side, bay, level, block, pick_sequence, active', { count: 'exact' })
     .order('pick_sequence', { ascending: true })
     .limit(50)
+  if (error) console.error('[locations] locations error', error.message)
 
   return (
     <AppLayout activeNavId={14}>

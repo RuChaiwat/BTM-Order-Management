@@ -3,18 +3,33 @@ import { TopBar } from '@/components/TopBar'
 import { ReasonMasterManager } from '@/components/admin/ReasonMasterManager'
 import { ConfigEditor } from '@/components/admin/ConfigEditor'
 import { HousekeepingPanel } from '@/components/admin/HousekeepingPanel'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function AdminPage() {
-  const supabase = await createClient()
+  const admin = createAdminClient()
 
-  const [{ data: reasons }, { data: configs }, { data: auditLogs }, { data: exportJobs }, { data: purgeLog }] = await Promise.all([
-    supabase.from('reason_master').select('reason_code, reason_type, label_en, label_th, active').order('reason_type').order('reason_code'),
-    supabase.from('configuration').select('key, value, version').eq('active', true).order('key'),
-    supabase.from('audit_logs').select('id, user_id, action, entity_type, entity_id, created_at').order('created_at', { ascending: false }).limit(30),
-    supabase.from('export_jobs').select('id, status, period_start, period_end, row_count, target_ref, finished_at, error_detail').order('created_at', { ascending: false }).limit(10),
-    supabase.from('purge_log').select('id, covered_period_start, table_name, rows_purged, result, created_at').order('created_at', { ascending: false }).limit(20),
+  const [
+    { data: reasons, error: reasonsError },
+    { data: configs, error: configsError },
+    { data: auditLogs, error: auditError },
+    { data: exportJobs, error: exportError },
+    { data: purgeLog, error: purgeError },
+  ] = await Promise.all([
+    admin.from('reason_master').select('reason_code, reason_type, label_en, label_th, active').order('reason_type').order('reason_code'),
+    admin.from('configuration').select('key, value, version').eq('active', true).order('key'),
+    admin.from('audit_logs').select('id, user_id, action, entity_type, entity_id, created_at').order('created_at', { ascending: false }).limit(30),
+    admin.from('export_jobs').select('id, status, period_start, period_end, row_count, target_ref, finished_at, error_detail').order('created_at', { ascending: false }).limit(10),
+    admin.from('purge_log').select('id, covered_period_start, table_name, rows_purged, result, created_at').order('created_at', { ascending: false }).limit(20),
   ])
+  for (const [label, err] of [
+    ['reason_master', reasonsError],
+    ['configuration', configsError],
+    ['audit_logs', auditError],
+    ['export_jobs', exportError],
+    ['purge_log', purgeError],
+  ] as const) {
+    if (err) console.error(`[admin] ${label} error`, err.message)
+  }
 
   return (
     <AppLayout activeNavId={15}>

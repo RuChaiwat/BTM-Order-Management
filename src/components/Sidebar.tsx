@@ -17,6 +17,18 @@ interface SidebarProps {
 export function Sidebar({ activeId, user, badges }: SidebarProps) {
   const pathname = usePathname()
 
+  // Menu item ids are stable keys (used for role access / badges / activeNavId) but aren't
+  // sequential — new items got ids appended out of visual order (e.g. Admin Verification = 16,
+  // shown between Pick Completion = 8 and Zone Dashboard = 9). The number shown to the user is a
+  // separate display sequence, numbered by each item's actual position in the visible menu.
+  let displaySeq = 0
+  const displayNumberById = new Map<number, number>()
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (canAccessMenuItem(user.role, item.id)) displayNumberById.set(item.id, ++displaySeq)
+    }
+  }
+
   return (
     <div className="sidebar">
       <div className="sidebar-brand">
@@ -38,7 +50,7 @@ export function Sidebar({ activeId, user, badges }: SidebarProps) {
               const content = (
                 <>
                   <span className="nav-item-label">
-                    {item.id}. {item.en}
+                    {displayNumberById.get(item.id)}. {item.en}
                     <span className="nav-item-th">{item.th}</span>
                   </span>
                   {badge && <span className="nav-item-badge">{badge}</span>}

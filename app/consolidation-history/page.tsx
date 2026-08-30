@@ -3,19 +3,20 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { getSessionUser } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function ConsolidationHistoryPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const supabase = await createClient()
+  const admin = createAdminClient()
 
-  const { data: batches } = await supabase
+  const { data: batches, error } = await admin
     .from('consolidation_batches')
     .select('consol_batch_id, order_date, priority, stores_count, orders_count, total_pieces, status, released_at, created_at')
     .in('status', ['report_released', 'picking', 'at_consolidation', 'sorting', 'completed', 'cancelled'])
     .order('created_at', { ascending: false })
     .limit(100)
+  if (error) console.error('[consolidation-history] consolidation_batches error', error.message)
 
   return (
     <AppLayout activeNavId={6}>

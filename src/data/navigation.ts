@@ -26,7 +26,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 3, en: 'Matching Dashboard', th: 'แดชบอร์ดการจับคู่', path: '/matching' },
       { id: 4, en: 'Matching Analysis & Batch Review', th: 'วิเคราะห์การจับคู่ / ตรวจแบตช์', path: '/matching-analysis' },
-      { id: 5, en: 'Consolidation Pick Report', th: 'รายงานหยิบรวม', path: '/consolidation-history' },
+      { id: 5, en: 'Consolidation Pick Report', th: 'รายงานหยิบรวม', path: '/consolidation-pick-report' },
       { id: 6, en: 'Consolidation History', th: 'ประวัติการรวมออเดอร์', path: '/consolidation-history' },
     ],
   },

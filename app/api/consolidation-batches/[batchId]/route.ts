@@ -7,6 +7,7 @@ const TRANSITIONS: Record<string, string> = {
   approve: 'approved',
   release: 'report_released',
   cancel: 'cancelled',
+  complete: 'completed',
 }
 
 /** §9-11 consolidation batch lifecycle: candidate -> approved -> report_released (or cancelled). */

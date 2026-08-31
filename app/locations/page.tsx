@@ -1,16 +1,27 @@
 import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { UploadForm } from '@/components/UploadForm'
+import { AddLocationForm } from '@/components/locations/AddLocationForm'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getSessionUser } from '@/lib/auth'
 
 export default async function LocationMasterPage() {
+  const user = await getSessionUser()
+  const warehouseCode = user?.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
-  const { data: locations, count, error } = await admin
-    .from('locations')
-    .select('bin_code, warehouse_code, zone_code, aisle, side, bay, level, block, pick_sequence, active', { count: 'exact' })
-    .order('pick_sequence', { ascending: true })
-    .limit(50)
+  const [{ data: locations, count, error }, { data: aisleSequence, error: aisleError }] = await Promise.all([
+    admin
+      .from('locations')
+      .select('bin_code, warehouse_code, zone_code, aisle, side, bay, level, block, pick_sequence, active', { count: 'exact' })
+      .order('pick_sequence', { ascending: true })
+      .limit(50),
+    admin.from('aisle_sequence').select('aisle, aisle_rank').eq('warehouse_code', warehouseCode).order('aisle_rank'),
+  ])
   if (error) console.error('[locations] locations error', error.message)
+  if (aisleError) console.error('[locations] aisle_sequence error', aisleError.message)
+
+  const existingAisles = aisleSequence ?? []
+  const nextAisleRank = existingAisles.length > 0 ? Math.max(...existingAisles.map((a) => a.aisle_rank)) + 1 : 1
 
   return (
     <AppLayout activeNavId={14}>
@@ -19,8 +30,10 @@ export default async function LocationMasterPage() {
         <UploadForm
           endpoint="/api/imports/locations"
           label="Import Location Master"
-          hint="Upload Bin Code master (.csv or .xlsx) — required columns: Bin Code, Warehouse Code, Zone Code (optional: Zone Name, Aisle, Side, Side Pair, Direction, Bay, Level, Block, Pick Sequence, Active Flag)"
+          hint="Upload Bin Code master (.csv or .xlsx) — required columns: Bin Code, Warehouse Code, Zone Code, Aisle, Side, Bay, Level, Block (optional: Zone Name, Active Flag) — Pick Sequence is always computed, not read from the file"
         />
+
+        <AddLocationForm warehouseCode={warehouseCode} existingAisles={existingAisles} nextAisleRank={nextAisleRank} />
 
         <div className="card" style={{ flex: 1, minHeight: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>

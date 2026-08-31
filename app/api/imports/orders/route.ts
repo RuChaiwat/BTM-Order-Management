@@ -61,8 +61,10 @@ export async function POST(request: Request) {
     raw: Record<string, string>
   }
 
+  type ImportErrorRow = { rowNumber: number; raw: Record<string, string>; reason: string; severity: 'blocking' | 'warning' }
+
   const parsed: ParsedLine[] = []
-  const preValidationErrors: { rowNumber: number; raw: Record<string, string>; reason: string }[] = []
+  const preValidationErrors: ImportErrorRow[] = []
 
   rows.forEach((row, i) => {
     const rowNumber = i + 2 // header is row 1
@@ -88,7 +90,7 @@ export async function POST(request: Request) {
     ].filter(Boolean)
 
     if (missing.length > 0) {
-      preValidationErrors.push({ rowNumber, raw: row, reason: `Missing/invalid required field(s): ${missing.join(', ')}` })
+      preValidationErrors.push({ rowNumber, raw: row, reason: `Missing/invalid required field(s): ${missing.join(', ')} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' })
       return
     }
 
@@ -115,7 +117,7 @@ export async function POST(request: Request) {
     .in('warehouse_code', warehouseCodes)
   const locationMap = new Map((locations ?? []).map((l) => [`${l.warehouse_code}|${l.bin_code}`, l]))
 
-  const binErrors: { rowNumber: number; raw: Record<string, string>; reason: string }[] = []
+  const binErrors: ImportErrorRow[] = []
 
   type OrderGroup = { key: string; warehouseCode: string; orderNo: string; originalOrderDate: string; storeCode: string; lines: ParsedLine[] }
   const groups = new Map<string, OrderGroup>()
@@ -158,7 +160,7 @@ export async function POST(request: Request) {
         .select('order_id')
         .single()
       if (newOrderError || !newOrder) {
-        group.lines.forEach((l) => binErrors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `Failed to create order: ${newOrderError?.message}` }))
+        group.lines.forEach((l) => binErrors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `Failed to create order: ${newOrderError?.message} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' }))
         continue
       }
       orderId = newOrder.order_id
@@ -168,7 +170,12 @@ export async function POST(request: Request) {
     for (const line of group.lines) {
       const location = locationMap.get(`${line.warehouseCode}|${line.binCode}`)
       if (!location || !location.active) {
-        binErrors.push({ rowNumber: line.rowNumber, raw: line.raw, reason: `Invalid Bin Code '${line.binCode}': not found in Location Master or inactive (§5.2, UAT-03)` })
+        binErrors.push({
+          rowNumber: line.rowNumber,
+          raw: line.raw,
+          reason: `Invalid Bin Code '${line.binCode}': not found in Location Master or inactive (§5.2, UAT-03) — the order line was still imported, but has no Zone/Pick Sequence. Safe to leave, or fix the Bin Code and re-upload to backfill it.`,
+          severity: 'warning',
+        })
       }
 
       const { error: lineError } = await admin.from('order_lines').upsert(
@@ -188,7 +195,7 @@ export async function POST(request: Request) {
         { onConflict: 'order_id,sku,bin_code,source_line_id' },
       )
       if (!lineError) linesUpserted++
-      else binErrors.push({ rowNumber: line.rowNumber, raw: line.raw, reason: lineError.message })
+      else binErrors.push({ rowNumber: line.rowNumber, raw: line.raw, reason: `${lineError.message} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' })
     }
 
     const { data: lineAgg } = await admin.from('order_lines').select('sku, qty').eq('order_id', orderId)
@@ -200,16 +207,20 @@ export async function POST(request: Request) {
   const allErrors = [...preValidationErrors, ...binErrors]
   if (allErrors.length > 0) {
     await admin.from('import_errors').insert(
-      allErrors.map((e) => ({ import_id: importBatch.import_id, row_number: e.rowNumber, raw_data: e.raw, error_reason: e.reason })),
+      allErrors.map((e) => ({ import_id: importBatch.import_id, row_number: e.rowNumber, raw_data: e.raw, error_reason: e.reason, severity: e.severity })),
     )
   }
 
-  const finalStatus = allErrors.length === 0 ? 'completed' : parsed.length === 0 ? 'failed' : 'completed_with_errors'
+  // "Warning" rows (e.g. Invalid Bin Code) were still imported — only "blocking" rows never made
+  // it into order_lines. success_rows should reflect what actually landed, not just what avoided
+  // any error at all.
+  const blockingCount = allErrors.filter((e) => e.severity === 'blocking').length
+  const finalStatus = allErrors.length === 0 ? 'completed' : parsed.length === blockingCount ? 'failed' : 'completed_with_errors'
   await admin
     .from('import_batches')
     .update({
       status: finalStatus,
-      success_rows: parsed.length - binErrors.length,
+      success_rows: rows.length - blockingCount,
       error_rows: allErrors.length,
       finished_at: new Date().toISOString(),
     })
@@ -223,6 +234,9 @@ export async function POST(request: Request) {
     after: { orders_created: ordersCreated, orders_updated: ordersUpdated, lines_upserted: linesUpserted, errors: allErrors.length },
   })
 
+  // Cap the inline error list returned to the client — a bad file can have thousands of rows
+  // wrong; the full list is always available via GET /api/imports/[importId]/errors.
+  const ERROR_PREVIEW_LIMIT = 100
   return NextResponse.json({
     import_id: importBatch.import_id,
     status: finalStatus,
@@ -230,6 +244,10 @@ export async function POST(request: Request) {
     orders_updated: ordersUpdated,
     lines_upserted: linesUpserted,
     error_count: allErrors.length,
+    blocking_count: blockingCount,
+    warning_count: allErrors.length - blockingCount,
+    errors: allErrors.slice(0, ERROR_PREVIEW_LIMIT).map((e) => ({ row_number: e.rowNumber, reason: e.reason, severity: e.severity })),
+    errors_truncated: allErrors.length > ERROR_PREVIEW_LIMIT,
   })
 }
 

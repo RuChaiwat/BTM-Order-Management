@@ -100,9 +100,14 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
     })
   }
 
+  // Filtered by the actual Bin Codes this batch needs, not the whole warehouse — Location Master
+  // can be tens of thousands of rows, and an unfiltered select silently truncates at Supabase's
+  // default row cap (1000), which made most Bin Code lookups fail even for real, active bins
+  // once Location Master grew past that.
   const warehouseCodes = [...new Set(parsed.map((p) => p.warehouseCode))]
-  const { data: locations } = warehouseCodes.length
-    ? await admin.from('locations').select('warehouse_code, bin_code, zone_code, pick_sequence, active').in('warehouse_code', warehouseCodes)
+  const binCodes = [...new Set(parsed.map((p) => p.binCode))]
+  const { data: locations } = warehouseCodes.length && binCodes.length
+    ? await admin.from('locations').select('warehouse_code, bin_code, zone_code, pick_sequence, active').in('warehouse_code', warehouseCodes).in('bin_code', binCodes)
     : { data: [] as { warehouse_code: string; bin_code: string; zone_code: string | null; pick_sequence: string | null; active: boolean }[] }
   const locationMap = new Map((locations ?? []).map((l) => [`${l.warehouse_code}|${l.bin_code}`, l]))
 

@@ -1,23 +1,21 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
+import { getActiveZoneCodes } from './locations'
 
 /** §12/§13 Zone Dashboard — a zone-level drill-down of Control Tower's zone overview: which
  * orders touch each zone, who is actively picking there, and each zone's backlog/SLA. */
 export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: string) {
-  const [linesRes, ordersRes, alertsRes, batchesRes, locationsRes] = await Promise.all([
+  const [linesRes, ordersRes, alertsRes, batchesRes, zones] = await Promise.all([
     db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode),
     db.from('orders').select('order_id, order_no, status, assignment_batch_id, planned_pieces').eq('warehouse_code', warehouseCode),
     db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog'),
     db.from('assignment_batches').select('assignment_batch_id, picker_id, zone_code, status').eq('warehouse_code', warehouseCode),
-    db.from('locations').select('zone_code').eq('warehouse_code', warehouseCode).eq('active', true),
+    getActiveZoneCodes(db, warehouseCode),
   ])
   const lines = unwrap(linesRes)
   const orders = unwrap(ordersRes)
   const alerts = unwrap(alertsRes)
   const batches = unwrap(batchesRes)
-  const locations = unwrap(locationsRes)
-
-  const zones = [...new Set(locations.map((l) => l.zone_code))].filter(Boolean).sort()
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
   const pickerIdByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))

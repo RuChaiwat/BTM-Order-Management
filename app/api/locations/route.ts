@@ -66,3 +66,30 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ location }, { status: 201 })
 }
+
+/** Toggles a Location's Active flag from the Location Master list's detail panel. Only `active`
+ * is editable here — Aisle/Side/Bay/Level/Block (and therefore Pick Sequence) are set once at
+ * creation/import; changing a bin's physical position is a bigger operation than this screen
+ * covers today. */
+export async function PATCH(request: Request) {
+  let caller
+  try {
+    caller = await requireRole(['system_admin'])
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 403 })
+  }
+
+  const { warehouse_code, bin_code, active } = await request.json()
+  if (!warehouse_code || !bin_code || typeof active !== 'boolean') {
+    return NextResponse.json({ error: 'warehouse_code, bin_code, and active (boolean) are required' }, { status: 400 })
+  }
+
+  const admin = createAdminClient()
+  const { data: location, error } = await admin.from('locations').update({ active }).eq('warehouse_code', warehouse_code).eq('bin_code', bin_code).select().maybeSingle()
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (!location) return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+
+  await writeAudit(admin, { userId: caller.user_id, action: active ? 'locations.activate' : 'locations.deactivate', entityType: 'locations', entityId: bin_code, after: location })
+
+  return NextResponse.json({ location })
+}

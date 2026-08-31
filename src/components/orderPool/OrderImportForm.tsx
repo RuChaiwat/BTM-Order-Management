@@ -41,6 +41,9 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
   const [progress, setProgress] = useState(0)
   const [result, setResult] = useState<ImportSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Bumped after a successful import to remount the <input type="file"> — a file input's
+  // displayed filename can't be cleared via its `value` (read-only), only by remounting it.
+  const [inputKey, setInputKey] = useState(0)
 
   const busy = phase === 'parsing' || phase === 'importing' || phase === 'finishing'
 
@@ -120,6 +123,8 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
         errors_truncated: allErrors.length > 100,
       })
       setPhase('done')
+      setFile(null)
+      setInputKey((k) => k + 1)
       router.refresh()
     } catch (e) {
       setError((e as Error).message)
@@ -139,6 +144,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <input
+          key={inputKey}
           type="file"
           accept=".csv,.xlsx,.xls"
           disabled={busy}

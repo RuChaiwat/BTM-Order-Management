@@ -40,6 +40,10 @@ export function UploadForm({ endpoint, label, hint }: UploadFormProps) {
   const [progress, setProgress] = useState(0)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Bumped after a successful upload to remount the <input type="file"> — its displayed filename
+  // can't be cleared by resetting React state (the DOM input's `value` is read-only for file
+  // inputs), only by remounting the element.
+  const [inputKey, setInputKey] = useState(0)
 
   function handleUpload() {
     if (!file) return
@@ -70,6 +74,8 @@ export function UploadForm({ endpoint, label, hint }: UploadFormProps) {
       if (xhr.status >= 200 && xhr.status < 300 && body) {
         setResult(body)
         setPhase('done')
+        setFile(null)
+        setInputKey((k) => k + 1)
         router.refresh()
       } else {
         setError(body?.error ?? `Upload failed (HTTP ${xhr.status})`)
@@ -92,7 +98,18 @@ export function UploadForm({ endpoint, label, hint }: UploadFormProps) {
         {hint}
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <input type="file" accept=".csv,.xlsx,.xls" disabled={busy} onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPhase('idle'); setResult(null); setError(null) }} />
+        <input
+          key={inputKey}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          disabled={busy}
+          onChange={(e) => {
+            setFile(e.target.files?.[0] ?? null)
+            setPhase('idle')
+            setResult(null)
+            setError(null)
+          }}
+        />
         <button className="btn btn-primary btn-sm" disabled={!file || busy} onClick={handleUpload}>
           {busy ? 'Uploading…' : 'Upload'}
         </button>

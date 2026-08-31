@@ -650,3 +650,17 @@ table { border-collapse: collapse; width: 100%; }
 /* ---------- misc utility ---------- */
 .text-muted { color: var(--color-text-secondary); }
 .mt-auto { margin-top: auto; }
+
+/* Indeterminate progress: for phases with no real percentage to report (parsing a file,
+   finalizing an import) — a moving stripe reads as "still working" instead of a bar stuck at a
+   number that isn't actually moving. */
+.progress-track.indeterminate { position: relative; }
+.progress-fill.indeterminate {
+  background: repeating-linear-gradient(45deg, var(--color-primary) 0 10px, rgba(255,255,255,.35) 10px 20px) !important;
+  background-size: 28px 28px;
+  animation: progress-stripes 900ms linear infinite;
+}
+@keyframes progress-stripes {
+  from { background-position: 0 0; }
+  to { background-position: 28px 0; }
+}

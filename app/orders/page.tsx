@@ -1,6 +1,6 @@
 import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
-import { UploadForm } from '@/components/UploadForm'
+import { OrderImportForm } from '@/components/orderPool/OrderImportForm'
 import { ImportErrorsViewer } from '@/components/ImportErrorsViewer'
 import { OrderPoolOverview } from '@/components/orderPool/OrderPoolOverview'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -26,9 +26,8 @@ export default async function OrderPoolPage() {
     <AppLayout activeNavId={2}>
       <TopBar title="Order Pool / Import Status" subtitle="พูลออเดอร์ / สถานะนำเข้า · WMS Transfer Order export" />
       <div className="page-body">
-        <UploadForm
-          endpoint="/api/imports/orders"
-          label="Import WMS orders"
+        <OrderImportForm
+          endpointBase="/api/imports/orders"
           hint="Upload the Transfer Order export (.csv or .xlsx) — required columns: Transfer, Warehouse Code, Shipment Date, Store Code, Item No., SKU Barcode, Bin Code, Quantity"
         />
 

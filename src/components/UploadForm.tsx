@@ -100,8 +100,9 @@ export function UploadForm({ endpoint, label, hint }: UploadFormProps) {
 
       {busy && (
         <div style={{ marginTop: 14 }}>
-          <div style={{ height: 8, borderRadius: 4, background: '#F3F4F6', overflow: 'hidden' }}>
+          <div className={phase === 'processing' ? 'progress-track indeterminate' : 'progress-track'} style={{ height: 8, borderRadius: 4, background: '#F3F4F6', overflow: 'hidden' }}>
             <span
+              className={phase === 'processing' ? 'progress-fill indeterminate' : undefined}
               style={{
                 display: 'block',
                 height: '100%',
@@ -112,7 +113,7 @@ export function UploadForm({ endpoint, label, hint }: UploadFormProps) {
             />
           </div>
           <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-            {phase === 'uploading' ? `กำลังอัปโหลด… ${progress}%` : 'กำลังประมวลผลข้อมูล…'}
+            {phase === 'uploading' ? `กำลังอัปโหลด… ${progress}%` : 'กำลังประมวลผลข้อมูล… (ไฟล์เล็กอาจอัปโหลดเสร็จเร็วมาก ขั้นตอนนี้คือรอเซิร์ฟเวอร์ประมวลผล)'}
           </div>
         </div>
       )}

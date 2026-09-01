@@ -7,6 +7,12 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getMatchingOverviewData } from '@/lib/queries/matchingOverview'
 
+// Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
+// fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
+// so a dynamically-rendered page can still silently keep serving a stale snapshot forever. Force
+// this route (and its data) to always be fresh.
+export const dynamic = 'force-dynamic'
+
 function yesterday() {
   const d = new Date()
   d.setDate(d.getDate() - 1)

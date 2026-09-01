@@ -7,6 +7,12 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getWorkerData } from '@/lib/queries/workers'
 
+// Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
+// fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
+// so a dynamically-rendered page can still silently keep serving a stale snapshot forever. Force
+// this route (and its data) to always be fresh.
+export const dynamic = 'force-dynamic'
+
 export default async function WorkerManagementPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')

@@ -7,6 +7,12 @@ import { LocationTable } from '@/components/locations/LocationTable'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/auth'
 
+// Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
+// fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
+// so a dynamically-rendered page can still silently keep serving a stale snapshot forever. Force
+// this route (and its data) to always be fresh.
+export const dynamic = 'force-dynamic'
+
 const RESULT_LIMIT = 100
 
 export default async function LocationMasterPage({ searchParams }: { searchParams: { warehouse?: string; bin?: string; zone?: string } }) {

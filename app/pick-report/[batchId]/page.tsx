@@ -5,6 +5,12 @@ import { getBatchDetail, buildPickReportLines } from '@/lib/queries/consolidatio
 import { Barcode } from '@/components/Barcode'
 import { PrintButton } from '@/components/PrintButton'
 
+// Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
+// fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
+// so a dynamically-rendered page can still silently keep serving a stale snapshot forever. Force
+// this route (and its data) to always be fresh.
+export const dynamic = 'force-dynamic'
+
 export default async function PickReportPage({ params }: { params: { batchId: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')

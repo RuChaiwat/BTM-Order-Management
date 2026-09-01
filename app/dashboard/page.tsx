@@ -6,6 +6,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getDashboardData } from '@/lib/queries/dashboard'
 import { redirect } from 'next/navigation'
 
+// Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
+// fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
+// so a dynamically-rendered page can still silently keep serving a stale snapshot forever. Force
+// this route (and its data) to always be fresh.
+export const dynamic = 'force-dynamic'
+
 const STATUS_LABELS: Record<string, string> = {
   new: 'New',
   assigned: 'Assigned',

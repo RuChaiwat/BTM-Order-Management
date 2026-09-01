@@ -1,18 +1,26 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 
-export async function getMatchingDashboardData(db: SupabaseClient, warehouseCode: string) {
+/**
+ * Batch Review is scoped to one Order Date at a time (the same date "Run matching" runs
+ * for) rather than a rolling "last 50 batches" list — Run Matching only ever touches one
+ * Order Date, so a same-date review keeps the two in sync by construction instead of by
+ * convention. Browsing a different date is just a different `orderDate` here.
+ */
+export async function getMatchingDashboardData(db: SupabaseClient, warehouseCode: string, orderDate: string) {
   const batchesRes = await db
     .from('consolidation_batches')
-    .select('consol_batch_id, order_date, priority, match_pct, stores_count, orders_count, unique_sku_count, total_pieces, status, created_at')
+    .select('consol_batch_id, batch_no, order_date, priority, match_pct, stores_count, orders_count, unique_sku_count, total_pieces, status, created_at')
+    .eq('order_date', orderDate)
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(1000)
   const batches = unwrap(batchesRes)
 
   const pendingOrdersRes = await db
     .from('orders')
     .select('order_id', { count: 'exact', head: true })
     .eq('warehouse_code', warehouseCode)
+    .eq('original_order_date', orderDate)
     .eq('status', 'new')
     .is('consolidation_batch_id', null)
 
@@ -84,3 +92,5 @@ export function buildPickReportLines(
     .sort((a, b) => (a.pickSequence ?? '').localeCompare(b.pickSequence ?? ''))
     .map((e) => ({ ...e, orderCount: e.orderIds.size, storeCount: e.stores.size }))
 }
+
+export type PickReportLine = ReturnType<typeof buildPickReportLines>[number]

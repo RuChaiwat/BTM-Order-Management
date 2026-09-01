@@ -8,7 +8,7 @@ import { unwrap } from './unwrap'
 export async function getActivePickReportBatches(db: SupabaseClient) {
   const batchesRes = await db
     .from('consolidation_batches')
-    .select('consol_batch_id, order_date, priority, stores_count, orders_count, unique_sku_count, total_pieces, status, released_at, report_generated_at')
+    .select('consol_batch_id, batch_no, order_date, priority, stores_count, orders_count, unique_sku_count, total_pieces, status, released_at, report_generated_at')
     .in('status', ['report_released', 'picking', 'at_consolidation', 'sorting'])
     .order('released_at', { ascending: true })
   const batches = unwrap(batchesRes)

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { KpiCard } from '../KpiCard'
+import { batchStatusLabel } from '@/lib/matching/batchStatus'
 
 interface OverviewData {
   orderDate: string
@@ -15,16 +16,15 @@ interface OverviewData {
   priorityBreakdown: { priority: string; batches: number; orders: number }[]
   totalGroupedOrders: number
   zoneDistribution: { zone: string; orders: number }[]
-  actionRequired: { lowMatchRateBatches: number; oversizedSingleOrders: number; needsReview: number; readyToRelease: number }
-  topBatches: { consol_batch_id: string; priority: string; match_pct: number | null; stores_count: number; orders_count: number; total_pieces: number; status: string }[]
+  actionRequired: { lowMatchRateBatches: number; oversizedSingleOrders: number; awaitingApproval: number }
+  topBatches: { consol_batch_id: string; batch_no: string; priority: string; match_pct: number | null; stores_count: number; orders_count: number; total_pieces: number; status: string }[]
 }
 
 const PRIORITY_COLOR: Record<string, string> = { P1: '#16A34A', P2: '#2563EB', P3: '#F59E0B', P4: '#DC2626' }
 
 export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
   const maxZoneOrders = Math.max(1, ...data.zoneDistribution.map((z) => z.orders))
-  const hasActions =
-    data.actionRequired.lowMatchRateBatches > 0 || data.actionRequired.oversizedSingleOrders > 0 || data.actionRequired.needsReview > 0 || data.actionRequired.readyToRelease > 0
+  const hasActions = data.actionRequired.lowMatchRateBatches > 0 || data.actionRequired.oversizedSingleOrders > 0 || data.actionRequired.awaitingApproval > 0
 
   return (
     <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
@@ -120,7 +120,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
               {data.topBatches.map((b) => (
                 <tr key={b.consol_batch_id}>
                   <td className="link">
-                    <Link href="/matching-analysis">{b.consol_batch_id.slice(0, 8)}</Link>
+                    <Link href={`/pick-report/${b.consol_batch_id}`}>{b.batch_no}</Link>
                   </td>
                   <td>
                     <span style={{ color: PRIORITY_COLOR[b.priority], fontWeight: 700 }}>{b.priority}</span>
@@ -129,7 +129,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
                   <td>{b.stores_count}</td>
                   <td>{b.orders_count}</td>
                   <td style={{ fontWeight: 700 }}>{b.total_pieces}</td>
-                  <td>{b.status}</td>
+                  <td>{batchStatusLabel(b.status)}</td>
                 </tr>
               ))}
               {data.topBatches.length === 0 && (
@@ -149,8 +149,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
             <span className="card-subtitle">รายการที่ต้องดำเนินการ</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5 }}>
-            {data.actionRequired.needsReview > 0 && <ActionRow color="#F59E0B" text={`${data.actionRequired.needsReview} batch(es) awaiting review`} />}
-            {data.actionRequired.readyToRelease > 0 && <ActionRow color="#16A34A" text={`${data.actionRequired.readyToRelease} batch(es) approved, ready to release`} />}
+            {data.actionRequired.awaitingApproval > 0 && <ActionRow color="#F59E0B" text={`${data.actionRequired.awaitingApproval} batch(es) awaiting approval`} />}
             {data.actionRequired.lowMatchRateBatches > 0 && <ActionRow color="#DC2626" text={`${data.actionRequired.lowMatchRateBatches} batch(es) with match rate < 50%`} />}
             {data.actionRequired.oversizedSingleOrders > 0 && <ActionRow color="#EA580C" text={`${data.actionRequired.oversizedSingleOrders} single order(s) over the size threshold`} />}
             {!hasActions && <span style={{ color: 'var(--color-text-secondary)' }}>Nothing needs attention for {data.orderDate}.</span>}

@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -18,7 +19,7 @@ export default async function ConsolidationHistoryPage() {
 
   const { data: batches, error } = await admin
     .from('consolidation_batches')
-    .select('consol_batch_id, order_date, priority, stores_count, orders_count, total_pieces, status, released_at, created_at')
+    .select('consol_batch_id, batch_no, order_date, priority, stores_count, orders_count, total_pieces, status, released_at, created_at')
     .in('status', ['report_released', 'picking', 'at_consolidation', 'sorting', 'completed', 'cancelled'])
     .order('created_at', { ascending: false })
     .limit(100)
@@ -46,7 +47,7 @@ export default async function ConsolidationHistoryPage() {
               {(batches ?? []).map((b) => (
                 <tr key={b.consol_batch_id}>
                   <td className="link">
-                    <Link href={`/pick-report/${b.consol_batch_id}`}>{b.consol_batch_id.slice(0, 8)}</Link>
+                    <Link href={`/pick-report/${b.consol_batch_id}`}>{b.batch_no}</Link>
                   </td>
                   <td>{b.order_date}</td>
                   <td>{b.priority}</td>
@@ -55,7 +56,7 @@ export default async function ConsolidationHistoryPage() {
                   <td>{b.total_pieces}</td>
                   <td>{b.released_at ? new Date(b.released_at).toLocaleString() : '—'}</td>
                   <td>
-                    <span className="badge badge-neutral">{b.status}</span>
+                    <span className={`badge badge-${batchStatusTone(b.status)}`}>{batchStatusLabel(b.status)}</span>
                   </td>
                 </tr>
               ))}

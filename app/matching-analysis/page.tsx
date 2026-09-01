@@ -12,17 +12,24 @@ import { getMatchingDashboardData } from '@/lib/queries/consolidation'
 // this route (and its data) to always be fresh.
 export const dynamic = 'force-dynamic'
 
-export default async function MatchingAnalysisPage() {
+function yesterday() {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
+export default async function MatchingAnalysisPage({ searchParams }: { searchParams: { date?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const warehouseCode = user.warehouse_code ?? 'DC002'
+  const orderDate = searchParams.date ?? yesterday()
   const admin = createAdminClient()
-  const { batches, unmatchedPendingCount } = await getMatchingDashboardData(admin, warehouseCode)
+  const { batches, unmatchedPendingCount } = await getMatchingDashboardData(admin, warehouseCode, orderDate)
 
   return (
     <AppLayout activeNavId={4}>
       <TopBar title="Matching Analysis & Batch Review" subtitle={`วิเคราะห์การจับคู่ / ตรวจแบตช์ · ${warehouseCode}`} />
-      <MatchingBoard batches={batches} warehouseCode={warehouseCode} unmatchedPendingCount={unmatchedPendingCount} />
+      <MatchingBoard batches={batches} warehouseCode={warehouseCode} unmatchedPendingCount={unmatchedPendingCount} orderDate={orderDate} />
     </AppLayout>
   )
 }

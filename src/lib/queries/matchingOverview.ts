@@ -19,7 +19,7 @@ export async function getMatchingOverviewData(db: SupabaseClient, warehouseCode:
     db.from('orders').select('order_id, status, planned_pieces, consolidation_batch_id').eq('warehouse_code', warehouseCode).eq('original_order_date', orderDate),
     db
       .from('consolidation_batches')
-      .select('consol_batch_id, priority, match_pct, stores_count, orders_count, unique_sku_count, total_pieces, status')
+      .select('consol_batch_id, batch_no, priority, match_pct, stores_count, orders_count, unique_sku_count, total_pieces, status')
       .eq('order_date', orderDate),
     getActiveConfig(db, ['matching.p4_min_pieces']),
   ])
@@ -68,8 +68,9 @@ export async function getMatchingOverviewData(db: SupabaseClient, warehouseCode:
     actionRequired: {
       lowMatchRateBatches: batches.filter((b) => (b.match_pct ?? 1) < 0.5).length,
       oversizedSingleOrders: unmatchedOrders.filter((o) => (o.planned_pieces ?? 0) > oversizedThreshold).length,
-      needsReview: batches.filter((b) => b.status === 'review').length,
-      readyToRelease: batches.filter((b) => b.status === 'approved').length,
+      // Approve is now the batch's only review step (it replaces the old separate Approve +
+      // Release actions), so "needs attention" collapses to just "still sitting as a candidate".
+      awaitingApproval: batches.filter((b) => b.status === 'candidate').length,
     },
     topBatches,
   }

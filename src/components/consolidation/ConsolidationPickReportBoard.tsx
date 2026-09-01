@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
 
 interface Batch {
   consol_batch_id: string
+  batch_no: string
   order_date: string
   priority: string
   stores_count: number
@@ -66,7 +68,7 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
           {batches.map((b) => (
             <tr key={b.consol_batch_id}>
               <td className="link">
-                <Link href={`/pick-report/${b.consol_batch_id}`}>{b.consol_batch_id.slice(0, 8)}</Link>
+                <Link href={`/pick-report/${b.consol_batch_id}`}>{b.batch_no}</Link>
               </td>
               <td>{b.order_date}</td>
               <td>
@@ -77,7 +79,7 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
               <td style={{ fontWeight: 700 }}>{b.total_pieces}</td>
               <td>{b.released_at ? new Date(b.released_at).toLocaleString() : '—'}</td>
               <td>
-                <span className="badge badge-info">{b.status}</span>
+                <span className={`badge badge-${batchStatusTone(b.status)}`}>{batchStatusLabel(b.status)}</span>
               </td>
               <td>
                 <div style={{ display: 'flex', gap: 6 }}>

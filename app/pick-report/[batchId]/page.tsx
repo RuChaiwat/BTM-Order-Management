@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBatchDetail, buildPickReportLines } from '@/lib/queries/consolidation'
-import { PickReportBody, PICK_REPORT_PRINT_CSS } from '@/components/consolidation/PickReportBody'
+import { BatchReportDocument, PICK_REPORT_PRINT_CSS } from '@/components/consolidation/BatchReportDocument'
 import { PrintButton } from '@/components/PrintButton'
 import { batchStatusLabel, isBatchPrintable } from '@/lib/matching/batchStatus'
 
@@ -21,15 +21,13 @@ export default async function PickReportPage({ params }: { params: { batchId: st
 
   const { batch, orders, lines } = detail
   const pickLines = buildPickReportLines(lines, orders)
-  const zones = [...new Set(lines.map((l) => l.zone_code).filter(Boolean))].sort()
-  const uniqueSkuCount = new Set(lines.map((l) => l.sku)).size
   const printable = isBatchPrintable(batch.status)
 
   return (
-    <div className="a4-report">
+    <div>
       <style>{PICK_REPORT_PRINT_CSS}</style>
 
-      <div className="no-print" style={{ marginBottom: 16 }}>
+      <div className="no-print" style={{ marginBottom: 16, maxWidth: 800, margin: '0 auto 16px' }}>
         {printable ? (
           <PrintButton />
         ) : (
@@ -39,11 +37,10 @@ export default async function PickReportPage({ params }: { params: { batchId: st
         )}
       </div>
 
-      <PickReportBody
+      <BatchReportDocument
         batch={batch}
         warehouseCode={orders[0]?.warehouse_code ?? user.warehouse_code ?? ''}
-        uniqueSkuCount={uniqueSkuCount}
-        zones={zones}
+        orders={orders}
         pickLines={pickLines}
         generatedAt={new Date().toLocaleString()}
         generatedByName={user.name_en}

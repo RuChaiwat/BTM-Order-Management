@@ -1,19 +1,30 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getDashboardData } from './dashboard'
 import { unwrap } from './unwrap'
+import { getActiveZoneCodes } from './locations'
 
-const ZONES = ['A', 'B', 'C', 'D', 'E']
+// See dashboard.ts — unbounded selects silently truncate at Supabase's default 1000-row cap.
+const ROW_CAP = 200000
 
 export async function getControlTowerData(db: SupabaseClient, warehouseCode: string) {
-  const base = await getDashboardData(db, warehouseCode)
-
-  const [ordersRes, linesRes, alertsRes] = await Promise.all([
-    db.from('orders').select('order_id, order_no, status, assigned_time, warehouse_code, assignment_batch_id').eq('warehouse_code', warehouseCode),
-    db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode),
-    db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog'),
+  const [base, zones, ordersRes, linesRes] = await Promise.all([
+    getDashboardData(db, warehouseCode),
+    getActiveZoneCodes(db, warehouseCode),
+    db.from('orders').select('order_id, order_no, status, assigned_time, warehouse_code, assignment_batch_id').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
+    db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
   ])
+  if (ordersRes.error) console.error('[controlTower] orders error', ordersRes.error.message)
+  if (linesRes.error) console.error('[controlTower] order_lines error', linesRes.error.message)
+
   const orders = unwrap(ordersRes)
   const lines = unwrap(linesRes)
+
+  // order_alerts has no warehouse_code column — scope it via this warehouse's own order_ids
+  // rather than fetching every warehouse's alerts unfiltered (part of the original truncation bug).
+  const orderIds = orders.map((o) => o.order_id)
+  const alertsRes = orderIds.length
+    ? await db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).limit(ROW_CAP)
+    : { data: [] as { order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }[], error: null }
   const alertByOrder = new Map(unwrap(alertsRes).map((a) => [a.order_id, a]))
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
 
@@ -24,7 +35,7 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     zoneOrders.get(l.zone_code)!.add(l.order_id)
   }
 
-  const zoneOverview = ZONES.map((zone) => {
+  const zoneOverview = zones.map((zone) => {
     const touching = [...(zoneOrders.get(zone) ?? new Set())]
     const inProgress = touching.filter((id) => orderStatusById.get(id) === 'in_progress').length
     const completed = touching.filter((id) => orderStatusById.get(id)?.startsWith('final_closed')).length

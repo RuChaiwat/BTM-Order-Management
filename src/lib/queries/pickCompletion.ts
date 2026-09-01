@@ -12,6 +12,7 @@ export async function getPickCompletionData(db: SupabaseClient, warehouseCode: s
     .select('order_id, order_no, store_code, planned_pieces, status, assignment_batch_id, assigned_time')
     .eq('warehouse_code', warehouseCode)
     .in('status', ['assigned', 'in_progress', 'correction_in_progress'])
+    .limit(200000)
   let orders = unwrap(ordersRes)
 
   if (user.role === 'picker') {

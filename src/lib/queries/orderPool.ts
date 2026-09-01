@@ -4,6 +4,9 @@ import { unwrap } from './unwrap'
 
 export type ComplexityBand = 'green' | 'yellow' | 'red'
 
+// See dashboard.ts — unbounded selects silently truncate at Supabase's default 1000-row cap.
+const ROW_CAP = 200000
+
 /**
  * Order Pool overview — replaces a raw "50 most recent orders" list with two decision-support
  * breakdowns of the pending pool (status = 'new', i.e. not yet consolidated/assigned):
@@ -17,16 +20,17 @@ export type ComplexityBand = 'green' | 'yellow' | 'red'
  */
 export async function getOrderPoolOverview(db: SupabaseClient, warehouseCode: string) {
   const [ordersRes, cfg] = await Promise.all([
-    db.from('orders').select('order_id, planned_pieces, unique_sku_count').eq('warehouse_code', warehouseCode).eq('status', 'new'),
+    db.from('orders').select('order_id, planned_pieces, unique_sku_count').eq('warehouse_code', warehouseCode).eq('status', 'new').limit(ROW_CAP),
     getActiveConfig(db, ['order_complexity.green_min_pcs_per_sku', 'order_complexity.red_max_pcs_per_sku']),
   ])
+  if (ordersRes.error) console.error('[orderPool] orders error', ordersRes.error.message)
   const orders = unwrap(ordersRes)
   const greenMinPcsPerSku = Number(cfg.value('order_complexity.green_min_pcs_per_sku') ?? 5)
   const redMaxPcsPerSku = Number(cfg.value('order_complexity.red_max_pcs_per_sku') ?? 2)
 
   const orderIds = orders.map((o) => o.order_id)
   const linesRes = orderIds.length
-    ? await db.from('order_lines').select('order_id, zone_code, qty').in('order_id', orderIds)
+    ? await db.from('order_lines').select('order_id, zone_code, qty').in('order_id', orderIds).limit(ROW_CAP)
     : { data: [] as { order_id: string; zone_code: string | null; qty: number }[] }
   const lines = unwrap(linesRes)
 

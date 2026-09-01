@@ -1,7 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
+import { getActiveZoneCodes } from './locations'
 
-const ZONES = ['A', 'B', 'C', 'D', 'E']
+// Any select scoped only by warehouse_code/status (no further narrowing) needs an explicit high
+// limit — Supabase/PostgREST caps an unbounded select at 1000 rows by default, which silently
+// truncated these once real order volume passed that (confirmed root cause of Dashboard/Zone
+// Dashboard/Control Tower all under-reporting after a real import).
+const ROW_CAP = 200000
 
 /**
  * Aggregates computed in JS after small raw-row fetches, not SQL views — fine at dev/demo scale.
@@ -9,25 +14,36 @@ const ZONES = ['A', 'B', 'C', 'D', 'E']
  * function; flagged rather than silently left as a scaling trap.
  */
 export async function getDashboardData(db: SupabaseClient, warehouseCode: string) {
-  const [ordersRes, linesRes, assignmentBatchesRes, alertsRes, importErrorsRes] = await Promise.all([
-    db.from('orders').select('order_id, status, planned_pieces, assigned_time, picker_completed_time, assignment_batch_id').eq('warehouse_code', warehouseCode),
-    db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode),
-    db.from('assignment_batches').select('assignment_batch_id, picker_id, status, zone_code').eq('warehouse_code', warehouseCode),
-    db.from('order_alerts').select('order_id, time_alert, is_picking_backlog, is_verification_backlog'),
-    db.from('import_errors').select('error_id, error_reason').ilike('error_reason', '%Invalid Bin Code%'),
+  const [ordersRes, linesRes, assignmentBatchesRes, importErrorsRes, zones] = await Promise.all([
+    db.from('orders').select('order_id, status, planned_pieces, assigned_time, picker_completed_time, assignment_batch_id').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
+    db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
+    db.from('assignment_batches').select('assignment_batch_id, picker_id, status, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
+    db.from('import_errors').select('error_id, error_reason').ilike('error_reason', '%Invalid Bin Code%').limit(ROW_CAP),
+    getActiveZoneCodes(db, warehouseCode),
   ])
+  if (ordersRes.error) console.error('[dashboard] orders error', ordersRes.error.message)
+  if (linesRes.error) console.error('[dashboard] order_lines error', linesRes.error.message)
+  if (assignmentBatchesRes.error) console.error('[dashboard] assignment_batches error', assignmentBatchesRes.error.message)
 
   const orders = ordersRes.data ?? []
   const lines = linesRes.data ?? []
   const assignmentBatches = assignmentBatchesRes.data ?? []
-  const alerts = alertsRes.data ?? []
   const invalidBinErrors = importErrorsRes.data ?? []
 
   const orderIds = orders.map((o) => o.order_id)
-  const completionsRes = orderIds.length
-    ? await db.from('picker_completions').select('order_id, actual_pieces, picker_completed_time, result').in('order_id', orderIds)
-    : { data: [] as { order_id: string; actual_pieces: number; picker_completed_time: string; result: string }[] }
-  const completions = completionsRes.data ?? []
+  // order_alerts has no warehouse_code column (it's a plain derived view over all orders), so it
+  // must be scoped via order_id here rather than fetched unfiltered — that unfiltered fetch was
+  // also part of the truncation bug, pulling an arbitrary slice of every warehouse's alerts.
+  const [completionsRes, alertsRes] = await Promise.all([
+    orderIds.length
+      ? db.from('picker_completions').select('order_id, actual_pieces, picker_completed_time, result').in('order_id', orderIds).limit(ROW_CAP)
+      : Promise.resolve({ data: [] as { order_id: string; actual_pieces: number; picker_completed_time: string; result: string }[], error: null }),
+    orderIds.length
+      ? db.from('order_alerts').select('order_id, time_alert, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).limit(ROW_CAP)
+      : Promise.resolve({ data: [] as { order_id: string; time_alert: string | null; is_picking_backlog: boolean; is_verification_backlog: boolean }[], error: null }),
+  ])
+  const completions = unwrap(completionsRes)
+  const alerts = unwrap(alertsRes)
 
   const totalOrders = orders.length
   const totalPlannedPieces = orders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
@@ -55,7 +71,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   }
 
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
-  const zoneStatus = ZONES.map((zone) => {
+  const zoneStatus = zones.map((zone) => {
     const touching = zoneOrders.get(zone) ?? new Set()
     const closed = [...touching].filter((id) => orderStatusById.get(id)?.startsWith('final_closed')).length
     const slaPct = touching.size > 0 ? Math.round((closed / touching.size) * 1000) / 10 : 100

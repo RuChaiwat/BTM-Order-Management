@@ -74,7 +74,9 @@ export function BatchReportDocument({ batch, warehouseCode, orders, pickLines, g
   const zones = [...new Set(pickLines.map((l) => l.zoneCode).filter(Boolean))].sort() as string[]
   const uniqueSkuCount = new Set(pickLines.map((l) => l.sku)).size
   const pages = chunk(pickLines, ROWS_PER_PAGE)
-  const totalPages = pages.length
+  // The Order Grouping sheet is the last page of this same numbered sequence, not a separate
+  // document -- it's one continuous printout per batch (pick list pages, then the sorting sheet).
+  const totalDocPages = pages.length + 1
 
   return (
     <>
@@ -86,7 +88,7 @@ export function BatchReportDocument({ batch, warehouseCode, orders, pickLines, g
             warehouseCode={warehouseCode}
             generatedAt={generatedAt}
             generatedByName={generatedByName}
-            pageLabel={totalPages > 1 ? `Page ${i + 1} of ${totalPages}` : undefined}
+            pageLabel={`Page ${i + 1} of ${totalDocPages}`}
           />
           <SummaryRow stores={batch.stores_count} orders={batch.orders_count} uniqueSku={uniqueSkuCount} totalPieces={batch.total_pieces} zones={zones} />
 
@@ -139,16 +141,23 @@ export function BatchReportDocument({ batch, warehouseCode, orders, pickLines, g
       ))}
 
       <div className="a4-report" style={{ breakAfter: isLastInDocument ? undefined : 'page' }}>
-        <ReportHeader title="Order Grouping — Sorting Sheet" batch={batch} warehouseCode={warehouseCode} generatedAt={generatedAt} generatedByName={generatedByName} />
+        <ReportHeader
+          title="Order Grouping — Sorting Sheet"
+          batch={batch}
+          warehouseCode={warehouseCode}
+          generatedAt={generatedAt}
+          generatedByName={generatedByName}
+          pageLabel={`Page ${totalDocPages} of ${totalDocPages}`}
+        />
         <SummaryRow stores={batch.stores_count} orders={batch.orders_count} uniqueSku={uniqueSkuCount} totalPieces={batch.total_pieces} zones={zones} />
 
         <table>
           <colgroup>
-            <col style={{ width: '8%' }} />
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '36%' }} />
+            <col style={{ width: '20%' }} />
             <col style={{ width: '22%' }} />
-            <col style={{ width: '30%' }} />
-            <col style={{ width: '20%' }} />
-            <col style={{ width: '20%' }} />
           </colgroup>
           <thead>
             <tr>
@@ -164,7 +173,9 @@ export function BatchReportDocument({ batch, warehouseCode, orders, pickLines, g
               <tr key={o.order_id}>
                 <td>{i + 1}</td>
                 <td>{o.store_code}</td>
-                <td>{o.order_no}</td>
+                <td>
+                  <Barcode value={o.order_no} height={18} width={1} fontSize={8} />
+                </td>
                 <td>{o.unique_sku_count}</td>
                 <td style={{ fontWeight: 700 }}>{o.planned_pieces}</td>
               </tr>

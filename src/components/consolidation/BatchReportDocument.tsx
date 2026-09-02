@@ -74,9 +74,10 @@ export function BatchReportDocument({ batch, warehouseCode, orders, pickLines, g
   const zones = [...new Set(pickLines.map((l) => l.zoneCode).filter(Boolean))].sort() as string[]
   const uniqueSkuCount = new Set(pickLines.map((l) => l.sku)).size
   const pages = chunk(pickLines, ROWS_PER_PAGE)
-  // The Order Grouping sheet is the last page of this same numbered sequence, not a separate
-  // document -- it's one continuous printout per batch (pick list pages, then the sorting sheet).
-  const totalDocPages = pages.length + 1
+  // Each report type numbers its own pages independently -- the Order Grouping sheet is always
+  // "Page 1 of 1" on its own, not a continuation of the Consolidated Pick Report's count, even
+  // though the two always print back-to-back as one physical printout per batch.
+  const pickTotalPages = pages.length
 
   return (
     <>
@@ -88,7 +89,7 @@ export function BatchReportDocument({ batch, warehouseCode, orders, pickLines, g
             warehouseCode={warehouseCode}
             generatedAt={generatedAt}
             generatedByName={generatedByName}
-            pageLabel={`Page ${i + 1} of ${totalDocPages}`}
+            pageLabel={`Page ${i + 1} of ${pickTotalPages}`}
           />
           <SummaryRow stores={batch.stores_count} orders={batch.orders_count} uniqueSku={uniqueSkuCount} totalPieces={batch.total_pieces} zones={zones} />
 
@@ -147,7 +148,7 @@ export function BatchReportDocument({ batch, warehouseCode, orders, pickLines, g
           warehouseCode={warehouseCode}
           generatedAt={generatedAt}
           generatedByName={generatedByName}
-          pageLabel={`Page ${totalDocPages} of ${totalDocPages}`}
+          pageLabel="Page 1 of 1"
         />
         <SummaryRow stores={batch.stores_count} orders={batch.orders_count} uniqueSku={uniqueSkuCount} totalPieces={batch.total_pieces} zones={zones} />
 

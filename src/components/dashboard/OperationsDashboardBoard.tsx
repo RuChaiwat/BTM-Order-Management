@@ -46,6 +46,7 @@ interface DashboardData {
     totalBacklogPieces: number
     activePickers: number
     activePickerTotalPieces: number
+    activePickerTotalOrders: number
   }
   backlogByDate: BacklogRow[]
   zoneStatus: ZoneStatus[]
@@ -153,10 +154,10 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
           style={{ textAlign: 'center' }}
         />
         <KpiCard
-          label="ACTIVE PICKERS"
+          label="ACTIVE PICKERS (PCS)"
           labelTh="ผู้หยิบที่ทำงานอยู่"
-          value={kpis.activePickers}
-          sub={`${kpis.activePickerTotalPieces.toLocaleString()} pcs in hand`}
+          value={kpis.activePickerTotalPieces.toLocaleString()}
+          sub={`${kpis.activePickerTotalOrders.toLocaleString()} orders in hand`}
           style={{ textAlign: 'center' }}
         />
         <KpiCard

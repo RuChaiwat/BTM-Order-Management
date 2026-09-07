@@ -176,6 +176,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   }
   const activePickers = activePickerWork.size
   const activePickerTotalPieces = [...activePickerWork.values()].reduce((s, w) => s + w.pieces, 0)
+  const activePickerTotalOrders = [...activePickerWork.values()].reduce((s, w) => s + w.orders, 0)
 
   const pickerIds = [...new Set([...pickerTotals.keys(), ...activePickerWork.keys()])]
   const pickerNamesRes = pickerIds.length
@@ -207,6 +208,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
       totalBacklogOrders,
       totalBacklogPieces,
       activePickers,
+      activePickerTotalOrders,
       activePickerTotalPieces,
     },
     backlogByDate,

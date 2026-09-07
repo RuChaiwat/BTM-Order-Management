@@ -12,7 +12,7 @@ import { getZoneDashboardData } from '@/lib/queries/zoneDashboard'
 // this route (and its data) to always be fresh.
 export const dynamic = 'force-dynamic'
 
-export default async function ZoneDashboardPage() {
+export default async function ZoneDashboardPage({ searchParams }: { searchParams: { zone?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const warehouseCode = user.warehouse_code ?? 'DC002'
@@ -22,7 +22,7 @@ export default async function ZoneDashboardPage() {
   return (
     <AppLayout activeNavId={9}>
       <TopBar title="Zone Dashboard" subtitle={`แดชบอร์ดโซน · ${data.zoneDetail.length} zones · ${warehouseCode}`} />
-      <ZoneDashboardBoard zoneDetail={data.zoneDetail} />
+      <ZoneDashboardBoard zoneDetail={data.zoneDetail} initialZone={searchParams.zone} />
     </AppLayout>
   )
 }

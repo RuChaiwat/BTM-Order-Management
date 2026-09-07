@@ -8,6 +8,14 @@ import { getActiveZoneCodes } from './locations'
 // Dashboard/Control Tower all under-reporting after a real import).
 const ROW_CAP = 200000
 
+const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
+
+function daysBetween(fromDate: string, toDate: string): number {
+  const [y1, m1, d1] = fromDate.split('-').map(Number)
+  const [y2, m2, d2] = toDate.split('-').map(Number)
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000)
+}
+
 /**
  * Aggregates computed in JS after small raw-row fetches, not SQL views — fine at dev/demo scale.
  * At the §19 design capacity (5,000 orders/day) these should move into SQL views or an RPC
@@ -15,7 +23,11 @@ const ROW_CAP = 200000
  */
 export async function getDashboardData(db: SupabaseClient, warehouseCode: string) {
   const [ordersRes, linesRes, assignmentBatchesRes, importErrorsRes, zones] = await Promise.all([
-    db.from('orders').select('order_id, status, planned_pieces, assigned_time, picker_completed_time, assignment_batch_id').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
+    db
+      .from('orders')
+      .select('order_id, status, planned_pieces, original_order_date, assigned_time, picker_completed_time, assignment_batch_id')
+      .eq('warehouse_code', warehouseCode)
+      .limit(ROW_CAP),
     db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
     db.from('assignment_batches').select('assignment_batch_id, picker_id, status, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
     db.from('import_errors').select('error_id, error_reason').ilike('error_reason', '%Invalid Bin Code%').limit(ROW_CAP),
@@ -44,24 +56,50 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   ])
   const completions = unwrap(completionsRes)
   const alerts = unwrap(alertsRes)
+  const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
 
-  const totalOrders = orders.length
-  const totalPlannedPieces = orders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
-  const piecesPicked = completions.reduce((s, c) => s + (c.actual_pieces ?? 0), 0)
-  const pickerCompletedCount = completions.length
-  const pickerCompleted100 = completions.filter((c) => c.result === '100_percent').length
-  const pickerCompletedShort = completions.filter((c) => c.result === 'short').length
+  // §management KPI funnel: Total Orders -> Assigned -> Completed (admin-verified only) -> %
+  // Completed -> Total Backlog. Cancelled orders are excluded from every stage here -- they were
+  // deliberately taken out of the workflow, so counting them as "imported" or as "backlog" would
+  // be misleading for a decision-making view.
+  const activeOrders = orders.filter((o) => o.status !== 'cancelled')
+  const totalOrders = activeOrders.length
+  const totalPieces = activeOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
+
+  const assignedOrdersList = activeOrders.filter((o) => o.assignment_batch_id)
+  const assignedOrders = assignedOrdersList.length
+  const assignedPieces = assignedOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
+
+  const completedOrdersList = activeOrders.filter((o) => TERMINAL_CLOSED_STATUSES.has(o.status))
+  const completedOrders = completedOrdersList.length
+  const completedPieces = completedOrdersList.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0)
+
+  const pctOrdersCompleted = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 1000) / 10 : 0
+  const pctPiecesCompleted = totalPieces > 0 ? Math.round((completedPieces / totalPieces) * 1000) / 10 : 0
+  const totalBacklogOrders = totalOrders - completedOrders
+
+  // Backlog by Order Date: every non-cancelled order that hasn't reached admin-verified close yet,
+  // grouped by its original (WMS) order date. Only dates that actually have backlog appear.
+  const today = new Date().toISOString().slice(0, 10)
+  const backlogByDateMap = new Map<string, { orders: number; pieces: number }>()
+  for (const o of activeOrders) {
+    if (TERMINAL_CLOSED_STATUSES.has(o.status)) continue
+    const entry = backlogByDateMap.get(o.original_order_date) ?? { orders: 0, pieces: 0 }
+    entry.orders += 1
+    entry.pieces += o.planned_pieces ?? 0
+    backlogByDateMap.set(o.original_order_date, entry)
+  }
+  const backlogByDate = [...backlogByDateMap.entries()]
+    .map(([orderDate, v]) => ({ orderDate, orders: v.orders, pieces: v.pieces, daysOld: daysBetween(orderDate, today) }))
+    .sort((a, b) => a.orderDate.localeCompare(b.orderDate))
 
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
-  const pickingBacklog = orders.filter((o) => alertByOrder.get(o.order_id)?.is_picking_backlog).length
-  const verificationBacklog = orders.filter((o) => alertByOrder.get(o.order_id)?.is_verification_backlog).length
   const critical = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'critical').length
   const overdue = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'overdue').length
-
-  const activePickers = new Set(assignmentBatches.filter((b) => b.status === 'in_progress').map((b) => b.picker_id)).size
-
   const statusCounts = new Map<string, number>()
   for (const o of orders) statusCounts.set(o.status, (statusCounts.get(o.status) ?? 0) + 1)
+
+  const activePickers = new Set(assignmentBatches.filter((b) => b.status === 'in_progress').map((b) => b.picker_id)).size
 
   const zoneOrders = new Map<string, Set<string>>()
   for (const l of lines) {
@@ -69,17 +107,16 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     if (!zoneOrders.has(l.zone_code)) zoneOrders.set(l.zone_code, new Set())
     zoneOrders.get(l.zone_code)!.add(l.order_id)
   }
-
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
   const zoneStatus = zones.map((zone) => {
     const touching = zoneOrders.get(zone) ?? new Set()
     const closed = [...touching].filter((id) => orderStatusById.get(id)?.startsWith('final_closed')).length
     const slaPct = touching.size > 0 ? Math.round((closed / touching.size) * 1000) / 10 : 100
-    return { zone: `Zone ${zone}`, orders: touching.size, slaPct, onTrack: slaPct >= 85 }
+    return { zone, orders: touching.size, slaPct, onTrack: slaPct >= 85 }
   })
 
-  const orderById = new Map(orders.map((o) => [o.order_id, o]))
   const batchByAssignmentId = new Map(assignmentBatches.map((b) => [b.assignment_batch_id, b]))
+  const orderById = new Map(orders.map((o) => [o.order_id, o]))
 
   const pickerTotals = new Map<string, { pieces: number; minutes: number }>()
   for (const c of completions) {
@@ -92,7 +129,23 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     entry.minutes += Math.max(minutes, 1)
     pickerTotals.set(pickerId, entry)
   }
-  const pickerIds = [...pickerTotals.keys()]
+
+  // Active pickers right now: which orders are still sitting in an in-progress batch (i.e. picked
+  // up but not yet handed to a picker_completed status), broken down per picker for the roster.
+  const activeBatchPickerById = new Map(assignmentBatches.filter((b) => b.status === 'in_progress' && b.picker_id).map((b) => [b.assignment_batch_id, b.picker_id as string]))
+  const activePickerWork = new Map<string, { orders: number; pieces: number }>()
+  for (const o of orders) {
+    if (!o.assignment_batch_id) continue
+    const pickerId = activeBatchPickerById.get(o.assignment_batch_id)
+    if (!pickerId) continue
+    if (o.status !== 'assigned' && o.status !== 'in_progress') continue
+    const entry = activePickerWork.get(pickerId) ?? { orders: 0, pieces: 0 }
+    entry.orders += 1
+    entry.pieces += o.planned_pieces ?? 0
+    activePickerWork.set(pickerId, entry)
+  }
+
+  const pickerIds = [...new Set([...pickerTotals.keys(), ...activePickerWork.keys()])]
   const pickerNamesRes = pickerIds.length
     ? await db.from('employees_users').select('user_id, name_en').in('user_id', pickerIds)
     : { data: [] as { user_id: string; name_en: string }[] }
@@ -103,30 +156,34 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     .sort((a, b) => b.pcsPerHour - a.pcsPerHour)
     .slice(0, 6)
 
+  const activePickerRoster = [...activePickerWork.entries()]
+    .map(([pickerId, w]) => ({ pickerId, name: nameByPickerId.get(pickerId) ?? pickerId, orders: w.orders, pieces: w.pieces }))
+    .sort((a, b) => b.pieces - a.pieces)
+
   return {
     kpis: {
       totalOrders,
-      totalPlannedPieces,
-      piecesPicked,
-      pickerCompletedCount,
-      pickerCompleted100,
-      pickerCompletedShort,
-      pickingBacklog,
-      verificationBacklog,
+      totalPieces,
+      assignedOrders,
+      assignedPieces,
+      completedOrders,
+      completedPieces,
+      pctOrdersCompleted,
+      pctPiecesCompleted,
+      totalBacklogOrders,
       activePickers,
     },
+    backlogByDate,
     statusCounts: Object.fromEntries(statusCounts),
     zoneStatus,
     pickerProductivity,
+    activePickerRoster,
     actionRequired: {
       critical,
       overdue,
       waitingVerification: statusCounts.get('waiting_admin_verification') ?? 0,
+      correctionInProgress: (statusCounts.get('admin_rejected') ?? 0) + (statusCounts.get('correction_in_progress') ?? 0),
       invalidBinCode: invalidBinErrors.length,
-    },
-    flow: {
-      importOrders: totalOrders,
-      assignment: (statusCounts.get('assigned') ?? 0) + (statusCounts.get('in_progress') ?? 0),
     },
   }
 }

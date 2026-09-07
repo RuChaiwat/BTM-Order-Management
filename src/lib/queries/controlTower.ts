@@ -6,11 +6,19 @@ import { getActiveZoneCodes } from './locations'
 // See dashboard.ts — unbounded selects silently truncate at Supabase's default 1000-row cap.
 const ROW_CAP = 200000
 
+/**
+ * Control Tower has its own real-time-monitoring KPI set (all orders including cancelled, raw
+ * picker-completion counts regardless of admin verification) which is deliberately different from
+ * Operations Dashboard's management funnel (getDashboardData) — only `activePickers` and
+ * `actionRequired` are shared from there, everything else here is computed from this function's
+ * own orders/alerts/completions fetch so the two pages can't accidentally couple to the same
+ * shape and break each other when one is redesigned.
+ */
 export async function getControlTowerData(db: SupabaseClient, warehouseCode: string) {
   const [base, zones, ordersRes, linesRes] = await Promise.all([
     getDashboardData(db, warehouseCode),
     getActiveZoneCodes(db, warehouseCode),
-    db.from('orders').select('order_id, order_no, status, assigned_time, warehouse_code, assignment_batch_id').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
+    db.from('orders').select('order_id, order_no, status, planned_pieces, assigned_time, warehouse_code, assignment_batch_id').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
     db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
   ])
   if (ordersRes.error) console.error('[controlTower] orders error', ordersRes.error.message)
@@ -22,10 +30,16 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
   // order_alerts has no warehouse_code column — scope it via this warehouse's own order_ids
   // rather than fetching every warehouse's alerts unfiltered (part of the original truncation bug).
   const orderIds = orders.map((o) => o.order_id)
-  const alertsRes = orderIds.length
-    ? await db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).limit(ROW_CAP)
-    : { data: [] as { order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }[], error: null }
+  const [alertsRes, completionsRes] = await Promise.all([
+    orderIds.length
+      ? db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).limit(ROW_CAP)
+      : Promise.resolve({ data: [] as { order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }[], error: null }),
+    orderIds.length
+      ? db.from('picker_completions').select('order_id, actual_pieces, result').in('order_id', orderIds).limit(ROW_CAP)
+      : Promise.resolve({ data: [] as { order_id: string; actual_pieces: number; result: string }[], error: null }),
+  ])
   const alertByOrder = new Map(unwrap(alertsRes).map((a) => [a.order_id, a]))
+  const completions = unwrap(completionsRes)
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
 
   const zoneOrders = new Map<string, Set<string>>()
@@ -68,7 +82,21 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
   })
 
   return {
-    ...base,
+    kpis: {
+      totalOrders: orders.length,
+      totalPlannedPieces: orders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),
+      piecesPicked: completions.reduce((s, c) => s + (c.actual_pieces ?? 0), 0),
+      pickerCompletedCount: completions.length,
+      pickerCompleted100: completions.filter((c) => c.result === '100_percent').length,
+      pickerCompletedShort: completions.filter((c) => c.result === 'short').length,
+      pickingBacklog: orders.filter((o) => alertByOrder.get(o.order_id)?.is_picking_backlog).length,
+      verificationBacklog: orders.filter((o) => alertByOrder.get(o.order_id)?.is_verification_backlog).length,
+      activePickers: base.kpis.activePickers,
+    },
+    flow: {
+      assignment: orders.filter((o) => o.status === 'assigned' || o.status === 'in_progress').length,
+    },
+    actionRequired: base.actionRequired,
     zoneOverview,
     topOverdueOrders: overdueOrders,
     secondaryKpis: {

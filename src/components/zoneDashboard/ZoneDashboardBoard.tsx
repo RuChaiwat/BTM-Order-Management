@@ -38,8 +38,8 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
-export function ZoneDashboardBoard({ zoneDetail }: { zoneDetail: ZoneDetail[] }) {
-  const [activeZone, setActiveZone] = useState(zoneDetail[0]?.zone ?? '')
+export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: ZoneDetail[]; initialZone?: string }) {
+  const [activeZone, setActiveZone] = useState(() => (initialZone && zoneDetail.some((z) => z.zone === initialZone) ? initialZone : (zoneDetail[0]?.zone ?? '')))
   const selected = zoneDetail.find((z) => z.zone === activeZone) ?? zoneDetail[0]
 
   return (

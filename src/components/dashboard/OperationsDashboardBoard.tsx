@@ -34,6 +34,8 @@ interface DashboardData {
     totalPieces: number
     assignedOrders: number
     assignedPieces: number
+    waitingVerifyOrders: number
+    waitingVerifyPieces: number
     completedOrders: number
     completedPieces: number
     pctOrdersCompleted: number
@@ -106,9 +108,16 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
         </div>
       )}
 
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
         <KpiCard label="TOTAL ORDERS" labelTh="ออเดอร์ทั้งหมดที่ Import" value={kpis.totalOrders.toLocaleString()} sub={`${kpis.totalPieces.toLocaleString()} pcs total`} />
         <KpiCard label="ASSIGNED" labelTh="มอบหมายงานแล้ว" value={kpis.assignedOrders.toLocaleString()} sub={`${kpis.assignedPieces.toLocaleString()} pcs assigned`} />
+        <KpiCard
+          label="WAITING VERIFY"
+          labelTh="รอ Admin Confirm"
+          value={kpis.waitingVerifyOrders.toLocaleString()}
+          valueColor={kpis.waitingVerifyOrders > 0 ? '#2563EB' : undefined}
+          sub={`${kpis.waitingVerifyPieces.toLocaleString()} pcs waiting`}
+        />
         <KpiCard
           label="COMPLETED"
           labelTh="ปิดงานแล้ว (Admin Verified)"

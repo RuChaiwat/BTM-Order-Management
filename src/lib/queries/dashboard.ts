@@ -9,6 +9,13 @@ import { getActiveZoneCodes } from './locations'
 const ROW_CAP = 200000
 
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
+// This app never actually transitions an assignment_batch or order to 'in_progress' today (no
+// "picker started scanning" event is implemented) -- every live batch/order just sits at
+// 'assigned' until the picker submits a completion. Treating only 'in_progress' as "active" made
+// Active Pickers (and the roster below it) permanently read zero. Both statuses are accepted here
+// so this keeps working if 'in_progress' ever does get wired up later.
+const ACTIVE_BATCH_STATUSES = new Set(['assigned', 'in_progress'])
+const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in_progress'])
 
 function daysBetween(fromDate: string, toDate: string): number {
   const [y1, m1, d1] = fromDate.split('-').map(Number)
@@ -70,6 +77,13 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const assignedOrders = assignedOrdersList.length
   const assignedPieces = assignedOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
 
+  // Waiting Verify: picker has already submitted a completion for these, they're just sitting in
+  // Admin Verification's queue -- distinct from "Completed" below, which only counts orders the
+  // admin has actually confirmed closed.
+  const waitingVerifyOrdersList = activeOrders.filter((o) => o.status === 'waiting_admin_verification')
+  const waitingVerifyOrders = waitingVerifyOrdersList.length
+  const waitingVerifyPieces = waitingVerifyOrdersList.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0)
+
   const completedOrdersList = activeOrders.filter((o) => TERMINAL_CLOSED_STATUSES.has(o.status))
   const completedOrders = completedOrdersList.length
   const completedPieces = completedOrdersList.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0)
@@ -99,7 +113,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const statusCounts = new Map<string, number>()
   for (const o of orders) statusCounts.set(o.status, (statusCounts.get(o.status) ?? 0) + 1)
 
-  const activePickers = new Set(assignmentBatches.filter((b) => b.status === 'in_progress').map((b) => b.picker_id)).size
+  const activePickers = new Set(assignmentBatches.filter((b) => ACTIVE_BATCH_STATUSES.has(b.status) && b.picker_id).map((b) => b.picker_id)).size
 
   const zoneOrders = new Map<string, Set<string>>()
   for (const l of lines) {
@@ -130,15 +144,16 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     pickerTotals.set(pickerId, entry)
   }
 
-  // Active pickers right now: which orders are still sitting in an in-progress batch (i.e. picked
-  // up but not yet handed to a picker_completed status), broken down per picker for the roster.
-  const activeBatchPickerById = new Map(assignmentBatches.filter((b) => b.status === 'in_progress' && b.picker_id).map((b) => [b.assignment_batch_id, b.picker_id as string]))
+  // Active pickers right now: which orders are still sitting in an active batch (i.e. handed to a
+  // picker but not yet submitted as a picker_completed status), broken down per picker for the
+  // roster below Zone Status.
+  const activeBatchPickerById = new Map(assignmentBatches.filter((b) => ACTIVE_BATCH_STATUSES.has(b.status) && b.picker_id).map((b) => [b.assignment_batch_id, b.picker_id as string]))
   const activePickerWork = new Map<string, { orders: number; pieces: number }>()
   for (const o of orders) {
     if (!o.assignment_batch_id) continue
     const pickerId = activeBatchPickerById.get(o.assignment_batch_id)
     if (!pickerId) continue
-    if (o.status !== 'assigned' && o.status !== 'in_progress') continue
+    if (!ACTIVE_ORDER_STATUSES.has(o.status)) continue
     const entry = activePickerWork.get(pickerId) ?? { orders: 0, pieces: 0 }
     entry.orders += 1
     entry.pieces += o.planned_pieces ?? 0
@@ -166,6 +181,8 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
       totalPieces,
       assignedOrders,
       assignedPieces,
+      waitingVerifyOrders,
+      waitingVerifyPieces,
       completedOrders,
       completedPieces,
       pctOrdersCompleted,

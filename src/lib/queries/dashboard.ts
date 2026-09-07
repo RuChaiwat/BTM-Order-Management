@@ -91,8 +91,15 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const completedOrders = completedOrdersList.length
   const completedPieces = completedOrdersList.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0)
 
-  const pctOrdersCompleted = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 1000) / 10 : 0
-  const pctPiecesCompleted = totalPieces > 0 ? Math.round((completedPieces / totalPieces) * 1000) / 10 : 0
+  // % Completed counts pieces, not orders, and treats a short-picked order that was still closed
+  // as "accounted for" -- the gap between what was ordered and what was actually picked on a
+  // final_closed_short order is "issue" pieces (acknowledged missing, not simply unworked), so it
+  // counts toward the percentage alongside the pieces that were fully picked. e.g. Total 100,
+  // Completed 85, Issue 5 -> 90% (the remaining 10 haven't been touched at all yet).
+  const issuePieces = activeOrders
+    .filter((o) => o.status === 'final_closed_short')
+    .reduce((s, o) => s + Math.max(0, (o.planned_pieces ?? 0) - (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0)), 0)
+  const pctPiecesCompleted = totalPieces > 0 ? Math.round(((completedPieces + issuePieces) / totalPieces) * 1000) / 10 : 0
   const totalBacklogOrders = totalOrders - completedOrders
   const totalBacklogPieces = totalPieces - completedPieces
 
@@ -124,11 +131,16 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     zoneOrders.get(l.zone_code)!.add(l.order_id)
   }
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
+  const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
   const zoneStatus = zones.map((zone) => {
-    const touching = zoneOrders.get(zone) ?? new Set()
-    const closed = [...touching].filter((id) => orderStatusById.get(id)?.startsWith('final_closed')).length
-    const slaPct = touching.size > 0 ? Math.round((closed / touching.size) * 1000) / 10 : 100
-    return { zone, orders: touching.size, slaPct, onTrack: slaPct >= 85 }
+    const touching = [...(zoneOrders.get(zone) ?? new Set())]
+    const closedIds = touching.filter((id) => orderStatusById.get(id)?.startsWith('final_closed'))
+    const totalPieces = touching.reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
+    // Pieces Pending drops as Admin confirms each order in this zone -- Total Pieces is the
+    // stable denominator it's shrinking against.
+    const pendingPieces = touching.filter((id) => !closedIds.includes(id)).reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
+    const slaPct = touching.length > 0 ? Math.round((closedIds.length / touching.length) * 1000) / 10 : 100
+    return { zone, orders: touching.length, totalPieces, pendingPieces, slaPct, onTrack: slaPct >= 85 }
   })
 
   const batchByAssignmentId = new Map(assignmentBatches.map((b) => [b.assignment_batch_id, b]))
@@ -163,6 +175,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     activePickerWork.set(pickerId, entry)
   }
   const activePickers = activePickerWork.size
+  const activePickerTotalPieces = [...activePickerWork.values()].reduce((s, w) => s + w.pieces, 0)
 
   const pickerIds = [...new Set([...pickerTotals.keys(), ...activePickerWork.keys()])]
   const pickerNamesRes = pickerIds.length
@@ -189,11 +202,12 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
       waitingVerifyPieces,
       completedOrders,
       completedPieces,
-      pctOrdersCompleted,
+      issuePieces,
       pctPiecesCompleted,
       totalBacklogOrders,
       totalBacklogPieces,
       activePickers,
+      activePickerTotalPieces,
     },
     backlogByDate,
     statusCounts: Object.fromEntries(statusCounts),

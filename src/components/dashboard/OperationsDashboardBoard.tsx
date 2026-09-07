@@ -11,6 +11,8 @@ interface BacklogRow {
 interface ZoneStatus {
   zone: string
   orders: number
+  totalPieces: number
+  pendingPieces: number
   slaPct: number
   onTrack: boolean
 }
@@ -38,11 +40,12 @@ interface DashboardData {
     waitingVerifyPieces: number
     completedOrders: number
     completedPieces: number
-    pctOrdersCompleted: number
+    issuePieces: number
     pctPiecesCompleted: number
     totalBacklogOrders: number
     totalBacklogPieces: number
     activePickers: number
+    activePickerTotalPieces: number
   }
   backlogByDate: BacklogRow[]
   zoneStatus: ZoneStatus[]
@@ -110,44 +113,54 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
       )}
 
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
-        <KpiCard label="TOTAL ORDERS" labelTh="ออเดอร์ทั้งหมดที่ Import" value={kpis.totalOrders.toLocaleString()} sub={`${kpis.totalPieces.toLocaleString()} pcs total`} />
+        <KpiCard
+          label="TOTAL ORDERS"
+          labelTh="ออเดอร์ทั้งหมดที่ Import"
+          value={`${kpis.totalPieces.toLocaleString()} pcs`}
+          sub={`${kpis.totalOrders.toLocaleString()} orders`}
+        />
         <KpiCard
           label="ORDERS COMPLETED"
           labelTh="ปิดงานแล้ว (Admin Verified)"
-          value={kpis.completedOrders.toLocaleString()}
+          value={`${kpis.completedPieces.toLocaleString()} pcs`}
           valueColor="#16A34A"
-          sub={`${kpis.completedPieces.toLocaleString()} pcs completed`}
+          sub={`${kpis.completedOrders.toLocaleString()} orders`}
           subColor="#16A34A"
         />
         <KpiCard
           label="% COMPLETED"
-          labelTh="% ความสำเร็จ"
-          value={`${kpis.pctOrdersCompleted}%`}
-          valueColor={kpis.pctOrdersCompleted >= 85 ? '#16A34A' : kpis.pctOrdersCompleted >= 60 ? '#F59E0B' : '#DC2626'}
-          sub={`${kpis.pctPiecesCompleted}% of pieces`}
+          labelTh="% ความสำเร็จ (ชิ้น)"
+          value={`${kpis.pctPiecesCompleted}%`}
+          valueColor={kpis.pctPiecesCompleted >= 85 ? '#16A34A' : kpis.pctPiecesCompleted >= 60 ? '#F59E0B' : '#DC2626'}
+          sub={`Completed ${kpis.completedPieces.toLocaleString()} · Issue ${kpis.issuePieces.toLocaleString()}`}
         />
         <KpiCard
           label="TOTAL BACKLOG"
           labelTh="งานคงค้างทั้งหมด"
-          value={kpis.totalBacklogOrders.toLocaleString()}
-          valueColor={kpis.totalBacklogOrders > 0 ? '#F59E0B' : undefined}
-          sub={`${kpis.totalBacklogPieces.toLocaleString()} pcs backlog`}
+          value={`${kpis.totalBacklogPieces.toLocaleString()} pcs`}
+          valueColor={kpis.totalBacklogPieces > 0 ? '#F59E0B' : undefined}
+          sub={`${kpis.totalBacklogOrders.toLocaleString()} orders`}
         />
-        <KpiCard label="ORDERS ASSIGNED" labelTh="มอบหมายงานแล้ว" value={kpis.assignedOrders.toLocaleString()} sub={`${kpis.assignedPieces.toLocaleString()} pcs assigned`} />
-        <KpiCard label="ACTIVE PICKERS" labelTh="ผู้หยิบที่ทำงานอยู่" value={kpis.activePickers} />
+        <KpiCard
+          label="ORDERS ASSIGNED"
+          labelTh="มอบหมายงานแล้ว"
+          value={`${kpis.assignedPieces.toLocaleString()} pcs`}
+          sub={`${kpis.assignedOrders.toLocaleString()} orders`}
+        />
+        <KpiCard label="ACTIVE PICKERS" labelTh="ผู้หยิบที่ทำงานอยู่" value={kpis.activePickers} sub={`${kpis.activePickerTotalPieces.toLocaleString()} pcs in hand`} />
         <KpiCard
           label="PENDING CONFIRMATION"
           labelTh="รอ Admin Confirm"
-          value={kpis.waitingVerifyOrders.toLocaleString()}
-          valueColor={kpis.waitingVerifyOrders > 0 ? '#2563EB' : undefined}
-          sub={`${kpis.waitingVerifyPieces.toLocaleString()} pcs pending`}
+          value={`${kpis.waitingVerifyPieces.toLocaleString()} pcs`}
+          valueColor={kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
+          sub={`${kpis.waitingVerifyOrders.toLocaleString()} orders`}
         />
       </div>
 
       <div className="card">
         <div className="card-header" style={{ marginBottom: 10 }}>
           <span className="card-title">Zone Status</span>
-          <span className="card-subtitle">สถานะโซน · Orders Touching Zone (non-additive) · คลิกเพื่อดูรายละเอียดโซน</span>
+          <span className="card-subtitle">สถานะโซน · Pieces Pending drops as Admin confirms · (non-additive) · คลิกเพื่อดูรายละเอียดโซน</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {data.zoneStatus.map((z) => (
@@ -166,8 +179,9 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
               }}
             >
               <div style={{ fontSize: 12, fontWeight: 700 }}>Zone {z.zone}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3 }}>{z.orders}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>orders touching</div>
+              <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3 }}>{z.pendingPieces.toLocaleString()}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>pieces pending</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{z.totalPieces.toLocaleString()} total pieces</div>
               <div style={{ fontSize: 11, marginTop: 6, color: z.onTrack ? '#16A34A' : '#B45309', fontWeight: 500 }}>
                 {z.onTrack ? 'On track' : 'At risk'} · {z.slaPct}%
               </div>

@@ -114,18 +114,20 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
 
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
         <KpiCard
-          label="TOTAL ORDERS"
+          label="TOTAL ORDERS (PCS)"
           labelTh="ออเดอร์ทั้งหมดที่ Import"
-          value={`${kpis.totalPieces.toLocaleString()} pcs`}
+          value={kpis.totalPieces.toLocaleString()}
           sub={`${kpis.totalOrders.toLocaleString()} orders`}
+          style={{ textAlign: 'center' }}
         />
         <KpiCard
-          label="ORDERS COMPLETED"
+          label="ORDERS COMPLETED (PCS)"
           labelTh="ปิดงานแล้ว (Admin Verified)"
-          value={`${kpis.completedPieces.toLocaleString()} pcs`}
+          value={kpis.completedPieces.toLocaleString()}
           valueColor="#16A34A"
           sub={`${kpis.completedOrders.toLocaleString()} orders`}
           subColor="#16A34A"
+          style={{ textAlign: 'center' }}
         />
         <KpiCard
           label="% COMPLETED"
@@ -133,27 +135,37 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
           value={`${kpis.pctPiecesCompleted}%`}
           valueColor={kpis.pctPiecesCompleted >= 85 ? '#16A34A' : kpis.pctPiecesCompleted >= 60 ? '#F59E0B' : '#DC2626'}
           sub={`Completed ${kpis.completedPieces.toLocaleString()} · Issue ${kpis.issuePieces.toLocaleString()}`}
+          style={{ textAlign: 'center' }}
         />
         <KpiCard
-          label="TOTAL BACKLOG"
+          label="TOTAL BACKLOG (PCS)"
           labelTh="งานคงค้างทั้งหมด"
-          value={`${kpis.totalBacklogPieces.toLocaleString()} pcs`}
+          value={kpis.totalBacklogPieces.toLocaleString()}
           valueColor={kpis.totalBacklogPieces > 0 ? '#F59E0B' : undefined}
           sub={`${kpis.totalBacklogOrders.toLocaleString()} orders`}
+          style={{ textAlign: 'center' }}
         />
         <KpiCard
-          label="ORDERS ASSIGNED"
+          label="ORDERS ASSIGNED (PCS)"
           labelTh="มอบหมายงานแล้ว"
-          value={`${kpis.assignedPieces.toLocaleString()} pcs`}
+          value={kpis.assignedPieces.toLocaleString()}
           sub={`${kpis.assignedOrders.toLocaleString()} orders`}
+          style={{ textAlign: 'center' }}
         />
-        <KpiCard label="ACTIVE PICKERS" labelTh="ผู้หยิบที่ทำงานอยู่" value={kpis.activePickers} sub={`${kpis.activePickerTotalPieces.toLocaleString()} pcs in hand`} />
         <KpiCard
-          label="PENDING CONFIRMATION"
+          label="ACTIVE PICKERS"
+          labelTh="ผู้หยิบที่ทำงานอยู่"
+          value={kpis.activePickers}
+          sub={`${kpis.activePickerTotalPieces.toLocaleString()} pcs in hand`}
+          style={{ textAlign: 'center' }}
+        />
+        <KpiCard
+          label="PENDING CONFIRMATION (PCS)"
           labelTh="รอ Admin Confirm"
-          value={`${kpis.waitingVerifyPieces.toLocaleString()} pcs`}
+          value={kpis.waitingVerifyPieces.toLocaleString()}
           valueColor={kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
           sub={`${kpis.waitingVerifyOrders.toLocaleString()} orders`}
+          style={{ textAlign: 'center' }}
         />
       </div>
 
@@ -228,8 +240,8 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
             <thead>
               <tr>
                 <th>PICKER</th>
-                <th>ORDERS</th>
                 <th>PIECES</th>
+                <th>ORDERS</th>
               </tr>
             </thead>
             <tbody>
@@ -238,8 +250,8 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
                   <td style={{ fontWeight: 700 }}>
                     {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.pickerId})</span>
                   </td>
+                  <td style={{ fontWeight: 700 }}>{p.pieces.toLocaleString()}</td>
                   <td>{p.orders}</td>
-                  <td>{p.pieces.toLocaleString()}</td>
                 </tr>
               ))}
               {data.activePickerRoster.length === 0 && (

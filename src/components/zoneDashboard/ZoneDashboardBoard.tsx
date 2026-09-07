@@ -15,14 +15,18 @@ interface ZoneDetail {
   zone: string
   orders: ZoneOrder[]
   activePickers: number
+  activePickerTotalPieces: number
+  activePickerTotalOrders: number
   assigned: number
-  inProgress: number
+  correctionInProgress: number
   completed: number
   pickingBacklog: number
   verificationBacklog: number
+  verificationBacklogPieces: number
   critical: number
   overdue: number
-  plannedPieces: number
+  totalPieces: number
+  pendingPieces: number
   slaPct: number
 }
 
@@ -44,7 +48,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
 
   return (
     <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(zoneDetail.length, 1)}, 1fr)`, gap: 12 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         {zoneDetail.map((z) => (
           <button
             key={z.zone}
@@ -53,13 +57,19 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             style={{
               textAlign: 'left',
               cursor: 'pointer',
+              flex: '1 1 150px',
+              minWidth: 150,
+              maxWidth: 200,
               border: z.zone === activeZone ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
               padding: 14,
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 700 }}>Zone {z.zone}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, margin: '4px 0' }}>{z.orders.length}</div>
-            <div style={{ fontSize: 11, color: '#6B7280' }}>orders touching · {z.activePickers} active picker(s)</div>
+            <div style={{ fontSize: 22, fontWeight: 700, margin: '4px 0' }}>{z.pendingPieces.toLocaleString()}</div>
+            <div style={{ fontSize: 11, color: '#6B7280' }}>pieces pending</div>
+            <div style={{ fontSize: 11, color: '#6B7280' }}>
+              {z.totalPieces.toLocaleString()} total pieces · {z.activePickers} active picker(s)
+            </div>
             <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
               {z.critical > 0 && <span className="badge badge-danger">{z.critical} critical</span>}
               {z.overdue > 0 && <span className="badge badge-warning">{z.overdue} overdue</span>}
@@ -73,12 +83,50 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
       {selected && (
         <>
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
-            <KpiCard label="ORDERS TOUCHING" value={selected.orders.length} compact style={{ padding: 14 }} />
-            <KpiCard label="PLANNED PIECES" value={selected.plannedPieces} compact style={{ padding: 14 }} />
-            <KpiCard label="ACTIVE PICKERS" value={selected.activePickers} compact style={{ padding: 14 }} />
-            <KpiCard label="ASSIGNED / IN PROGRESS" value={`${selected.assigned} / ${selected.inProgress}`} compact style={{ padding: 14 }} />
-            <KpiCard label="BACKLOG P/V" value={`${selected.pickingBacklog} / ${selected.verificationBacklog}`} valueColor="#F59E0B" compact style={{ padding: 14 }} />
-            <KpiCard label="SLA" value={`${selected.slaPct}%`} valueColor={selected.slaPct >= 85 ? '#16A34A' : '#DC2626'} compact style={{ padding: 14 }} />
+            <KpiCard
+              label="TOTAL PIECES (PCS)"
+              value={selected.totalPieces.toLocaleString()}
+              sub={`${selected.orders.length.toLocaleString()} orders`}
+              compact
+              style={{ padding: 14, textAlign: 'center' }}
+            />
+            <KpiCard
+              label="PENDING PIECES (PCS)"
+              value={selected.pendingPieces.toLocaleString()}
+              valueColor={selected.pendingPieces > 0 ? '#F59E0B' : undefined}
+              sub={`${selected.orders.length - selected.completed} orders`}
+              compact
+              style={{ padding: 14, textAlign: 'center' }}
+            />
+            <KpiCard
+              label="ACTIVE PICKERS (PCS)"
+              value={selected.activePickerTotalPieces.toLocaleString()}
+              sub={`${selected.activePickers} picker(s) · ${selected.activePickerTotalOrders} orders in hand`}
+              compact
+              style={{ padding: 14, textAlign: 'center' }}
+            />
+            <KpiCard
+              label="ASSIGNED / CORRECTION"
+              value={`${selected.assigned} / ${selected.correctionInProgress}`}
+              sub="orders"
+              compact
+              style={{ padding: 14, textAlign: 'center' }}
+            />
+            <KpiCard
+              label="BACKLOG P/V"
+              value={`${selected.pickingBacklog} / ${selected.verificationBacklog}`}
+              valueColor="#F59E0B"
+              sub={`${selected.verificationBacklogPieces.toLocaleString()} pcs waiting verify`}
+              compact
+              style={{ padding: 14, textAlign: 'center' }}
+            />
+            <KpiCard
+              label="SLA"
+              value={`${selected.slaPct}%`}
+              valueColor={selected.slaPct >= 85 ? '#16A34A' : '#DC2626'}
+              compact
+              style={{ padding: 14, textAlign: 'center' }}
+            />
           </div>
 
           <div className="card" style={{ minHeight: 0 }}>

@@ -6,13 +6,19 @@ import { getActiveZoneCodes } from './locations'
 // See dashboard.ts — unbounded selects silently truncate at Supabase's default 1000-row cap.
 const ROW_CAP = 200000
 
+// Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
+// 'in_progress' (no "picker started scanning" event exists), so treating it as a distinct state
+// from 'assigned' just reads as a permanently-zero number. Anything meant to mean "still being
+// worked, not yet submitted" checks both, plus 'correction_in_progress' for orders sent back.
+const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in_progress'])
+
 /**
  * Control Tower has its own real-time-monitoring KPI set (all orders including cancelled, raw
  * picker-completion counts regardless of admin verification) which is deliberately different from
- * Operations Dashboard's management funnel (getDashboardData) — only `activePickers` and
- * `actionRequired` are shared from there, everything else here is computed from this function's
- * own orders/alerts/completions fetch so the two pages can't accidentally couple to the same
- * shape and break each other when one is redesigned.
+ * Operations Dashboard's management funnel (getDashboardData) — only `activePickers` (and its
+ * pieces/orders-in-hand pair) and `actionRequired` are shared from there, everything else here is
+ * computed from this function's own orders/alerts/completions fetch so the two pages can't
+ * accidentally couple to the same shape and break each other when one is redesigned.
  */
 export async function getControlTowerData(db: SupabaseClient, warehouseCode: string) {
   const [base, zones, ordersRes, linesRes] = await Promise.all([
@@ -40,7 +46,9 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
   ])
   const alertByOrder = new Map(unwrap(alertsRes).map((a) => [a.order_id, a]))
   const completions = unwrap(completionsRes)
+  const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
+  const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
 
   const zoneOrders = new Map<string, Set<string>>()
   for (const l of lines) {
@@ -51,12 +59,13 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
 
   const zoneOverview = zones.map((zone) => {
     const touching = [...(zoneOrders.get(zone) ?? new Set())]
-    const inProgress = touching.filter((id) => orderStatusById.get(id) === 'in_progress').length
+    const active = touching.filter((id) => ACTIVE_ORDER_STATUSES.has(orderStatusById.get(id) ?? '')).length
     const completed = touching.filter((id) => orderStatusById.get(id)?.startsWith('final_closed')).length
     const pickingBacklog = touching.filter((id) => alertByOrder.get(id)?.is_picking_backlog).length
     const verificationBacklog = touching.filter((id) => alertByOrder.get(id)?.is_verification_backlog).length
+    const totalPieces = touching.reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
     const slaPct = touching.length > 0 ? Math.round((completed / touching.length) * 1000) / 10 : 100
-    return { zone, orders: touching.length, pickingBacklog, verificationBacklog, inProgress, completed, slaPct }
+    return { zone, orders: touching.length, totalPieces, pickingBacklog, verificationBacklog, active, completed, slaPct }
   })
 
   const overdueOrdersRaw = orders
@@ -81,6 +90,10 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     return { ...o, pickerName: pickerId ? nameByPickerId.get(pickerId) ?? pickerId : '—' }
   })
 
+  const pickingBacklogOrders = orders.filter((o) => alertByOrder.get(o.order_id)?.is_picking_backlog)
+  const verificationBacklogOrders = orders.filter((o) => alertByOrder.get(o.order_id)?.is_verification_backlog)
+  const inPickingOrders = orders.filter((o) => ACTIVE_ORDER_STATUSES.has(o.status))
+
   return {
     kpis: {
       totalOrders: orders.length,
@@ -89,12 +102,17 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
       pickerCompletedCount: completions.length,
       pickerCompleted100: completions.filter((c) => c.result === '100_percent').length,
       pickerCompletedShort: completions.filter((c) => c.result === 'short').length,
-      pickingBacklog: orders.filter((o) => alertByOrder.get(o.order_id)?.is_picking_backlog).length,
-      verificationBacklog: orders.filter((o) => alertByOrder.get(o.order_id)?.is_verification_backlog).length,
+      pickingBacklog: pickingBacklogOrders.length,
+      pickingBacklogPieces: pickingBacklogOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),
+      verificationBacklog: verificationBacklogOrders.length,
+      verificationBacklogPieces: verificationBacklogOrders.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0),
       activePickers: base.kpis.activePickers,
+      activePickerTotalPieces: base.kpis.activePickerTotalPieces,
+      activePickerTotalOrders: base.kpis.activePickerTotalOrders,
     },
     flow: {
-      assignment: orders.filter((o) => o.status === 'assigned' || o.status === 'in_progress').length,
+      assignment: inPickingOrders.length,
+      assignmentPieces: inPickingOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),
     },
     actionRequired: base.actionRequired,
     zoneOverview,

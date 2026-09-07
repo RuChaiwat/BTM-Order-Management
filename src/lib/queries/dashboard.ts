@@ -9,12 +9,13 @@ import { getActiveZoneCodes } from './locations'
 const ROW_CAP = 200000
 
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
-// This app never actually transitions an assignment_batch or order to 'in_progress' today (no
-// "picker started scanning" event is implemented) -- every live batch/order just sits at
-// 'assigned' until the picker submits a completion. Treating only 'in_progress' as "active" made
-// Active Pickers (and the roster below it) permanently read zero. Both statuses are accepted here
-// so this keeps working if 'in_progress' ever does get wired up later.
-const ACTIVE_BATCH_STATUSES = new Set(['assigned', 'in_progress'])
+// assignment_batches.status is not a reliable "is this picker still working" signal: nothing in
+// this app ever updates it after creation, so a batch stays 'assigned' forever even once every
+// order in it has moved on to picker_completed/waiting_verification/final_closed. Using batch
+// status to derive Active Pickers previously showed a picker as active with an empty roster,
+// because the batch looked "assigned" while none of its orders actually were anymore. The only
+// reliable signal is the orders themselves: a picker is active if they have at least one order
+// still sitting in one of these statuses, which is also exactly Pick Completion's own queue.
 const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in_progress'])
 
 function daysBetween(fromDate: string, toDate: string): number {
@@ -113,8 +114,6 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const statusCounts = new Map<string, number>()
   for (const o of orders) statusCounts.set(o.status, (statusCounts.get(o.status) ?? 0) + 1)
 
-  const activePickers = new Set(assignmentBatches.filter((b) => ACTIVE_BATCH_STATUSES.has(b.status) && b.picker_id).map((b) => b.picker_id)).size
-
   const zoneOrders = new Map<string, Set<string>>()
   for (const l of lines) {
     if (!l.zone_code) continue
@@ -144,21 +143,23 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     pickerTotals.set(pickerId, entry)
   }
 
-  // Active pickers right now: which orders are still sitting in an active batch (i.e. handed to a
-  // picker but not yet submitted as a picker_completed status), broken down per picker for the
-  // roster below Zone Status.
-  const activeBatchPickerById = new Map(assignmentBatches.filter((b) => ACTIVE_BATCH_STATUSES.has(b.status) && b.picker_id).map((b) => [b.assignment_batch_id, b.picker_id as string]))
+  // Active pickers right now: which orders are still sitting in an active status (handed to a
+  // picker but not yet submitted), broken down per picker for the roster below Zone Status.
+  // Active Pickers itself (below) is just this map's size, so the KPI and the roster it explains
+  // can never disagree with each other.
+  const pickerIdByBatchId = new Map(assignmentBatches.filter((b) => b.picker_id).map((b) => [b.assignment_batch_id, b.picker_id as string]))
   const activePickerWork = new Map<string, { orders: number; pieces: number }>()
   for (const o of orders) {
     if (!o.assignment_batch_id) continue
-    const pickerId = activeBatchPickerById.get(o.assignment_batch_id)
-    if (!pickerId) continue
     if (!ACTIVE_ORDER_STATUSES.has(o.status)) continue
+    const pickerId = pickerIdByBatchId.get(o.assignment_batch_id)
+    if (!pickerId) continue
     const entry = activePickerWork.get(pickerId) ?? { orders: 0, pieces: 0 }
     entry.orders += 1
     entry.pieces += o.planned_pieces ?? 0
     activePickerWork.set(pickerId, entry)
   }
+  const activePickers = activePickerWork.size
 
   const pickerIds = [...new Set([...pickerTotals.keys(), ...activePickerWork.keys()])]
   const pickerNamesRes = pickerIds.length

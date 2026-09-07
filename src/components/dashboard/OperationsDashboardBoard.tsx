@@ -110,16 +110,8 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
 
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
         <KpiCard label="TOTAL ORDERS" labelTh="ออเดอร์ทั้งหมดที่ Import" value={kpis.totalOrders.toLocaleString()} sub={`${kpis.totalPieces.toLocaleString()} pcs total`} />
-        <KpiCard label="ASSIGNED" labelTh="มอบหมายงานแล้ว" value={kpis.assignedOrders.toLocaleString()} sub={`${kpis.assignedPieces.toLocaleString()} pcs assigned`} />
         <KpiCard
-          label="WAITING VERIFY"
-          labelTh="รอ Admin Confirm"
-          value={kpis.waitingVerifyOrders.toLocaleString()}
-          valueColor={kpis.waitingVerifyOrders > 0 ? '#2563EB' : undefined}
-          sub={`${kpis.waitingVerifyPieces.toLocaleString()} pcs waiting`}
-        />
-        <KpiCard
-          label="COMPLETED"
+          label="ORDERS COMPLETED"
           labelTh="ปิดงานแล้ว (Admin Verified)"
           value={kpis.completedOrders.toLocaleString()}
           valueColor="#16A34A"
@@ -140,7 +132,15 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
           valueColor={kpis.totalBacklogOrders > 0 ? '#F59E0B' : undefined}
           sub="orders not yet completed"
         />
+        <KpiCard label="ORDERS ASSIGNED" labelTh="มอบหมายงานแล้ว" value={kpis.assignedOrders.toLocaleString()} sub={`${kpis.assignedPieces.toLocaleString()} pcs assigned`} />
         <KpiCard label="ACTIVE PICKERS" labelTh="ผู้หยิบที่ทำงานอยู่" value={kpis.activePickers} />
+        <KpiCard
+          label="PENDING CONFIRMATION"
+          labelTh="รอ Admin Confirm"
+          value={kpis.waitingVerifyOrders.toLocaleString()}
+          valueColor={kpis.waitingVerifyOrders > 0 ? '#2563EB' : undefined}
+          sub={`${kpis.waitingVerifyPieces.toLocaleString()} pcs pending`}
+        />
       </div>
 
       <div className="card">

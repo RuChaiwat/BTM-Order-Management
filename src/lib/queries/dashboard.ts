@@ -78,10 +78,12 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const assignedOrders = assignedOrdersList.length
   const assignedPieces = assignedOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
 
-  // Waiting Verify: picker has already submitted a completion for these, they're just sitting in
-  // Admin Verification's queue -- distinct from "Completed" below, which only counts orders the
-  // admin has actually confirmed closed.
-  const waitingVerifyOrdersList = activeOrders.filter((o) => o.status === 'waiting_admin_verification')
+  // Pending Confirmation: picker has already submitted a completion for these (status lands on
+  // picker_completed_100/short, never the unused 'waiting_admin_verification' enum value — Admin
+  // Verification's own queue query confirms this is the real pair), they're just sitting in Admin
+  // Verification's queue -- distinct from "Completed" below, which only counts orders the admin
+  // has actually confirmed closed.
+  const waitingVerifyOrdersList = activeOrders.filter((o) => o.status === 'picker_completed_100' || o.status === 'picker_completed_short')
   const waitingVerifyOrders = waitingVerifyOrdersList.length
   const waitingVerifyPieces = waitingVerifyOrdersList.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0)
 
@@ -92,6 +94,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const pctOrdersCompleted = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 1000) / 10 : 0
   const pctPiecesCompleted = totalPieces > 0 ? Math.round((completedPieces / totalPieces) * 1000) / 10 : 0
   const totalBacklogOrders = totalOrders - completedOrders
+  const totalBacklogPieces = totalPieces - completedPieces
 
   // Backlog by Order Date: every non-cancelled order that hasn't reached admin-verified close yet,
   // grouped by its original (WMS) order date. Only dates that actually have backlog appear.
@@ -189,6 +192,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
       pctOrdersCompleted,
       pctPiecesCompleted,
       totalBacklogOrders,
+      totalBacklogPieces,
       activePickers,
     },
     backlogByDate,
@@ -199,7 +203,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     actionRequired: {
       critical,
       overdue,
-      waitingVerification: statusCounts.get('waiting_admin_verification') ?? 0,
+      waitingVerification: waitingVerifyOrders,
       correctionInProgress: (statusCounts.get('admin_rejected') ?? 0) + (statusCounts.get('correction_in_progress') ?? 0),
       invalidBinCode: invalidBinErrors.length,
     },

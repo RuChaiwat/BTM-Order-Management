@@ -41,6 +41,7 @@ interface DashboardData {
     pctOrdersCompleted: number
     pctPiecesCompleted: number
     totalBacklogOrders: number
+    totalBacklogPieces: number
     activePickers: number
   }
   backlogByDate: BacklogRow[]
@@ -130,7 +131,7 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
           labelTh="งานคงค้างทั้งหมด"
           value={kpis.totalBacklogOrders.toLocaleString()}
           valueColor={kpis.totalBacklogOrders > 0 ? '#F59E0B' : undefined}
-          sub="orders not yet completed"
+          sub={`${kpis.totalBacklogPieces.toLocaleString()} pcs backlog`}
         />
         <KpiCard label="ORDERS ASSIGNED" labelTh="มอบหมายงานแล้ว" value={kpis.assignedOrders.toLocaleString()} sub={`${kpis.assignedPieces.toLocaleString()} pcs assigned`} />
         <KpiCard label="ACTIVE PICKERS" labelTh="ผู้หยิบที่ทำงานอยู่" value={kpis.activePickers} />

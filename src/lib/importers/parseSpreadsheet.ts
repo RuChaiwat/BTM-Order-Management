@@ -25,15 +25,23 @@ export function col(row: Record<string, string>, ...candidates: string[]): strin
   return ''
 }
 
-/** WMS dates observed as-is in sample exports; accepts YYYY-MM-DD or DD/MM/YYYY and normalizes to ISO. */
+/** WMS dates observed as-is in sample exports; accepts YYYY-MM-DD or DD/MM/YYYY and normalizes to
+ * ISO. Also strips a trailing time-of-day (some exports carry an otherwise-ISO date as
+ * "2026-09-14 00:00:00" or "2026-09-14T00:00:00.000Z") -- this value is used as an exact-match
+ * lookup/matching key against Postgres's own bare `date` serialization elsewhere in the import
+ * pipeline, not just displayed, so two strings for the same calendar day must normalize identically
+ * or every order in the file silently fails to match back up after being written. */
 export function normalizeDate(value: string): string {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
-  const m = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  const trimmed = value.trim()
+  const isoWithTime = trimmed.match(/^(\d{4}-\d{2}-\d{2})[T ]/)
+  if (isoWithTime) return isoWithTime[1]
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+  const m = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
   if (m) {
     const [, d, mo, y] = m
     return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
   }
-  return value
+  return trimmed
 }
 
 /** The grouping key used to chunk rows into orders — used both client-side (to batch an order's

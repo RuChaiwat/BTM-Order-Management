@@ -190,8 +190,25 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
       continue
     }
     const inserted = insertedByKey.get(g.key)
-    if (inserted) resolvedGroups.push({ group: g, orderId: inserted.order_id, isNew: true, status: 'new' })
-    // else: order creation failed for this group -- already recorded in errors above, skip its lines
+    if (inserted) {
+      resolvedGroups.push({ group: g, orderId: inserted.order_id, isNew: true, status: 'new' })
+      continue
+    }
+    // The insert-failure path above already reports an error for every group in newGroups when
+    // the insert itself errored. This covers the other way this can go wrong: the insert
+    // succeeded, but this group's key didn't match any returned row (e.g. a date normalized
+    // differently than Postgres's own `date` serialization) -- fail loud instead of silently
+    // reporting 0 orders/lines imported while actually writing nothing for this order.
+    if (newGroups.includes(g)) {
+      g.lines.forEach((l) =>
+        errors.push({
+          rowNumber: l.rowNumber,
+          raw: l.raw,
+          reason: `Order was created but could not be re-matched afterward (internal key mismatch) — this row was NOT imported, fix and re-upload it`,
+          severity: 'blocking',
+        }),
+      )
+    }
   }
 
   const ordersCreated = resolvedGroups.filter((r) => r.isNew).length

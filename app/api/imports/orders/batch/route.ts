@@ -7,6 +7,13 @@ import { processOrderRowsBatch, type RawImportRow } from '@/lib/importers/proces
  * can show real progress (batches completed / total batches) instead of just upload-transfer %,
  * which for a small file completes almost instantly while the actual row-by-row DB writes are
  * still the slow part. */
+
+// Vercel's default serverless function duration (10s on Hobby) is too tight for a large batch
+// even with processOrderRowsBatch's bulk round trips. 60s is supported on every paid plan tier
+// without extra configuration; raise it further (Pro: up to 300s, Enterprise: up to 900s) if a
+// batch call is still timing out at real WMS Transfer Order volume.
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   try {
     await requireRole(['system_admin', 'planner_admin', 'supervisor'])

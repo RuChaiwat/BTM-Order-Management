@@ -4,7 +4,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseSpreadsheet, orderGroupKey } from '@/lib/importers/parseSpreadsheet'
 
-const ORDERS_PER_BATCH = 5
+// processOrderRowsBatch now does a small constant number of DB round trips per HTTP call
+// (bulk order lookup/insert/line-upsert/re-aggregate) instead of one round trip per order or per
+// line, so this can be much larger than before without each HTTP call getting slower per-order --
+// it mainly trades off "fewer, larger requests" against very long .in() filter lists (distinct Bin
+// Codes in one call) and per-request serverless duration. 50 is a first cut for WMS Transfer Order
+// volume (~15-20k lines/day); tune down if a batch call is timing out, up if requests still feel
+// numerous.
+const ORDERS_PER_BATCH = 50
 
 interface ErrorRow {
   row_number: number

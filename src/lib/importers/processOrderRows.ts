@@ -33,10 +33,23 @@ export interface BatchResult {
  * No., which is Beautrium's internal code and is never printed on the item itself. Required, same
  * strictness as Bin Code.
  *
- * Known limitation: this runs as a sequence of PostgREST calls per order, not a single DB
- * transaction — a mid-batch crash can leave that batch partially written. A Postgres RPC function
- * would make each batch atomic and is a reasonable follow-up once import volume/reliability
- * requirements are confirmed with Business.
+ * Performance: every DB round trip here is batched across the WHOLE call (one order lookup, one
+ * order insert, one order_lines upsert, one order_lines re-aggregation, one orders upsert for the
+ * computed totals) instead of once per order-group or once per line. The original per-order/
+ * per-line version made one network round trip per line, which at ~15-20k lines/day (WMS Transfer
+ * Order export scale) meant tens of thousands of sequential awaited round trips per import --
+ * confirmed as the actual bottleneck (not the parse, not the upload transfer). This version does a
+ * small constant number of round trips regardless of how many orders/lines are in the call, so
+ * OrderImportForm's ORDERS_PER_BATCH can be turned up (fewer, larger HTTP calls) without turning
+ * any per-order work back into a per-order round trip.
+ *
+ * Known limitation: still not one DB transaction (a mid-batch crash can leave a batch partially
+ * written) -- a Postgres RPC function would make each batch atomic and is a reasonable follow-up
+ * once import volume/reliability requirements are confirmed with Business. A batch insert failure
+ * also fails closed for every new order in that HTTP call at once (rather than isolating just the
+ * conflicting one) -- rare in practice (it only bites two concurrent imports racing to create the
+ * exact same order), and simply re-uploading the same file resolves it, since the retry's lookup
+ * step now finds those orders already created.
  */
 export async function processOrderRowsBatch(admin: SupabaseClient, importId: string, rawRows: RawImportRow[]): Promise<BatchResult> {
   type ParsedLine = {
@@ -120,45 +133,74 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
     }
     groups.get(key)!.lines.push(line)
   }
+  const groupList = [...groups.values()]
 
-  let ordersCreated = 0
-  let ordersUpdated = 0
-  let linesUpserted = 0
+  // Step 1: one bulk lookup for every order-group this batch might already have, instead of one
+  // .maybeSingle() per group. The three .in() filters are a superset (matching each column
+  // independently, not the exact triple) -- re-keyed by the same composite string below, so an
+  // over-fetched non-match is simply ignored, never misapplied.
+  const orderNos = [...new Set(groupList.map((g) => g.orderNo))]
+  const orderDates = [...new Set(groupList.map((g) => g.originalOrderDate))]
+  const { data: existingOrdersRaw, error: existingOrdersError } =
+    warehouseCodes.length && orderNos.length && orderDates.length
+      ? await admin
+          .from('orders')
+          .select('order_id, order_no, warehouse_code, original_order_date, status')
+          .in('warehouse_code', warehouseCodes)
+          .in('order_no', orderNos)
+          .in('original_order_date', orderDates)
+          .limit(50000)
+      : { data: [] as { order_id: string; order_no: string; warehouse_code: string; original_order_date: string; status: string }[], error: null }
+  if (existingOrdersError) console.error('[processOrderRowsBatch] existing orders lookup error', existingOrdersError.message)
+  const existingByKey = new Map((existingOrdersRaw ?? []).map((o) => [`${o.warehouse_code}|${o.order_no}|${o.original_order_date}`, o]))
 
-  for (const group of groups.values()) {
-    const { data: existingOrder } = await admin
+  // Step 2: one bulk insert for every order-group that isn't already in the DB.
+  const newGroups = groupList.filter((g) => !existingByKey.has(g.key))
+  const insertedByKey = new Map<string, { order_id: string }>()
+  if (newGroups.length > 0) {
+    const { data: insertedOrders, error: insertError } = await admin
       .from('orders')
-      .select('order_id, status')
-      .eq('warehouse_code', group.warehouseCode)
-      .eq('order_no', group.orderNo)
-      .eq('original_order_date', group.originalOrderDate)
-      .maybeSingle()
-
-    let orderId: string
-    if (existingOrder) {
-      orderId = existingOrder.order_id
-      ordersUpdated++
-    } else {
-      const { data: newOrder, error: newOrderError } = await admin
-        .from('orders')
-        .insert({
-          order_no: group.orderNo,
-          warehouse_code: group.warehouseCode,
-          original_order_date: group.originalOrderDate,
-          store_code: group.storeCode,
+      .insert(
+        newGroups.map((g) => ({
+          order_no: g.orderNo,
+          warehouse_code: g.warehouseCode,
+          original_order_date: g.originalOrderDate,
+          store_code: g.storeCode,
           status: 'new',
           import_id: importId,
-        })
-        .select('order_id')
-        .single()
-      if (newOrderError || !newOrder) {
-        group.lines.forEach((l) => errors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `Failed to create order: ${newOrderError?.message} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' }))
-        continue
+        })),
+      )
+      .select('order_id, order_no, warehouse_code, original_order_date')
+    if (insertError || !insertedOrders) {
+      for (const g of newGroups) {
+        g.lines.forEach((l) =>
+          errors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `Failed to create order: ${insertError?.message ?? 'unknown error'} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' }),
+        )
       }
-      orderId = newOrder.order_id
-      ordersCreated++
+    } else {
+      for (const o of insertedOrders) insertedByKey.set(`${o.warehouse_code}|${o.order_no}|${o.original_order_date}`, o)
     }
+  }
 
+  const resolvedGroups: { group: OrderGroup; orderId: string; isNew: boolean; status: string }[] = []
+  for (const g of groupList) {
+    const existing = existingByKey.get(g.key)
+    if (existing) {
+      resolvedGroups.push({ group: g, orderId: existing.order_id, isNew: false, status: existing.status })
+      continue
+    }
+    const inserted = insertedByKey.get(g.key)
+    if (inserted) resolvedGroups.push({ group: g, orderId: inserted.order_id, isNew: true, status: 'new' })
+    // else: order creation failed for this group -- already recorded in errors above, skip its lines
+  }
+
+  const ordersCreated = resolvedGroups.filter((r) => r.isNew).length
+  const ordersUpdated = resolvedGroups.filter((r) => !r.isNew).length
+
+  // Step 3: one bulk upsert for every line across every order in this batch, instead of one
+  // upsert per line -- this is the change that matters most at WMS Transfer Order volume.
+  const lineRows: { orderId: string; rowNumber: number; raw: Record<string, string>; row: Record<string, unknown> }[] = []
+  for (const { group, orderId } of resolvedGroups) {
     for (const line of group.lines) {
       const location = locationMap.get(`${line.warehouseCode}|${line.binCode}`)
       if (!location || !location.active) {
@@ -169,9 +211,11 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
           severity: 'warning',
         })
       }
-
-      const { error: lineError } = await admin.from('order_lines').upsert(
-        {
+      lineRows.push({
+        orderId,
+        rowNumber: line.rowNumber,
+        raw: line.raw,
+        row: {
           order_id: orderId,
           sku: line.sku,
           sku_barcode: line.skuBarcode,
@@ -184,16 +228,51 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
           zone_code: location?.active ? location.zone_code : null,
           pick_sequence: location?.active ? location.pick_sequence : null,
         },
-        { onConflict: 'order_id,sku,bin_code,source_line_id' },
-      )
-      if (!lineError) linesUpserted++
-      else errors.push({ rowNumber: line.rowNumber, raw: line.raw, reason: `${lineError.message} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' })
+      })
     }
+  }
 
-    const { data: lineAgg } = await admin.from('order_lines').select('sku, qty').eq('order_id', orderId)
-    const plannedPieces = (lineAgg ?? []).reduce((sum, l) => sum + Number(l.qty), 0)
-    const uniqueSkuCount = new Set((lineAgg ?? []).map((l) => l.sku)).size
-    await admin.from('orders').update({ planned_pieces: plannedPieces, unique_sku_count: uniqueSkuCount }).eq('order_id', orderId)
+  let linesUpserted = 0
+  if (lineRows.length > 0) {
+    const { error: linesError } = await admin.from('order_lines').upsert(
+      lineRows.map((l) => l.row),
+      { onConflict: 'order_id,sku,bin_code,source_line_id' },
+    )
+    if (!linesError) linesUpserted = lineRows.length
+    else lineRows.forEach((l) => errors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `${linesError.message} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' }))
+  }
+
+  // Step 4: recompute planned_pieces/unique_sku_count for every order touched by this batch in one
+  // query (re-read from the DB, not just this batch's own lines, so a partial re-upload of an
+  // existing order still ends up with the correct total across old + new lines) and write all the
+  // results back in one upsert. order_no/warehouse_code/original_order_date/store_code/status are
+  // included only because orders has NOT NULL columns with no default that Postgres still requires
+  // a value for even on the conflict-update path of an upsert -- they're each set to the row's own
+  // existing/just-inserted value, not touched otherwise (import_id is deliberately omitted so an
+  // existing order's original import provenance is never overwritten by a later re-upload).
+  const touchedOrderIds = [...new Set(resolvedGroups.map((r) => r.orderId))]
+  if (touchedOrderIds.length > 0) {
+    const { data: lineAgg, error: aggError } = await admin.from('order_lines').select('order_id, sku, qty').in('order_id', touchedOrderIds).limit(50000)
+    if (aggError) console.error('[processOrderRowsBatch] line aggregation error', aggError.message)
+    const aggByOrder = new Map<string, { pieces: number; skus: Set<string> }>()
+    for (const l of lineAgg ?? []) {
+      const entry = aggByOrder.get(l.order_id) ?? { pieces: 0, skus: new Set<string>() }
+      entry.pieces += Number(l.qty)
+      entry.skus.add(l.sku)
+      aggByOrder.set(l.order_id, entry)
+    }
+    const orderUpdates = resolvedGroups.map(({ group, orderId, status }) => ({
+      order_id: orderId,
+      order_no: group.orderNo,
+      warehouse_code: group.warehouseCode,
+      original_order_date: group.originalOrderDate,
+      store_code: group.storeCode,
+      status,
+      planned_pieces: aggByOrder.get(orderId)?.pieces ?? 0,
+      unique_sku_count: aggByOrder.get(orderId)?.skus.size ?? 0,
+    }))
+    const { error: updateError } = await admin.from('orders').upsert(orderUpdates, { onConflict: 'order_id' })
+    if (updateError) console.error('[processOrderRowsBatch] order totals upsert error', updateError.message)
   }
 
   if (errors.length > 0) {

@@ -1,15 +1,36 @@
 import * as XLSX from 'xlsx'
 
-/** Parses an uploaded .csv/.xlsx File into an array of row objects keyed by header. */
+/** A genuine Excel date cell (with cellDates: true below) becomes a JS Date -- format it from its
+ * UTC parts, not local time. SheetJS deliberately builds these Date objects so the calendar day
+ * lands on UTC midnight regardless of the reading machine's timezone (its own docs recommend the
+ * UTC getters for exactly this reason); reading local parts instead risks landing on the wrong day
+ * printout of a UTC-minus timezone. */
+function formatCellDate(d: Date): string {
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Parses an uploaded .csv/.xlsx File into an array of row objects keyed by header.
+ *
+ * cellDates + raw:true (rather than the previous raw:false) so a genuine Excel date cell comes
+ * back as an actual Date computed from the workbook's real stored value, not a re-formatted
+ * display string. The previous raw:false asked SheetJS for the cell's *formatted display text*
+ * for every cell, dates included -- which depends on SheetJS's own interpretation of the cell's
+ * number-format code, and isn't guaranteed to match what a given Excel client happens to render
+ * on screen for the same file (a locale/format-code mismatch, not a parsing bug in this app's own
+ * date regex). A DD/MM/YYYY value like 13/09/2026 that isn't ambiguous (day > 12) still parsed
+ * correctly either way, which is why a single-cell sample alone couldn't show this. */
 export async function parseSpreadsheet(file: File): Promise<Record<string, string>[]> {
   const buffer = await file.arrayBuffer()
-  const workbook = XLSX.read(buffer, { type: 'array' })
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: false })
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true })
   return rows.map((row) => {
     const normalized: Record<string, string> = {}
     for (const [key, value] of Object.entries(row)) {
-      normalized[key.trim()] = String(value ?? '').trim()
+      normalized[key.trim()] = value instanceof Date ? formatCellDate(value) : String(value ?? '').trim()
     }
     return normalized
   })

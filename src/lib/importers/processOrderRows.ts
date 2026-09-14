@@ -154,13 +154,19 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
   if (existingOrdersError) console.error('[processOrderRowsBatch] existing orders lookup error', existingOrdersError.message)
   const existingByKey = new Map((existingOrdersRaw ?? []).map((o) => [`${o.warehouse_code}|${o.order_no}|${o.original_order_date}`, o]))
 
-  // Step 2: one bulk insert for every order-group that isn't already in the DB.
+  // Step 2: one bulk upsert for every order-group that isn't already in the DB. ON CONFLICT DO
+  // NOTHING (ignoreDuplicates) rather than a plain insert -- a plain multi-row INSERT is one
+  // atomic statement, so if even one row in it turns out to already exist (step 1 missing it for
+  // any reason -- a race with a concurrent import, or an edge case in matching), the WHOLE
+  // statement fails and every other genuinely-new order in this batch gets wrongly reported as
+  // failed too. With DO NOTHING, only the conflicting rows are skipped (silently, by Postgres --
+  // RETURNING never includes them), so they're re-looked-up explicitly below instead of guessed.
   const newGroups = groupList.filter((g) => !existingByKey.has(g.key))
   const insertedByKey = new Map<string, { order_id: string }>()
   if (newGroups.length > 0) {
     const { data: insertedOrders, error: insertError } = await admin
       .from('orders')
-      .insert(
+      .upsert(
         newGroups.map((g) => ({
           order_no: g.orderNo,
           warehouse_code: g.warehouseCode,
@@ -169,16 +175,36 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
           status: 'new',
           import_id: importId,
         })),
+        { onConflict: 'warehouse_code,order_no,original_order_date', ignoreDuplicates: true },
       )
       .select('order_id, order_no, warehouse_code, original_order_date')
-    if (insertError || !insertedOrders) {
+    if (insertError) {
       for (const g of newGroups) {
         g.lines.forEach((l) =>
-          errors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `Failed to create order: ${insertError?.message ?? 'unknown error'} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' }),
+          errors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `Failed to create order: ${insertError.message} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' }),
         )
       }
     } else {
-      for (const o of insertedOrders) insertedByKey.set(`${o.warehouse_code}|${o.order_no}|${o.original_order_date}`, o)
+      for (const o of insertedOrders ?? []) insertedByKey.set(`${o.warehouse_code}|${o.order_no}|${o.original_order_date}`, o)
+
+      // Groups DO NOTHING skipped (already exist under this exact key) never appear in
+      // insertedOrders -- look them up for real and fold them into existingByKey, rather than
+      // treating "not returned by the upsert" as proof the order doesn't exist.
+      const stillMissing = newGroups.filter((g) => !insertedByKey.has(g.key))
+      if (stillMissing.length > 0) {
+        const missingWarehouseCodes = [...new Set(stillMissing.map((g) => g.warehouseCode))]
+        const missingOrderNos = [...new Set(stillMissing.map((g) => g.orderNo))]
+        const missingDates = [...new Set(stillMissing.map((g) => g.originalOrderDate))]
+        const { data: reLookup, error: reLookupError } = await admin
+          .from('orders')
+          .select('order_id, order_no, warehouse_code, original_order_date, status')
+          .in('warehouse_code', missingWarehouseCodes)
+          .in('order_no', missingOrderNos)
+          .in('original_order_date', missingDates)
+          .limit(50000)
+        if (reLookupError) console.error('[processOrderRowsBatch] post-upsert re-lookup error', reLookupError.message)
+        for (const o of reLookup ?? []) existingByKey.set(`${o.warehouse_code}|${o.order_no}|${o.original_order_date}`, o)
+      }
     }
   }
 
@@ -194,20 +220,22 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
       resolvedGroups.push({ group: g, orderId: inserted.order_id, isNew: true, status: 'new' })
       continue
     }
-    // The insert-failure path above already reports an error for every group in newGroups when
-    // the insert itself errored. This covers the other way this can go wrong: the insert
-    // succeeded, but this group's key didn't match any returned row (e.g. a date normalized
-    // differently than Postgres's own `date` serialization) -- fail loud instead of silently
-    // reporting 0 orders/lines imported while actually writing nothing for this order.
-    if (newGroups.includes(g)) {
-      g.lines.forEach((l) =>
-        errors.push({
-          rowNumber: l.rowNumber,
-          raw: l.raw,
-          reason: `Order was created but could not be re-matched afterward (internal key mismatch) — this row was NOT imported, fix and re-upload it`,
-          severity: 'blocking',
-        }),
-      )
+    // Only reachable if the upsert itself errored (already reported above, so this group is
+    // deliberately not double-reported here) or the post-upsert re-lookup still couldn't find a
+    // row that DO NOTHING skipped -- either way, fail loud instead of silently reporting 0
+    // orders/lines imported while actually writing nothing for this order.
+    if (newGroups.includes(g) && !insertedByKey.has(g.key)) {
+      const alreadyReported = errors.some((e) => e.reason.startsWith('Failed to create order:') && g.lines.some((l) => l.rowNumber === e.rowNumber))
+      if (!alreadyReported) {
+        g.lines.forEach((l) =>
+          errors.push({
+            rowNumber: l.rowNumber,
+            raw: l.raw,
+            reason: `Order could not be found or created (internal key mismatch after upsert) — this row was NOT imported, fix and re-upload it`,
+            severity: 'blocking',
+          }),
+        )
+      }
     }
   }
 

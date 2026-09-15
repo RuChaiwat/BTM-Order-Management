@@ -1,14 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { formatDate } from '../../lib/formatDate'
 
 const TARGET = 300
 const LOW_MAX = 270
 const ACCEPTABLE_MAX = 330
-const PAGE_SIZE = 50
+const PAGE_SIZE = 15
 
 interface BacklogByDate {
   orderDate: string
@@ -24,6 +23,7 @@ interface ZoneDensity {
 
 type Band = 'green' | 'yellow' | 'red'
 type ComplexityBands = Record<Band, { count: number; sumPieces: number }>
+type SortColumn = 'order_no' | 'store_code' | 'unique_sku_count' | 'planned_pieces'
 
 interface PoolOrder {
   orderId: string
@@ -31,7 +31,18 @@ interface PoolOrder {
   storeCode: string
   plannedPieces: number
   uniqueSkuCount: number
+  band?: Band
   zones?: string[]
+}
+
+/** A selected order, remembering which zone(s) it's known to be compatible with -- either its
+ * real zone list (if it came in via the barcode scan fallback, which fetches the full list) or
+ * just the single Criteria zone it was picked under (pool/checkbox selections only ever confirm
+ * membership in that one zone, not the order's full zone list, which is a safe under-approximation
+ * for the compatibility check below: it can never wrongly ALLOW an incompatible order, only rarely
+ * disallow one that happens to also share a zone we don't know about). */
+interface SelectedOrder extends PoolOrder {
+  knownZones: string[]
 }
 
 interface Picker {
@@ -48,13 +59,12 @@ const BAND_META: Record<Band, { label: string; color: string; bg: string }> = {
   red: { label: 'Red — Hard', color: '#DC2626', bg: '#FEF2F2' },
 }
 
-function bandFor(pieces: number, uniqueSku: number, thresholds: { greenMin: number; redMax: number }): Band {
-  if (uniqueSku === 0) return 'yellow'
-  const pcsPerSku = pieces / uniqueSku
-  if (pcsPerSku >= thresholds.greenMin) return 'green'
-  if (pcsPerSku <= thresholds.redMax) return 'red'
-  return 'yellow'
-}
+const SORT_LABELS: { key: SortColumn; label: string }[] = [
+  { key: 'order_no', label: 'ORDER NO.' },
+  { key: 'store_code', label: 'STORE' },
+  { key: 'unique_sku_count', label: 'UNIQUE SKU' },
+  { key: 'planned_pieces', label: 'PLANNED PCS' },
+]
 
 function workloadBandFor(pieces: number) {
   if (pieces === 0 || pieces < LOW_MAX) return { name: 'Low', color: '#2563EB' }
@@ -63,29 +73,33 @@ function workloadBandFor(pieces: number) {
   return { name: 'Over', color: '#DC2626' }
 }
 
+/** Zones common to every currently-selected order -- null means "no constraint yet" (nothing
+ * selected). A candidate order can only be added if it shares at least one zone with this set. */
+function compatibleZonesOf(orders: SelectedOrder[]): string[] | null {
+  if (orders.length === 0) return null
+  return orders.slice(1).reduce((acc, o) => acc.filter((z) => o.knownZones.includes(z)), orders[0].knownZones)
+}
+
 /**
  * Work Assignment, redesigned into 3 sections per Business's spec:
  *   1. Criteria — Backlog by Order Date -> click a date to see Zone density -> click a zone to
  *      see Order Complexity (red/yellow/green) -> plus a "scan Order Barcode" fallback that skips
  *      straight to a specific order regardless of date/zone.
  *   2. Unassigned Order Pool — the orders matching whatever Criteria selection is active,
- *      paginated.
+ *      sortable and paginated (15/page) entirely server-side.
  *   3. Assignment Summary — unchanged workload band/confirm flow, except "Assign to worker" is
  *      now a Badge Code scan (resolved against the already-loaded active picker roster) instead
- *      of a login-account dropdown, since Pickers no longer have login accounts at all
- *      (migration 0015) -- there's nothing to build a dropdown of relationships against besides
- *      this roster fetched once up front.
+ *      of a login-account dropdown, since Pickers no longer have login accounts at all.
  */
 export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, pickers }: { warehouseCode: string; initialBacklogByDate: BacklogByDate[]; pickers: Picker[] }) {
-  const router = useRouter()
-
   const [backlogByDate] = useState(initialBacklogByDate)
   const [orderDate, setOrderDate] = useState<string | null>(null)
   const [zoneDensity, setZoneDensity] = useState<ZoneDensity[]>([])
   const [zoneCode, setZoneCode] = useState<string | null>(null)
   const [complexity, setComplexity] = useState<ComplexityBands | null>(null)
-  const [thresholds, setThresholds] = useState<{ greenMin: number; redMax: number } | null>(null)
   const [bandFilter, setBandFilter] = useState<Band | null>(null)
+  const [sortColumn, setSortColumn] = useState<SortColumn>('order_no')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [poolOrders, setPoolOrders] = useState<PoolOrder[]>([])
   const [poolTotal, setPoolTotal] = useState(0)
   const [poolPage, setPoolPage] = useState(1)
@@ -93,7 +107,8 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
   const [loadingPool, setLoadingPool] = useState(false)
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [selectedDetails, setSelectedDetails] = useState<Map<string, PoolOrder>>(new Map())
+  const [selectedDetails, setSelectedDetails] = useState<Map<string, SelectedOrder>>(new Map())
+  const [poolSelectError, setPoolSelectError] = useState<string | null>(null)
 
   const [orderScanValue, setOrderScanValue] = useState('')
   const [orderScanError, setOrderScanError] = useState<string | null>(null)
@@ -106,6 +121,19 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  async function fetchPool(date: string, zone: string, page: number, band: Band | null, sort: SortColumn, dir: 'asc' | 'desc') {
+    setLoadingPool(true)
+    const params = new URLSearchParams({ order_date: date, zone_code: zone, page: String(page), sort, sort_dir: dir })
+    if (band) params.set('band', band)
+    const res = await fetch(`/api/assignment-pool?${params.toString()}`)
+    const body = await res.json()
+    setLoadingPool(false)
+    setComplexity(body.complexity ?? null)
+    setPoolOrders(body.orders ?? [])
+    setPoolTotal(body.totalOrders ?? 0)
+    setPoolPage(page)
+  }
 
   async function selectDate(date: string) {
     setOrderDate(date)
@@ -121,33 +149,75 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     setZoneDensity(body.zoneDensity ?? [])
   }
 
-  async function selectZone(zone: string, page = 1) {
+  function selectZone(zone: string) {
     if (!orderDate) return
     setZoneCode(zone)
     setBandFilter(null)
-    setPoolPage(page)
-    setLoadingPool(true)
-    const res = await fetch(`/api/assignment-pool?order_date=${encodeURIComponent(orderDate)}&zone_code=${encodeURIComponent(zone)}&page=${page}`)
-    const body = await res.json()
-    setLoadingPool(false)
-    setComplexity(body.complexity ?? null)
-    setThresholds(body.thresholds ?? null)
-    setPoolOrders(body.orders ?? [])
-    setPoolTotal(body.totalOrders ?? 0)
+    setPoolSelectError(null)
+    fetchPool(orderDate, zone, 1, null, sortColumn, sortDir)
+  }
+
+  function selectBand(band: Band) {
+    if (!orderDate || !zoneCode) return
+    const next = bandFilter === band ? null : band
+    setBandFilter(next)
+    fetchPool(orderDate, zoneCode, 1, next, sortColumn, sortDir)
+  }
+
+  function changeSort(column: SortColumn) {
+    if (!orderDate || !zoneCode) return
+    const nextDir: 'asc' | 'desc' = sortColumn === column && sortDir === 'asc' ? 'desc' : 'asc'
+    setSortColumn(column)
+    setSortDir(nextDir)
+    fetchPool(orderDate, zoneCode, 1, bandFilter, column, nextDir)
   }
 
   function changePage(page: number) {
-    if (zoneCode) selectZone(zoneCode, page)
+    if (!orderDate || !zoneCode) return
+    fetchPool(orderDate, zoneCode, page, bandFilter, sortColumn, sortDir)
+  }
+
+  const compatibleZones = useMemo(() => compatibleZonesOf([...selectedDetails.values()]), [selectedDetails])
+
+  /** Returns an error message on rejection, or null on success -- returning the message directly
+   * (rather than having callers read a shared error state right after calling this) avoids
+   * reading a stale value, since setState updates aren't visible until the next render, and lets
+   * each caller show the message in its own spot (Section 1's scan error vs. Section 2's pool
+   * error) instead of duplicating it in both. */
+  function addSelection(order: PoolOrder, knownZones: string[]): string | null {
+    if (compatibleZones && !knownZones.some((z) => compatibleZones.includes(z))) {
+      return compatibleZones.length > 0
+        ? `Order ${order.orderNo} doesn't share a Zone with the orders already selected (compatible zone(s): ${compatibleZones.join(', ')})`
+        : `Order ${order.orderNo} doesn't share a Zone with the orders already selected`
+    }
+    setSelected((prev) => new Set(prev).add(order.orderId))
+    setSelectedDetails((prev) => new Map(prev).set(order.orderId, { ...order, knownZones }))
+    return null
+  }
+
+  function removeSelection(orderId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.delete(orderId)
+      return next
+    })
+    setSelectedDetails((prev) => {
+      const next = new Map(prev)
+      next.delete(orderId)
+      return next
+    })
+    setPoolSelectError(null)
   }
 
   function toggle(order: PoolOrder) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(order.orderId)) next.delete(order.orderId)
-      else next.add(order.orderId)
-      return next
-    })
-    setSelectedDetails((prev) => new Map(prev).set(order.orderId, order))
+    if (selected.has(order.orderId)) {
+      removeSelection(order.orderId)
+      return
+    }
+    // A pool row is only confirmed to touch the currently-selected Criteria zone -- treat that as
+    // its known zone set (see SelectedOrder doc comment above).
+    const err = addSelection(order, zoneCode ? [zoneCode] : [])
+    setPoolSelectError(err)
   }
 
   async function handleOrderScan() {
@@ -170,16 +240,18 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       setOrderScanError(`No pending order '${value}' found`)
       return
     }
-    if (zoneCode && !(match.zones ?? []).includes(zoneCode)) {
-      setOrderScanError(`Order '${value}' does not touch Zone ${zoneCode} — clear the zone selection first, or scan an order from that zone`)
+    const knownZones = match.zones ?? []
+    if (knownZones.length === 0) {
+      setOrderScanError(`Order '${value}' has no resolved Zone (invalid/missing Bin Code) — can't be assigned yet`)
       return
     }
-    if (!zoneCode && match.zones && match.zones.length > 0) {
-      setZoneCode(match.zones[0])
+    const err = addSelection(match, knownZones)
+    if (err) {
+      setOrderScanError(err)
+      return
     }
+    if (!zoneCode) setZoneCode(knownZones[0])
     setOrderScanUsed(true)
-    setSelected((prev) => new Set(prev).add(match.orderId))
-    setSelectedDetails((prev) => new Map(prev).set(match.orderId, match))
     setOrderScanValue('')
   }
 
@@ -192,25 +264,23 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       setPickerScanError(`No active picker with badge '${value}'`)
       return
     }
-    if (zoneCode && match.zone_scope.length > 0 && !match.zone_scope.includes(zoneCode)) {
-      setPickerScanError(`${match.name_en} is not scoped to Zone ${zoneCode}`)
+    if (effectiveZone && match.zone_scope.length > 0 && !match.zone_scope.includes(effectiveZone)) {
+      setPickerScanError(`${match.name_en} is not scoped to Zone ${effectiveZone}`)
       return
     }
     setScannedPicker(match)
     setPickerScanValue('')
   }
 
-  const selectedOrders = useMemo(() => [...selected].map((id) => selectedDetails.get(id)).filter((o): o is PoolOrder => Boolean(o)), [selected, selectedDetails])
+  const selectedOrders = useMemo(() => [...selected].map((id) => selectedDetails.get(id)).filter((o): o is SelectedOrder => Boolean(o)), [selected, selectedDetails])
   const plannedPieces = selectedOrders.reduce((s, o) => s + o.plannedPieces, 0)
   const workloadBand = workloadBandFor(plannedPieces)
-
-  const visiblePoolOrders = useMemo(() => {
-    if (!bandFilter || !thresholds) return poolOrders
-    return poolOrders.filter((o) => bandFor(o.plannedPieces, o.uniqueSkuCount, thresholds) === bandFilter)
-  }, [poolOrders, bandFilter, thresholds])
+  // The zone the batch actually commits to -- narrows to whatever's still common across every
+  // selected order; falls back to the Criteria zone while nothing's selected yet.
+  const effectiveZone = compatibleZones && compatibleZones.length > 0 ? compatibleZones[0] : zoneCode
 
   async function confirmAssignment() {
-    if (!zoneCode || !scannedPicker) return
+    if (!effectiveZone || !scannedPicker) return
     setSubmitting(true)
     setSubmitError(null)
     const res = await fetch('/api/assignments', {
@@ -218,7 +288,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         warehouse_code: warehouseCode,
-        zone_code: zoneCode,
+        zone_code: effectiveZone,
         picker_id: scannedPicker.picker_id,
         order_ids: [...selected],
         assignment_method: orderScanUsed ? 'barcode_scan' : 'list_selection',
@@ -235,7 +305,10 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     setSelectedDetails(new Map())
     setOrderScanUsed(false)
     setScannedPicker(null)
-    router.refresh()
+    // Refresh the pool for the SAME Criteria selection (rather than resetting it) -- assigning one
+    // picker's batch is usually the first of several against the same date/zone, so the admin can
+    // keep going against an accurate remaining list without re-clicking through Criteria again.
+    if (orderDate && zoneCode) fetchPool(orderDate, zoneCode, poolPage, bandFilter, sortColumn, sortDir)
   }
 
   const totalPages = Math.max(1, Math.ceil(poolTotal / PAGE_SIZE))
@@ -325,7 +398,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
                   return (
                     <button
                       key={band}
-                      onClick={() => setBandFilter(active ? null : band)}
+                      onClick={() => selectBand(band)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -370,17 +443,19 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <span className="card-title">Unassigned Order Pool</span>
             <span className="card-subtitle">
-              {orderDate && zoneCode ? `${poolTotal.toLocaleString()} orders · ${formatDate(orderDate)} · Zone ${zoneCode}` : 'Select a date and zone to see orders'}
+              {orderDate && zoneCode ? `${poolTotal.toLocaleString()} orders · ${formatDate(orderDate)} · Zone ${zoneCode}${bandFilter ? ` · ${BAND_META[bandFilter].label}` : ''}` : 'Select a date and zone to see orders'}
             </span>
           </div>
+          {poolSelectError && <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--color-danger)' }}>{poolSelectError}</div>}
           <table className="table">
             <thead>
               <tr>
                 <th style={{ width: 28 }} />
-                <th>ORDER NO.</th>
-                <th>STORE</th>
-                <th>UNIQUE SKU</th>
-                <th>PLANNED PCS</th>
+                {SORT_LABELS.map((col) => (
+                  <th key={col.key} onClick={() => changeSort(col.key)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                    {col.label} {sortColumn === col.key ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -392,7 +467,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
                 </tr>
               )}
               {!loadingPool &&
-                visiblePoolOrders.map((o) => {
+                poolOrders.map((o) => {
                   const isSelected = selected.has(o.orderId)
                   return (
                     <tr key={o.orderId} className={isSelected ? 'row-flag' : undefined}>
@@ -412,7 +487,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
                     </tr>
                   )
                 })}
-              {!loadingPool && visiblePoolOrders.length === 0 && (
+              {!loadingPool && poolOrders.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
                     {orderDate && zoneCode ? 'No orders match the current criteria.' : 'No orders loaded yet — pick a date and zone, or scan an order barcode.'}
@@ -490,9 +565,18 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
           <div style={{ marginTop: 16, fontSize: 12, color: '#374151', fontWeight: 500, marginBottom: 8 }}>Selected orders</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, maxHeight: 160, overflowY: 'auto' }}>
             {selectedOrders.map((o) => (
-              <div key={o.orderId} style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div key={o.orderId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <span>{o.orderNo}</span>
-                <span style={{ color: '#6B7280' }}>{o.plannedPieces} pcs</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: '#6B7280' }}>{o.plannedPieces} pcs</span>
+                  <button
+                    onClick={() => removeSelection(o.orderId)}
+                    title="Remove"
+                    style={{ border: '1px solid var(--color-border)', background: '#fff', borderRadius: 4, width: 20, height: 20, lineHeight: '18px', cursor: 'pointer', color: 'var(--color-danger)', padding: 0 }}
+                  >
+                    −
+                  </button>
+                </span>
               </div>
             ))}
             {selectedOrders.length === 0 && <span style={{ color: '#6B7280' }}>No orders selected.</span>}
@@ -501,10 +585,10 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
           {submitError && <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-danger)' }}>{submitError}</div>}
 
           <div className="mt-auto" style={{ paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button className="btn btn-primary" disabled={selectedOrders.length === 0 || !scannedPicker || !zoneCode} onClick={() => setShowConfirm(true)}>
+            <button className="btn btn-primary" disabled={selectedOrders.length === 0 || !scannedPicker || !effectiveZone} onClick={() => setShowConfirm(true)}>
               Confirm Assignment · เริ่มจับเวลา
             </button>
-            <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'center' }}>Timer starts only on Admin confirm. Assignment is confined to Zone {zoneCode ?? '—'}.</div>
+            <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'center' }}>Timer starts only on Admin confirm. Assignment is confined to Zone {effectiveZone ?? '—'}.</div>
           </div>
         </div>
       </div>
@@ -512,7 +596,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       {showConfirm && scannedPicker && (
         <Modal title="Confirm assignment?" subtitle="ยืนยันการมอบหมายงาน">
           <div className="modal-body">
-            {selectedOrders.length} orders · {plannedPieces} planned pieces to picker <strong>{scannedPicker.name_en}</strong> in Zone {zoneCode}. The Order timer starts now.
+            {selectedOrders.length} orders · {plannedPieces} planned pieces to picker <strong>{scannedPicker.name_en}</strong> in Zone {effectiveZone}. The Order timer starts now.
           </div>
           <div className="modal-grid">
             <div>

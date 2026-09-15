@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getAssignmentBacklogByDate, getAssignmentZoneDensity, getAssignmentComplexity, getAssignmentPoolOrders, findAssignablePoolOrderByOrderNo } from '@/lib/queries/assignmentPool'
+import {
+  getAssignmentBacklogByDate,
+  getAssignmentZoneDensity,
+  getAssignmentComplexity,
+  getAssignmentPoolOrders,
+  findAssignablePoolOrderByOrderNo,
+  type Band,
+  type PoolSortColumn,
+} from '@/lib/queries/assignmentPool'
+
+const SORT_COLUMNS: PoolSortColumn[] = ['order_no', 'store_code', 'unique_sku_count', 'planned_pieces']
+const BANDS: Band[] = ['green', 'yellow', 'red']
 
 /**
  * Backs the Work Assignment page's Criteria drill-down (Backlog by Order Date -> Zone -> read of
@@ -19,6 +30,11 @@ export async function GET(request: Request) {
   const zoneCode = searchParams.get('zone_code')
   const orderNo = searchParams.get('order_no')
   const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
+  const bandParam = searchParams.get('band')
+  const band = BANDS.includes(bandParam as Band) ? (bandParam as Band) : null
+  const sortParam = searchParams.get('sort')
+  const sort = SORT_COLUMNS.includes(sortParam as PoolSortColumn) ? (sortParam as PoolSortColumn) : 'order_no'
+  const sortDir = searchParams.get('sort_dir') === 'desc' ? 'desc' : 'asc'
 
   const admin = createAdminClient()
 
@@ -41,7 +57,7 @@ export async function GET(request: Request) {
 
   const [{ bands, thresholds }, pool] = await Promise.all([
     getAssignmentComplexity(admin, warehouseCode, orderDate, zoneCode),
-    getAssignmentPoolOrders(admin, warehouseCode, orderDate, zoneCode, page),
+    getAssignmentPoolOrders(admin, warehouseCode, orderDate, zoneCode, page, { band, sort, sortDir }),
   ])
 
   return NextResponse.json({ backlogByDate, zoneDensity, complexity: bands, thresholds, orders: pool.orders, totalOrders: pool.total, page })

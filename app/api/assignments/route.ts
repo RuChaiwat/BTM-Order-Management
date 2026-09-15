@@ -3,22 +3,19 @@ import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
 
-const TARGET = 300
-const LOW_MAX = 270
-const ACCEPTABLE_MAX = 330
-
-function workloadStatus(pieces: number) {
-  if (pieces < LOW_MAX) return 'low'
-  if (pieces <= TARGET) return 'target'
-  if (pieces <= ACCEPTABLE_MAX) return 'acceptable_over'
-  return 'over'
-}
-
 /**
  * §12.1 Create an Assignment Batch — either method (list_selection / barcode_scan, FR-031) goes
  * through this same endpoint so both get identical real-time piece counting (UAT-21). FR-030's
  * single-Zone/single-Warehouse rule is enforced by the `trg_enforce_assignment_zone_warehouse`
- * DB trigger on assignment_orders (0001_init_schema.sql) — this insert is the layer that trips it.
+ * DB trigger on assignment_orders (0001_init_schema.sql), which fires inside create_assignment_batch.
+ *
+ * The actual batch creation + order linking + status flip happens in one Postgres transaction via
+ * create_assignment_batch (migration 0017) rather than as several separate round trips here. Two
+ * Admins on different machines racing to assign the same order used to both pass an "is this
+ * order still 'new'?" pre-check before either write landed -- that RPC row-locks every candidate
+ * order first, so a losing concurrent call always sees the winner's committed result and gets a
+ * clean rejection instead of a partially-double-assigned order. The pre-checks below stay only
+ * for a friendlier, more specific error message on the common (non-racing) mistakes.
  */
 export async function POST(request: Request) {
   let caller
@@ -54,7 +51,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `This Picker is not scoped to Zone ${zone_code}` }, { status: 400 })
   }
 
-  const { data: orders, error: ordersError } = await admin.from('orders').select('order_id, planned_pieces, status').in('order_id', order_ids)
+  // Friendly pre-check only -- not the actual concurrency guard, see create_assignment_batch.
+  const { data: orders, error: ordersError } = await admin.from('orders').select('order_id, status').in('order_id', order_ids)
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 400 })
   if (!orders || orders.length !== order_ids.length) {
     return NextResponse.json({ error: 'One or more order_ids were not found' }, { status: 400 })
@@ -64,48 +62,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Order(s) not Pending: ${alreadyAssigned.map((o) => o.order_id).join(', ')} (FR-029/FR-032)` }, { status: 409 })
   }
 
-  const plannedPieces = orders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
-  const nowIso = new Date().toISOString()
-
-  const { data: batch, error: batchError } = await admin
-    .from('assignment_batches')
-    .insert({
-      warehouse_code,
-      zone_code,
-      picker_id,
-      admin_id: caller.user_id,
-      assigned_time: nowIso,
-      planned_pieces: plannedPieces,
-      workload_status: workloadStatus(plannedPieces),
-      assignment_method,
-      status: 'assigned',
-      linked_consolidation_batch_id: linked_consolidation_batch_id ?? null,
-    })
-    .select()
-    .single()
-  if (batchError || !batch) return NextResponse.json({ error: batchError?.message ?? 'Failed to create assignment batch' }, { status: 400 })
-
-  // Single bulk INSERT — statement-level atomicity means if the FR-030 trigger rejects any one
-  // row (wrong zone/warehouse, or a Cancelled order slipping through), the whole insert rolls
-  // back and no assignment_orders rows are left half-committed.
-  const { error: linkError } = await admin.from('assignment_orders').insert(
-    order_ids.map((orderId: string, i: number) => ({
-      assignment_batch_id: batch.assignment_batch_id,
-      order_id: orderId,
-      sequence: i + 1,
-      source_type: linked_consolidation_batch_id ? 'consolidation' : 'single',
-      source_id: linked_consolidation_batch_id ?? null,
-    })),
-  )
-  if (linkError) {
-    await admin.from('assignment_batches').delete().eq('assignment_batch_id', batch.assignment_batch_id)
-    return NextResponse.json({ error: linkError.message }, { status: 409 })
+  const { data: rpcResult, error: rpcError } = await admin.rpc('create_assignment_batch', {
+    p_warehouse_code: warehouse_code,
+    p_zone_code: zone_code,
+    p_picker_id: picker_id,
+    p_admin_id: caller.user_id,
+    p_order_ids: order_ids,
+    p_assignment_method: assignment_method,
+    p_linked_consolidation_batch_id: linked_consolidation_batch_id ?? null,
+  })
+  if (rpcError) {
+    if (rpcError.message.includes('ORDER_NOT_AVAILABLE')) {
+      return NextResponse.json({ error: 'One or more of these orders were just assigned by someone else — refresh the pool and try again' }, { status: 409 })
+    }
+    return NextResponse.json({ error: rpcError.message }, { status: 400 })
   }
-
-  await admin
-    .from('orders')
-    .update({ status: 'assigned', assigned_time: nowIso, assignment_batch_id: batch.assignment_batch_id })
-    .in('order_id', order_ids)
+  const batch = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult
+  if (!batch) return NextResponse.json({ error: 'Failed to create assignment batch' }, { status: 400 })
 
   await Promise.all(
     order_ids.map((orderId: string) =>

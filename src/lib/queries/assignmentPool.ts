@@ -13,11 +13,8 @@ export interface ZoneDensity {
   sumQty: number
 }
 
-export interface ComplexityBands {
-  green: { count: number; sumPieces: number }
-  yellow: { count: number; sumPieces: number }
-  red: { count: number; sumPieces: number }
-}
+export type Band = 'green' | 'yellow' | 'red'
+export type ComplexityBands = Record<Band, { count: number; sumPieces: number }>
 
 export interface PoolOrder {
   orderId: string
@@ -25,8 +22,11 @@ export interface PoolOrder {
   storeCode: string
   plannedPieces: number
   uniqueSkuCount: number
+  band?: Band
   zones?: string[]
 }
+
+const DEFAULT_PAGE_SIZE = 15
 
 /** Work Assignment's Criteria step 1: backlog of the assignable pool (status='new'), by Order
  * Date -- the same "aggregate in SQL, not JS" pattern as Order Pool overview (migration 0014) and
@@ -50,57 +50,75 @@ export async function getAssignmentZoneDensity(db: SupabaseClient, warehouseCode
     .sort((a, b) => b.sumQty - a.sumQty)
 }
 
-/** Criteria step 3: complexity bands for that date+zone selection. Thresholds are returned
- * alongside the bands so the client can classify each individual pool order the same way (e.g.
- * to let clicking a band filter the Unassigned Order Pool list) without a second config round trip. */
+/** Same green/red pieces-per-SKU thresholds used everywhere else in the app (Order Pool
+ * overview). Shared by both the complexity band aggregate and the pool order listing below so
+ * the two always classify an order the same way. */
+async function getComplexityThresholds(db: SupabaseClient): Promise<{ greenMin: number; redMax: number }> {
+  const cfg = await getActiveConfig(db, ['order_complexity.green_min_pcs_per_sku', 'order_complexity.red_max_pcs_per_sku'])
+  return {
+    greenMin: Number(cfg.value('order_complexity.green_min_pcs_per_sku') ?? 5),
+    redMax: Number(cfg.value('order_complexity.red_max_pcs_per_sku') ?? 2),
+  }
+}
+
+/** Criteria step 3: complexity bands for that date+zone selection. */
 export async function getAssignmentComplexity(
   db: SupabaseClient,
   warehouseCode: string,
   orderDate: string,
   zoneCode: string,
 ): Promise<{ bands: ComplexityBands; thresholds: { greenMin: number; redMax: number } }> {
-  const cfg = await getActiveConfig(db, ['order_complexity.green_min_pcs_per_sku', 'order_complexity.red_max_pcs_per_sku'])
-  const greenMin = Number(cfg.value('order_complexity.green_min_pcs_per_sku') ?? 5)
-  const redMax = Number(cfg.value('order_complexity.red_max_pcs_per_sku') ?? 2)
+  const thresholds = await getComplexityThresholds(db)
 
   const { data, error } = await db.rpc('get_new_orders_complexity_by_date_zone', {
     p_warehouse_code: warehouseCode,
     p_order_date: orderDate,
     p_zone_code: zoneCode,
-    p_green_min: greenMin,
-    p_red_max: redMax,
+    p_green_min: thresholds.greenMin,
+    p_red_max: thresholds.redMax,
   })
   if (error) console.error('[assignmentPool] complexity by date/zone error', error.message)
 
   const bands: ComplexityBands = { green: { count: 0, sumPieces: 0 }, yellow: { count: 0, sumPieces: 0 }, red: { count: 0, sumPieces: 0 } }
-  for (const row of (data ?? []) as { band: keyof ComplexityBands; order_count: number; sum_pieces: number }[]) {
+  for (const row of (data ?? []) as { band: Band; order_count: number; sum_pieces: number }[]) {
     bands[row.band] = { count: Number(row.order_count), sumPieces: Number(row.sum_pieces) }
   }
-  return { bands, thresholds: { greenMin, redMax } }
+  return { bands, thresholds }
 }
 
-/** Section 2 (Unassigned Order Pool): the actual order rows for a date+zone selection, paginated
- * server-side -- a single date+zone slice is small in practice, but pagination is still done in
- * SQL rather than trusting that to always hold. */
+export type PoolSortColumn = 'order_no' | 'store_code' | 'unique_sku_count' | 'planned_pieces'
+
+/** Section 2 (Unassigned Order Pool): the actual order rows for a date+zone selection, optionally
+ * narrowed to one complexity band, sorted, and paginated -- all server-side (migration 0017),
+ * so the header count, "Page X of Y", and the visible rows always agree with each other and with
+ * the Criteria panel's own band counts, regardless of how the result is spread across pages. */
 export async function getAssignmentPoolOrders(
   db: SupabaseClient,
   warehouseCode: string,
   orderDate: string,
   zoneCode: string,
   page: number,
-  pageSize = 50,
+  opts: { band?: Band | null; sort?: PoolSortColumn; sortDir?: 'asc' | 'desc'; pageSize?: number } = {},
 ): Promise<{ orders: PoolOrder[]; total: number }> {
+  const pageSize = opts.pageSize ?? DEFAULT_PAGE_SIZE
+  const thresholds = await getComplexityThresholds(db)
+
   const { data, error } = await db.rpc('get_new_orders_by_date_zone', {
     p_warehouse_code: warehouseCode,
     p_order_date: orderDate,
     p_zone_code: zoneCode,
+    p_green_min: thresholds.greenMin,
+    p_red_max: thresholds.redMax,
+    p_band: opts.band ?? null,
+    p_sort: opts.sort ?? 'order_no',
+    p_sort_dir: opts.sortDir ?? 'asc',
     p_limit: pageSize,
     p_offset: (page - 1) * pageSize,
   })
   if (error) console.error('[assignmentPool] pool orders error', error.message)
-  const rows = (data ?? []) as { order_id: string; order_no: string; store_code: string; planned_pieces: number; unique_sku_count: number; total_count: number }[]
+  const rows = (data ?? []) as { order_id: string; order_no: string; store_code: string; planned_pieces: number; unique_sku_count: number; band: Band; total_count: number }[]
   return {
-    orders: rows.map((r) => ({ orderId: r.order_id, orderNo: r.order_no, storeCode: r.store_code, plannedPieces: r.planned_pieces, uniqueSkuCount: r.unique_sku_count })),
+    orders: rows.map((r) => ({ orderId: r.order_id, orderNo: r.order_no, storeCode: r.store_code, plannedPieces: r.planned_pieces, uniqueSkuCount: r.unique_sku_count, band: r.band })),
     total: rows[0]?.total_count ?? 0,
   }
 }

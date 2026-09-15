@@ -2,9 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getDashboardData } from './dashboard'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
-
-// See dashboard.ts — unbounded selects silently truncate at Supabase's default 1000-row cap.
-const ROW_CAP = 200000
+import { fetchAllRows } from './fetchAllRows'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists), so treating it as a distinct state
@@ -21,31 +19,29 @@ const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in
  * accidentally couple to the same shape and break each other when one is redesigned.
  */
 export async function getControlTowerData(db: SupabaseClient, warehouseCode: string) {
-  const [base, zones, ordersRes, linesRes] = await Promise.all([
+  const [base, zones, orders, lines] = await Promise.all([
     getDashboardData(db, warehouseCode),
     getActiveZoneCodes(db, warehouseCode),
-    db.from('orders').select('order_id, order_no, status, planned_pieces, assigned_time, warehouse_code, assignment_batch_id').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
-    db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
+    fetchAllRows((from, to) =>
+      db.from('orders').select('order_id, order_no, status, planned_pieces, assigned_time, warehouse_code, assignment_batch_id').eq('warehouse_code', warehouseCode).range(from, to),
+    ),
+    fetchAllRows((from, to) => db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
   ])
-  if (ordersRes.error) console.error('[controlTower] orders error', ordersRes.error.message)
-  if (linesRes.error) console.error('[controlTower] order_lines error', linesRes.error.message)
-
-  const orders = unwrap(ordersRes)
-  const lines = unwrap(linesRes)
 
   // order_alerts has no warehouse_code column — scope it via this warehouse's own order_ids
   // rather than fetching every warehouse's alerts unfiltered (part of the original truncation bug).
   const orderIds = orders.map((o) => o.order_id)
-  const [alertsRes, completionsRes] = await Promise.all([
+  const [alerts, completions] = await Promise.all([
     orderIds.length
-      ? db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).limit(ROW_CAP)
-      : Promise.resolve({ data: [] as { order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }[], error: null }),
+      ? fetchAllRows((from, to) =>
+          db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).range(from, to),
+        )
+      : Promise.resolve([] as { order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }[]),
     orderIds.length
-      ? db.from('picker_completions').select('order_id, actual_pieces, result').in('order_id', orderIds).limit(ROW_CAP)
-      : Promise.resolve({ data: [] as { order_id: string; actual_pieces: number; result: string }[], error: null }),
+      ? fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces, result').in('order_id', orderIds).range(from, to))
+      : Promise.resolve([] as { order_id: string; actual_pieces: number; result: string }[]),
   ])
-  const alertByOrder = new Map(unwrap(alertsRes).map((a) => [a.order_id, a]))
-  const completions = unwrap(completionsRes)
+  const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
   const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))

@@ -1,12 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
-
-// Any select scoped only by warehouse_code/status (no further narrowing) needs an explicit high
-// limit — Supabase/PostgREST caps an unbounded select at 1000 rows by default, which silently
-// truncated these once real order volume passed that (confirmed root cause of Dashboard/Zone
-// Dashboard/Control Tower all under-reporting after a real import).
-const ROW_CAP = 200000
+import { fetchAllRows } from './fetchAllRows'
 
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
 // assignment_batches.status is not a reliable "is this picker still working" signal: nothing in
@@ -30,40 +25,34 @@ function daysBetween(fromDate: string, toDate: string): number {
  * function; flagged rather than silently left as a scaling trap.
  */
 export async function getDashboardData(db: SupabaseClient, warehouseCode: string) {
-  const [ordersRes, linesRes, assignmentBatchesRes, importErrorsRes, zones] = await Promise.all([
-    db
-      .from('orders')
-      .select('order_id, status, planned_pieces, original_order_date, assigned_time, picker_completed_time, assignment_batch_id')
-      .eq('warehouse_code', warehouseCode)
-      .limit(ROW_CAP),
-    db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
-    db.from('assignment_batches').select('assignment_batch_id, picker_id, status, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
-    db.from('import_errors').select('error_id, error_reason').ilike('error_reason', '%Invalid Bin Code%').limit(ROW_CAP),
+  const [orders, lines, assignmentBatches, invalidBinCount, zones] = await Promise.all([
+    fetchAllRows((from, to) =>
+      db
+        .from('orders')
+        .select('order_id, status, planned_pieces, original_order_date, assigned_time, picker_completed_time, assignment_batch_id')
+        .eq('warehouse_code', warehouseCode)
+        .range(from, to),
+    ),
+    fetchAllRows((from, to) => db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
+    fetchAllRows((from, to) => db.from('assignment_batches').select('assignment_batch_id, picker_id, status, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
+    // Only the count is used below -- a head request returns it via Content-Range without
+    // transferring any rows, so it's naturally immune to the row cap rather than needing paging.
+    db.from('import_errors').select('error_id', { count: 'exact', head: true }).ilike('error_reason', '%Invalid Bin Code%'),
     getActiveZoneCodes(db, warehouseCode),
   ])
-  if (ordersRes.error) console.error('[dashboard] orders error', ordersRes.error.message)
-  if (linesRes.error) console.error('[dashboard] order_lines error', linesRes.error.message)
-  if (assignmentBatchesRes.error) console.error('[dashboard] assignment_batches error', assignmentBatchesRes.error.message)
-
-  const orders = ordersRes.data ?? []
-  const lines = linesRes.data ?? []
-  const assignmentBatches = assignmentBatchesRes.data ?? []
-  const invalidBinErrors = importErrorsRes.data ?? []
 
   const orderIds = orders.map((o) => o.order_id)
   // order_alerts has no warehouse_code column (it's a plain derived view over all orders), so it
   // must be scoped via order_id here rather than fetched unfiltered — that unfiltered fetch was
   // also part of the truncation bug, pulling an arbitrary slice of every warehouse's alerts.
-  const [completionsRes, alertsRes] = await Promise.all([
+  const [completions, alerts] = await Promise.all([
     orderIds.length
-      ? db.from('picker_completions').select('order_id, actual_pieces, picker_completed_time, result').in('order_id', orderIds).limit(ROW_CAP)
-      : Promise.resolve({ data: [] as { order_id: string; actual_pieces: number; picker_completed_time: string; result: string }[], error: null }),
+      ? fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces, picker_completed_time, result').in('order_id', orderIds).range(from, to))
+      : Promise.resolve([] as { order_id: string; actual_pieces: number; picker_completed_time: string; result: string }[]),
     orderIds.length
-      ? db.from('order_alerts').select('order_id, time_alert, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).limit(ROW_CAP)
-      : Promise.resolve({ data: [] as { order_id: string; time_alert: string | null; is_picking_backlog: boolean; is_verification_backlog: boolean }[], error: null }),
+      ? fetchAllRows((from, to) => db.from('order_alerts').select('order_id, time_alert, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).range(from, to))
+      : Promise.resolve([] as { order_id: string; time_alert: string | null; is_picking_backlog: boolean; is_verification_backlog: boolean }[]),
   ])
-  const completions = unwrap(completionsRes)
-  const alerts = unwrap(alertsRes)
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
 
   // §management KPI funnel: Total Orders -> Assigned -> Completed (admin-verified only) -> %
@@ -221,7 +210,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
       overdue,
       waitingVerification: waitingVerifyOrders,
       correctionInProgress: (statusCounts.get('admin_rejected') ?? 0) + (statusCounts.get('correction_in_progress') ?? 0),
-      invalidBinCode: invalidBinErrors.length,
+      invalidBinCode: invalidBinCount.count ?? 0,
     },
   }
 }

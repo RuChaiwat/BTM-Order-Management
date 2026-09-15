@@ -1,9 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
-
-// See dashboard.ts — unbounded selects silently truncate at Supabase's default 1000-row cap.
-const ROW_CAP = 200000
+import { fetchAllRows } from './fetchAllRows'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists) -- every live order/batch just sits
@@ -15,35 +13,31 @@ const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_shor
 /** §12/§13 Zone Dashboard — a zone-level drill-down of Control Tower's zone overview: which
  * orders touch each zone, who is actively picking there, and each zone's backlog/SLA. */
 export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: string) {
-  const [linesRes, ordersRes, batchesRes, zones] = await Promise.all([
-    db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
-    db.from('orders').select('order_id, order_no, status, assignment_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
-    db.from('assignment_batches').select('assignment_batch_id, picker_id, zone_code, status').eq('warehouse_code', warehouseCode).limit(ROW_CAP),
+  const [lines, orders, batches, zones] = await Promise.all([
+    fetchAllRows((from, to) => db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
+    fetchAllRows((from, to) => db.from('orders').select('order_id, order_no, status, assignment_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).range(from, to)),
+    fetchAllRows((from, to) => db.from('assignment_batches').select('assignment_batch_id, picker_id, zone_code, status').eq('warehouse_code', warehouseCode).range(from, to)),
     getActiveZoneCodes(db, warehouseCode),
   ])
-  if (linesRes.error) console.error('[zoneDashboard] order_lines error', linesRes.error.message)
-  if (ordersRes.error) console.error('[zoneDashboard] orders error', ordersRes.error.message)
-  if (batchesRes.error) console.error('[zoneDashboard] assignment_batches error', batchesRes.error.message)
 
-  const lines = unwrap(linesRes)
-  const orders = unwrap(ordersRes)
-  const batches = unwrap(batchesRes)
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
   const pickerIdByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
 
   // order_alerts has no warehouse_code column — scope it via this warehouse's own order_ids
   // rather than fetching every warehouse's alerts unfiltered (part of the original truncation bug).
   const orderIds = orders.map((o) => o.order_id)
-  const [alertsRes, completionsRes] = await Promise.all([
+  const [alerts, completions] = await Promise.all([
     orderIds.length
-      ? db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).limit(ROW_CAP)
-      : Promise.resolve({ data: [] as { order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }[], error: null }),
+      ? fetchAllRows((from, to) =>
+          db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).range(from, to),
+        )
+      : Promise.resolve([] as { order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }[]),
     orderIds.length
-      ? db.from('picker_completions').select('order_id, actual_pieces').in('order_id', orderIds).limit(ROW_CAP)
-      : Promise.resolve({ data: [] as { order_id: string; actual_pieces: number }[], error: null }),
+      ? fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces').in('order_id', orderIds).range(from, to))
+      : Promise.resolve([] as { order_id: string; actual_pieces: number }[]),
   ])
-  const alertByOrder = new Map(unwrap(alertsRes).map((a) => [a.order_id, a]))
-  const completionByOrderId = new Map(unwrap(completionsRes).map((c) => [c.order_id, c]))
+  const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
+  const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
 
   const pickerIds = [...new Set(batches.map((b) => b.picker_id).filter(Boolean))] as string[]
   const pickersRes = pickerIds.length ? await db.from('employees_users').select('user_id, name_en').in('user_id', pickerIds) : { data: [] as { user_id: string; name_en: string }[] }

@@ -1,19 +1,21 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AppUser } from '../auth'
 import { unwrap } from './unwrap'
+import { fetchAllRows } from './fetchAllRows'
 
 /** Orders + lines available for the picker's own Pick Completion screen (§12.2 flow:
  * scan order → show all lines → mark short items → reason + qty → confirm). Pickers only see
  * orders on their own active Assignment Batches; office roles see the whole warehouse queue
  * (useful for support/testing, but the API still enforces the real scoping on write). */
 export async function getPickCompletionData(db: SupabaseClient, warehouseCode: string, user: AppUser) {
-  const ordersRes = await db
-    .from('orders')
-    .select('order_id, order_no, store_code, planned_pieces, status, assignment_batch_id, assigned_time')
-    .eq('warehouse_code', warehouseCode)
-    .in('status', ['assigned', 'in_progress', 'correction_in_progress'])
-    .limit(200000)
-  let orders = unwrap(ordersRes)
+  let orders = await fetchAllRows((from, to) =>
+    db
+      .from('orders')
+      .select('order_id, order_no, store_code, planned_pieces, status, assignment_batch_id, assigned_time')
+      .eq('warehouse_code', warehouseCode)
+      .in('status', ['assigned', 'in_progress', 'correction_in_progress'])
+      .range(from, to),
+  )
 
   if (user.role === 'picker') {
     const batchesRes = await db.from('assignment_batches').select('assignment_batch_id').eq('picker_id', user.user_id)
@@ -22,23 +24,13 @@ export async function getPickCompletionData(db: SupabaseClient, warehouseCode: s
   }
 
   const orderIds = orders.map((o) => o.order_id)
-  const linesRes = orderIds.length
-    ? await db.from('order_lines').select('line_id, order_id, sku, sku_barcode, item_description, bin_code, qty, uom_code, zone_code, pick_sequence').in('order_id', orderIds)
-    : {
-        data: [] as {
-          line_id: string
-          order_id: string
-          sku: string
-          sku_barcode: string | null
-          item_description: string | null
-          bin_code: string
-          qty: number
-          uom_code: string | null
-          zone_code: string | null
-          pick_sequence: string | null
-        }[],
-      }
-  const lines = unwrap(linesRes).sort((a, b) => (a.pick_sequence ?? '').localeCompare(b.pick_sequence ?? ''))
+  const lines = (
+    orderIds.length
+      ? await fetchAllRows((from, to) =>
+          db.from('order_lines').select('line_id, order_id, sku, sku_barcode, item_description, bin_code, qty, uom_code, zone_code, pick_sequence').in('order_id', orderIds).range(from, to),
+        )
+      : []
+  ).sort((a, b) => (a.pick_sequence ?? '').localeCompare(b.pick_sequence ?? ''))
 
   const reasonsRes = await db.from('reason_master').select('reason_code, label_en').eq('reason_type', 'short_pick').eq('active', true)
   const shortPickReasons = unwrap(reasonsRes)

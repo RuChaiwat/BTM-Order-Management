@@ -255,6 +255,16 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
           reason: `Invalid Bin Code '${line.binCode}': not found in Location Master or inactive (§5.2, UAT-03) — the order line was still imported, but has no Zone/Pick Sequence. Safe to leave, or fix the Bin Code and re-upload to backfill it.`,
           severity: 'warning',
         })
+      } else if (!location.zone_code) {
+        // A matched, active bin with no Zone Code set previously failed silently -- the line still
+        // imported fine, but with no way to ever show up on Order Density by Zone / Zone Dashboard.
+        // Surfaced now so a Location Master data gap is visible instead of looking like a bug.
+        errors.push({
+          rowNumber: line.rowNumber,
+          raw: line.raw,
+          reason: `Bin Code '${line.binCode}' has no Zone Code set in Location Master — the order line was still imported, but won't appear on Order Density by Zone / Zone Dashboard until Location Master is updated.`,
+          severity: 'warning',
+        })
       }
       lineRows.push({
         orderId,

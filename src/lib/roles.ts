@@ -7,27 +7,28 @@
 // flagged here rather than silently guessed. Action-level permission (view vs. edit vs. approve)
 // is enforced separately, per screen, via `requireRole` in the relevant Route Handler.
 
+// 'picker' is intentionally not a key here any more -- Pickers no longer have a login (see
+// migration 0015), so no employees_users row can ever have this role again. Left out of both maps
+// rather than kept as permanently-dead entries; the label may still appear in old audit_logs/
+// status_history snapshots, which display the raw string regardless of this map.
 export const ROLE_LABELS: Record<string, string> = {
   system_admin: 'System Admin',
   warehouse_manager: 'Warehouse Manager',
   supervisor: 'Supervisor',
   planner_admin: 'Planner / Admin',
   zone_controller: 'Zone Controller',
-  picker: 'Picker',
   viewer: 'Viewer',
 }
 
-// id 8 = Pick Completion (picker's own field/PDA screen); id 16 = Admin Verification
-// (office-only confirm/reject). Split from a single combined "Picker Monitor" menu item so the
-// two audiences — floor pickers vs. office admins — don't share a screen (see requirement
-// clarification: picker is at the work site, admin confirms in the office/WMS).
+// id 8 = Pick Completion (kept as an office/supervisor-operated screen for completing on a
+// picker's behalf, now that pickers themselves never log in); id 16 = Admin Verification
+// (office-only confirm/reject); id 17 = Picker Management (Admin-only picker CRUD).
 export const ROLE_MENU_ACCESS: Record<string, number[]> = {
-  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
-  warehouse_manager: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 14, 15, 16],
-  supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16],
+  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+  warehouse_manager: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 14, 15, 16, 17],
+  supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17],
   planner_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16],
   zone_controller: [1, 3, 8, 9, 10, 11, 12],
-  picker: [1, 7, 8],
   viewer: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 16],
 }
 

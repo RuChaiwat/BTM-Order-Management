@@ -18,12 +18,10 @@ interface WorkerRow {
   zone_scope: string[]
   active: boolean
   shift_label: string | null
-  pcsPerHour: number | null
-  completedCount: number
-  shortPickRate: number | null
 }
 
-const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'planner_admin', 'zone_controller', 'picker', 'viewer']
+// 'picker' deliberately excluded -- see /api/pickers and app/pickers for Picker management.
+const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'planner_admin', 'zone_controller', 'viewer']
 
 export function WorkerManagementBoard({ users, warehouseCode }: { users: WorkerRow[]; warehouseCode: string }) {
   const router = useRouter()
@@ -62,7 +60,6 @@ export function WorkerManagementBoard({ users, warehouseCode }: { users: WorkerR
               <th>NAME</th>
               <th>ROLE</th>
               <th>SCOPE</th>
-              <th>PCS/HR (7D)</th>
               <th>STATUS</th>
             </tr>
           </thead>
@@ -78,7 +75,6 @@ export function WorkerManagementBoard({ users, warehouseCode }: { users: WorkerR
                   <span className="badge badge-info">{ROLE_LABELS[u.role] ?? u.role}</span>
                 </td>
                 <td>{u.zone_scope.length > 0 ? `Zones ${u.zone_scope.join(', ')}` : 'All zones'}</td>
-                <td style={{ fontWeight: u.pcsPerHour ? 700 : 400, color: u.pcsPerHour ? undefined : '#6B7280' }}>{u.pcsPerHour ?? '—'}</td>
                 <td>{u.active ? <span style={{ color: '#16A34A' }}>● Active</span> : <span style={{ color: '#9CA3AF' }}>● Inactive</span>}</td>
               </tr>
             ))}
@@ -99,23 +95,6 @@ export function WorkerManagementBoard({ users, warehouseCode }: { users: WorkerR
                 <span className="badge badge-info" style={{ marginTop: 4 }}>
                   {ROLE_LABELS[selected.role] ?? selected.role}
                 </span>
-              </div>
-            </div>
-            <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>7-day productivity</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
-                <div>
-                  <span style={{ color: '#6B7280' }}>Pcs / hour</span>
-                  <div style={{ fontSize: 17, fontWeight: 700 }}>{selected.pcsPerHour ?? '—'}</div>
-                </div>
-                <div>
-                  <span style={{ color: '#6B7280' }}>Orders completed</span>
-                  <div style={{ fontSize: 17, fontWeight: 700 }}>{selected.completedCount}</div>
-                </div>
-                <div>
-                  <span style={{ color: '#6B7280' }}>Short pick rate</span>
-                  <div style={{ fontSize: 17, fontWeight: 700 }}>{selected.shortPickRate !== null ? `${selected.shortPickRate}%` : '—'}</div>
-                </div>
               </div>
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Audit Trail</div>
@@ -139,7 +118,7 @@ export function WorkerManagementBoard({ users, warehouseCode }: { users: WorkerR
 }
 
 function AddUserModal({ warehouseCode, onClose, onCreated }: { warehouseCode: string; onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ user_id: '', email: '', password: '', name_en: '', role: 'picker' })
+  const [form, setForm] = useState({ user_id: '', email: '', password: '', name_en: '', role: 'viewer' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

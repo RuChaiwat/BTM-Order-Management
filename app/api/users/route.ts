@@ -4,7 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
 import { toAuthEmail, isValidUserId, USER_ID_MAX_LENGTH } from '@/lib/authEmail'
 
-const VALID_ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'planner_admin', 'zone_controller', 'picker', 'viewer']
+// 'picker' is deliberately excluded -- Pickers are managed in their own `pickers` table (see
+// /api/pickers) with no login capability at all, not as an employees_users role.
+const VALID_ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'planner_admin', 'zone_controller', 'viewer']
 
 /** Create a new user: Supabase Auth account + matching employees_users row, in one call.
  * Login is by User ID (§7), not email — `email` here is optional contact info only; the

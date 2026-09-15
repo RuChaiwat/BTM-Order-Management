@@ -169,9 +169,9 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
 
   const pickerIds = [...new Set([...pickerTotals.keys(), ...activePickerWork.keys()])]
   const pickerNamesRes = pickerIds.length
-    ? await db.from('employees_users').select('user_id, name_en').in('user_id', pickerIds)
-    : { data: [] as { user_id: string; name_en: string }[] }
-  const nameByPickerId = new Map(unwrap(pickerNamesRes).map((p) => [p.user_id, p.name_en]))
+    ? await db.from('pickers').select('picker_id, name_en').in('picker_id', pickerIds)
+    : { data: [] as { picker_id: string; name_en: string }[] }
+  const nameByPickerId = new Map(unwrap(pickerNamesRes).map((p) => [p.picker_id, p.name_en]))
 
   const pickerProductivity = [...pickerTotals.entries()]
     .map(([pickerId, t]) => ({ pickerId, name: nameByPickerId.get(pickerId) ?? pickerId, pcsPerHour: Math.round((t.pieces / t.minutes) * 60) }))

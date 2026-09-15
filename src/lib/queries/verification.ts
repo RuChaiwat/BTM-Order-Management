@@ -44,9 +44,9 @@ export async function getVerificationData(db: SupabaseClient, warehouseCode: str
 
   const pickerIds = [...new Set(unwrap(batchesRes).map((b) => b.picker_id).filter(Boolean))] as string[]
   const pickersRes = pickerIds.length
-    ? await db.from('employees_users').select('user_id, name_en').in('user_id', pickerIds)
-    : { data: [] as { user_id: string; name_en: string }[] }
-  const nameByPicker = new Map(unwrap(pickersRes).map((p) => [p.user_id, p.name_en]))
+    ? await db.from('pickers').select('picker_id, name_en').in('picker_id', pickerIds)
+    : { data: [] as { picker_id: string; name_en: string }[] }
+  const nameByPicker = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.name_en]))
 
   const queue = waitingOrders
     .map((o) => {

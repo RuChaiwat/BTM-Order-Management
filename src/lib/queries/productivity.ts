@@ -15,7 +15,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
   const [completionsRes, ordersRes, pickersRes] = await Promise.all([
     db.from('picker_completions').select('completion_id, order_id, actual_pieces, result, picker_completed_time').gte('picker_completed_time', sinceIso),
     db.from('orders').select('order_id, assigned_time, assignment_batch_id, warehouse_code').eq('warehouse_code', warehouseCode),
-    db.from('employees_users').select('user_id, name_en').eq('warehouse_code', warehouseCode).eq('role', 'picker').eq('active', true),
+    db.from('pickers').select('picker_id, name_en').eq('warehouse_code', warehouseCode).eq('active', true),
   ])
   const orders = unwrap(ordersRes)
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
@@ -56,9 +56,9 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
 
   const pickerRows = pickers
     .map((p) => {
-      const e = productivityByPicker.get(p.user_id)
+      const e = productivityByPicker.get(p.picker_id)
       return {
-        user_id: p.user_id,
+        user_id: p.picker_id,
         name: p.name_en,
         pcsPerHour: e && e.minutes > 0 ? Math.round((e.pieces / e.minutes) * 60) : null,
         completed: e?.completed ?? 0,

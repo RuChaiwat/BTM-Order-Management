@@ -39,6 +39,21 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
+  // The client now resolves picker_id by scanning a badge code rather than picking from a
+  // dropdown of a trusted list -- worth validating server-side now that it's genuinely possible
+  // for a stale/garbled scan to reach here. Previously this endpoint trusted picker_id outright.
+  const { data: picker, error: pickerError } = await admin.from('pickers').select('picker_id, active, warehouse_code, zone_scope').eq('picker_id', picker_id).maybeSingle()
+  if (pickerError) return NextResponse.json({ error: pickerError.message }, { status: 400 })
+  if (!picker || !picker.active) {
+    return NextResponse.json({ error: 'Picker not found or inactive — re-scan the badge' }, { status: 400 })
+  }
+  if (picker.warehouse_code && picker.warehouse_code !== warehouse_code) {
+    return NextResponse.json({ error: 'This Picker belongs to a different warehouse' }, { status: 400 })
+  }
+  if (picker.zone_scope.length > 0 && !picker.zone_scope.includes(zone_code)) {
+    return NextResponse.json({ error: `This Picker is not scoped to Zone ${zone_code}` }, { status: 400 })
+  }
+
   const { data: orders, error: ordersError } = await admin.from('orders').select('order_id, planned_pieces, status').in('order_id', order_ids)
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 400 })
   if (!orders || orders.length !== order_ids.length) {

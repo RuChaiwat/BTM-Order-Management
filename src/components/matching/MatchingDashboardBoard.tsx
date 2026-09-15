@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { KpiCard } from '../KpiCard'
 import { batchStatusLabel } from '@/lib/matching/batchStatus'
+import { formatDate } from '@/lib/formatDate'
 
 interface OverviewData {
   orderDate: string
@@ -49,7 +50,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
         <div className="card">
           <div className="card-title">Matching by Priority</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            การจับคู่ตามลำดับความสำคัญ · Order Date {data.orderDate}
+            การจับคู่ตามลำดับความสำคัญ · Order Date {formatDate(data.orderDate)}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {data.priorityBreakdown.map((p) => {
@@ -135,7 +136,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
               {data.topBatches.length === 0 && (
                 <tr>
                   <td colSpan={7} style={{ color: 'var(--color-text-secondary)' }}>
-                    No batches for {data.orderDate} yet — run matching in Matching Analysis &amp; Batch Review.
+                    No batches for {formatDate(data.orderDate)} yet — run matching in Matching Analysis &amp; Batch Review.
                   </td>
                 </tr>
               )}
@@ -152,7 +153,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
             {data.actionRequired.awaitingApproval > 0 && <ActionRow color="#F59E0B" text={`${data.actionRequired.awaitingApproval} batch(es) awaiting approval`} />}
             {data.actionRequired.lowMatchRateBatches > 0 && <ActionRow color="#DC2626" text={`${data.actionRequired.lowMatchRateBatches} batch(es) with match rate < 50%`} />}
             {data.actionRequired.oversizedSingleOrders > 0 && <ActionRow color="#EA580C" text={`${data.actionRequired.oversizedSingleOrders} single order(s) over the size threshold`} />}
-            {!hasActions && <span style={{ color: 'var(--color-text-secondary)' }}>Nothing needs attention for {data.orderDate}.</span>}
+            {!hasActions && <span style={{ color: 'var(--color-text-secondary)' }}>Nothing needs attention for {formatDate(data.orderDate)}.</span>}
           </div>
           <div style={{ marginTop: 'auto', paddingTop: 12 }}>
             <Link href="/matching-analysis" className="btn btn-secondary btn-sm" style={{ width: '100%', textAlign: 'center', textDecoration: 'none', display: 'block' }}>

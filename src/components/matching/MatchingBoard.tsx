@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
+import { formatDate } from '@/lib/formatDate'
 
 interface Batch {
   consol_batch_id: string
@@ -214,7 +215,7 @@ export function MatchingBoard({
       <div className="card" style={{ flex: 1, minHeight: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div className="card-title">Batch review — {orderDate}</div>
+            <div className="card-title">Batch review — {formatDate(orderDate)}</div>
             <div className="card-subtitle" style={{ marginBottom: 12 }}>
               แดชบอร์ดตรวจแบตช์ · Approve prints the A4 pick report immediately
             </div>
@@ -282,7 +283,7 @@ export function MatchingBoard({
             {pageRows.length === 0 && (
               <tr>
                 <td colSpan={9} style={{ color: 'var(--color-text-secondary)' }}>
-                  No consolidation batches for {orderDate} — run matching above, or pick a different Order Date.
+                  No consolidation batches for {formatDate(orderDate)} — run matching above, or pick a different Order Date.
                 </td>
               </tr>
             )}

@@ -4,6 +4,7 @@ import { ReasonMasterManager } from '@/components/admin/ReasonMasterManager'
 import { ConfigEditor } from '@/components/admin/ConfigEditor'
 import { HousekeepingPanel } from '@/components/admin/HousekeepingPanel'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { formatDateTime } from '@/lib/formatDate'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -62,7 +63,7 @@ export default async function AdminPage() {
             <tbody>
               {(auditLogs ?? []).map((a) => (
                 <tr key={a.id}>
-                  <td>{new Date(a.created_at).toLocaleString()}</td>
+                  <td>{formatDateTime(a.created_at)}</td>
                   <td>{a.user_id ?? 'system'}</td>
                   <td>{a.action}</td>
                   <td>

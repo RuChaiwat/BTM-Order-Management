@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getBatchDetail, buildPickReportLines } from '@/lib/queries/consolidation'
 import { BatchReportDocument, PICK_REPORT_PRINT_CSS } from '@/components/consolidation/BatchReportDocument'
 import { AutoPrint } from '@/components/consolidation/AutoPrint'
+import { formatDateTime } from '@/lib/formatDate'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -25,7 +26,7 @@ export default async function PickReportPrintPage({ searchParams }: { searchPara
   const admin = createAdminClient()
 
   const details = await Promise.all(ids.map((id) => getBatchDetail(admin, id)))
-  const generatedAt = new Date().toLocaleString()
+  const generatedAt = formatDateTime(new Date())
 
   const reports = details
     .map((detail) => {

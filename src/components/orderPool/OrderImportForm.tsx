@@ -93,18 +93,44 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
       let linesUpserted = 0
       const allErrors: ErrorRow[] = []
 
+      // One batch call failing outright (a Vercel function timeout on an unusually large batch, a
+      // dropped connection, ...) used to throw and abort the whole loop, silently leaving every
+      // later batch's orders un-imported with no error shown for any of their rows -- exactly the
+      // "1494 in the file, 950 created" shape of bug. Now a failed batch gets one retry, and if it
+      // still fails, is recorded as a blocking error for each of ITS rows (persisted to the DB, not
+      // just shown in this browser tab) and the loop moves on, so one bad batch only costs its own
+      // rows instead of every batch after it.
       for (let i = 0; i < batches.length; i++) {
-        const res = await fetch(`${endpointBase}/batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ import_id: importId, rows: batches[i] }),
-        })
-        const body = await res.json()
-        if (!res.ok) throw new Error(body.error)
-        ordersCreated += body.orders_created
-        ordersUpdated += body.orders_updated
-        linesUpserted += body.lines_upserted
-        allErrors.push(...body.errors)
+        let body: { orders_created: number; orders_updated: number; lines_upserted: number; errors: ErrorRow[] } | null = null
+        let lastError: Error | null = null
+        for (let attempt = 0; attempt < 2 && !body; attempt++) {
+          try {
+            const res = await fetch(`${endpointBase}/batch`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ import_id: importId, rows: batches[i] }),
+            })
+            const parsed = await res.json()
+            if (!res.ok) throw new Error(parsed.error)
+            body = parsed
+          } catch (e) {
+            lastError = e as Error
+          }
+        }
+        if (body) {
+          ordersCreated += body.orders_created
+          ordersUpdated += body.orders_updated
+          linesUpserted += body.lines_upserted
+          allErrors.push(...body.errors)
+        } else {
+          const reason = `Batch failed: ${lastError?.message ?? 'unknown error'} — this batch was NOT imported, re-upload the file to retry it`
+          for (const r of batches[i]) allErrors.push({ row_number: r.rowNumber, reason, severity: 'blocking' })
+          await fetch(`/api/imports/${importId}/record-failed-batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: batches[i], reason }),
+          }).catch(() => {})
+        }
         setProgress(Math.round(((i + 1) / batches.length) * 100))
       }
 

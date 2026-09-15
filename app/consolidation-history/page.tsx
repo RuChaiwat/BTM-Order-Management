@@ -5,6 +5,7 @@ import { TopBar } from '@/components/TopBar'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
+import { formatDate, formatDateTime } from '@/lib/formatDate'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -49,12 +50,12 @@ export default async function ConsolidationHistoryPage() {
                   <td className="link">
                     <Link href={`/pick-report/${b.consol_batch_id}`}>{b.batch_no}</Link>
                   </td>
-                  <td>{b.order_date}</td>
+                  <td>{formatDate(b.order_date)}</td>
                   <td>{b.priority}</td>
                   <td>{b.stores_count}</td>
                   <td>{b.orders_count}</td>
                   <td>{b.total_pieces}</td>
-                  <td>{b.released_at ? new Date(b.released_at).toLocaleString() : '—'}</td>
+                  <td>{b.released_at ? formatDateTime(b.released_at) : '—'}</td>
                   <td>
                     <span className={`badge badge-${batchStatusTone(b.status)}`}>{batchStatusLabel(b.status)}</span>
                   </td>

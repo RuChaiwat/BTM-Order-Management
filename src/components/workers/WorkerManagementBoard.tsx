@@ -6,6 +6,7 @@ import { Modal, ModalFooter } from '../Modal'
 import { ROLE_LABELS } from '../../lib/roles'
 import { createClient } from '../../lib/supabase/client'
 import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
+import { formatDateTime } from '../../lib/formatDate'
 
 interface WorkerRow {
   user_id: string
@@ -121,7 +122,7 @@ export function WorkerManagementBoard({ users, warehouseCode }: { users: WorkerR
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               {auditTrail.map((a) => (
                 <div key={a.id}>
-                  {new Date(a.created_at).toLocaleString()} · {a.action}
+                  {formatDateTime(a.created_at)} · {a.action}
                 </div>
               ))}
               {auditTrail.length === 0 && <span style={{ color: '#6B7280' }}>No recorded actions.</span>}

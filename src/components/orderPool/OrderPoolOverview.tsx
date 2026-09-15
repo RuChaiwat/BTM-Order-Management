@@ -3,7 +3,7 @@ import type { ComplexityBand } from '@/lib/queries/orderPool'
 interface Props {
   totalOrders: number
   zoneDensity: { zone: string; orderCount: number; sumQty: number }[]
-  bands: Record<ComplexityBand, { count: number; sumSku: number }>
+  bands: Record<ComplexityBand, { count: number; sumPieces: number }>
   thresholds: { greenMinPcsPerSku: number; redMaxPcsPerSku: number }
 }
 
@@ -79,7 +79,7 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
                   <div>
                     <strong>{stat.count}</strong> orders
                   </div>
-                  <div style={{ color: '#6B7280' }}>{stat.sumSku} SKU (sum)</div>
+                  <div style={{ color: '#6B7280' }}>{stat.sumPieces.toLocaleString()} pcs (sum)</div>
                 </div>
               </div>
             )

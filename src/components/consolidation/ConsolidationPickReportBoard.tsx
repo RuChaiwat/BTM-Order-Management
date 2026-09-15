@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
+import { formatDate, formatDateTime } from '@/lib/formatDate'
 
 interface Batch {
   consol_batch_id: string
@@ -70,14 +71,14 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
               <td className="link">
                 <Link href={`/pick-report/${b.consol_batch_id}`}>{b.batch_no}</Link>
               </td>
-              <td>{b.order_date}</td>
+              <td>{formatDate(b.order_date)}</td>
               <td>
                 <span style={{ color: PRIORITY_COLOR[b.priority], fontWeight: 700 }}>{b.priority}</span>
               </td>
               <td>{b.stores_count}</td>
               <td>{b.orders_count}</td>
               <td style={{ fontWeight: 700 }}>{b.total_pieces}</td>
-              <td>{b.released_at ? new Date(b.released_at).toLocaleString() : '—'}</td>
+              <td>{b.released_at ? formatDateTime(b.released_at) : '—'}</td>
               <td>
                 <span className={`badge badge-${batchStatusTone(b.status)}`}>{batchStatusLabel(b.status)}</span>
               </td>

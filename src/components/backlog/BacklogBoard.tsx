@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { formatDate } from '../../lib/formatDate'
 
 interface BacklogRow {
   order_id: string
@@ -56,7 +57,7 @@ export function BacklogBoard({ rows }: { rows: BacklogRow[] }) {
             <tr key={r.order_id}>
               <td className="link">{r.order_no}</td>
               <td>{r.store_code}</td>
-              <td>{r.original_order_date}</td>
+              <td>{formatDate(r.original_order_date)}</td>
               <td>{r.zones.join(', ') || '—'}</td>
               <td>{r.pickerName}</td>
               <td>

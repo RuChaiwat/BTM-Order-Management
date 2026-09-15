@@ -46,17 +46,17 @@ export async function getOrderPoolOverview(db: SupabaseClient, warehouseCode: st
     .map(([zone, e]) => ({ zone, orderCount: e.orders.size, sumQty: e.sumQty }))
     .sort((a, b) => b.sumQty - a.sumQty)
 
-  const bands: Record<ComplexityBand, { count: number; sumSku: number }> = {
-    green: { count: 0, sumSku: 0 },
-    yellow: { count: 0, sumSku: 0 },
-    red: { count: 0, sumSku: 0 },
+  const bands: Record<ComplexityBand, { count: number; sumPieces: number }> = {
+    green: { count: 0, sumPieces: 0 },
+    yellow: { count: 0, sumPieces: 0 },
+    red: { count: 0, sumPieces: 0 },
   }
   for (const o of orders) {
     const uniqueSku = o.unique_sku_count || 0
     const pcsPerSku = uniqueSku > 0 ? o.planned_pieces / uniqueSku : 0
     const band: ComplexityBand = uniqueSku === 0 ? 'yellow' : pcsPerSku >= greenMinPcsPerSku ? 'green' : pcsPerSku <= redMaxPcsPerSku ? 'red' : 'yellow'
     bands[band].count += 1
-    bands[band].sumSku += uniqueSku
+    bands[band].sumPieces += o.planned_pieces || 0
   }
 
   return { totalOrders: orders.length, zoneDensity, bands, thresholds: { greenMinPcsPerSku, redMaxPcsPerSku } }

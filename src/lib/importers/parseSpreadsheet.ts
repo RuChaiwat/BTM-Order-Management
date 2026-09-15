@@ -14,26 +14,51 @@ function formatCellDate(d: Date): string {
 
 /** Parses an uploaded .csv/.xlsx File into an array of row objects keyed by header.
  *
- * cellDates + raw:true (rather than the previous raw:false) so a genuine Excel date cell comes
- * back as an actual Date computed from the workbook's real stored value, not a re-formatted
- * display string. The previous raw:false asked SheetJS for the cell's *formatted display text*
- * for every cell, dates included -- which depends on SheetJS's own interpretation of the cell's
- * number-format code, and isn't guaranteed to match what a given Excel client happens to render
- * on screen for the same file (a locale/format-code mismatch, not a parsing bug in this app's own
- * date regex). A DD/MM/YYYY value like 13/09/2026 that isn't ambiguous (day > 12) still parsed
- * correctly either way, which is why a single-cell sample alone couldn't show this. */
+ * cellDates:true so a genuine Excel date cell parses to an actual Date computed from the
+ * workbook's real stored value, not a re-formatted display string (see formatCellDate above for
+ * why that matters). But raw:true is deliberately NOT passed to sheet_to_json for every cell --
+ * an earlier version did that, and it silently broke Bin Code / Order No matching for any WMS
+ * export column that stores a business code as an Excel NUMBER with custom display formatting
+ * (e.g. a bin code entered as 7 but displayed "007" via a leading-zero number format): raw:true
+ * returned the underlying number (7) instead of the formatted text WMS actually shows and
+ * Location Master was seeded from ("007"), so the two never matched.
+ *
+ * Reading cells directly (not via sheet_to_json's raw option) instead gets the best of both: a
+ * true date cell (cell.v is a Date, only possible because of cellDates above) is formatted from
+ * its own value, while every other cell uses its formatted display text (cell.w -- the same text
+ * SheetJS would show if you opened the file), matching what the user sees in Excel. */
 export async function parseSpreadsheet(file: File): Promise<Record<string, string>[]> {
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true })
-  return rows.map((row) => {
-    const normalized: Record<string, string> = {}
-    for (const [key, value] of Object.entries(row)) {
-      normalized[key.trim()] = value instanceof Date ? formatCellDate(value) : String(value ?? '').trim()
+  const ref = sheet['!ref']
+  if (!ref) return []
+  const range = XLSX.utils.decode_range(ref)
+
+  const headers: string[] = []
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c })]
+    headers[c] = String(cell?.w ?? cell?.v ?? '').trim()
+  }
+
+  const rows: Record<string, string>[] = []
+  for (let r = range.s.r + 1; r <= range.e.r; r++) {
+    const row: Record<string, string> = {}
+    let hasValue = false
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const header = headers[c]
+      if (!header) continue
+      const cell = sheet[XLSX.utils.encode_cell({ r, c })]
+      let text = ''
+      if (cell) {
+        text = cell.v instanceof Date ? formatCellDate(cell.v) : String(cell.w ?? cell.v ?? '').trim()
+        if (text !== '') hasValue = true
+      }
+      row[header] = text
     }
-    return normalized
-  })
+    if (hasValue) rows.push(row)
+  }
+  return rows
 }
 
 /** Case/whitespace-insensitive column lookup — WMS exports vary column casing/spacing. */

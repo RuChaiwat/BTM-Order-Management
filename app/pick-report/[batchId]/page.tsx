@@ -5,6 +5,7 @@ import { getBatchDetail, buildPickReportLines } from '@/lib/queries/consolidatio
 import { BatchReportDocument, PICK_REPORT_PRINT_CSS } from '@/components/consolidation/BatchReportDocument'
 import { PrintButton } from '@/components/PrintButton'
 import { batchStatusLabel, isBatchPrintable } from '@/lib/matching/batchStatus'
+import { formatDateTime } from '@/lib/formatDate'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -42,7 +43,7 @@ export default async function PickReportPage({ params }: { params: { batchId: st
         warehouseCode={orders[0]?.warehouse_code ?? user.warehouse_code ?? ''}
         orders={orders}
         pickLines={pickLines}
-        generatedAt={new Date().toLocaleString()}
+        generatedAt={formatDateTime(new Date())}
         generatedByName={user.name_en}
       />
     </div>

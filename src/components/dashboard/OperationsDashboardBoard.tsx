@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { KpiCard } from '../KpiCard'
+import { formatDate } from '../../lib/formatDate'
 
 interface BacklogRow {
   orderDate: string
@@ -99,7 +100,7 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
                 const color = backlogAgeColor(row.daysOld)
                 return (
                   <tr key={row.orderDate}>
-                    <td style={{ fontWeight: 700 }}>{row.orderDate}</td>
+                    <td style={{ fontWeight: 700 }}>{formatDate(row.orderDate)}</td>
                     <td>
                       <span style={{ color: color.text, fontWeight: 700 }}>{row.daysOld === 0 ? 'Today' : `${row.daysOld}d`}</span>
                     </td>

@@ -1,5 +1,6 @@
 import { Barcode } from '@/components/Barcode'
 import type { PickReportLine } from '@/lib/queries/consolidation'
+import { formatDate } from '@/lib/formatDate'
 
 export const PICK_REPORT_PRINT_CSS = `
   .a4-report { font-family: 'Noto Sans Thai', Arial, sans-serif; color: #1F2937; max-width: 800px; margin: 0 auto 0; padding: 24px; }
@@ -215,7 +216,7 @@ function ReportHeader({
       <div>
         <div style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
         <div style={{ fontSize: 11, color: '#6B7280' }}>
-          Warehouse {warehouseCode} · Order Date {batch.order_date} · Priority {batch.priority}
+          Warehouse {warehouseCode} · Order Date {formatDate(batch.order_date)} · Priority {batch.priority}
         </div>
         <div style={{ fontSize: 11, color: '#6B7280' }}>
           Generated {generatedAt} · by {generatedByName}

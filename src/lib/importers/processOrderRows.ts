@@ -120,7 +120,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
   const warehouseCodes = [...new Set(parsed.map((p) => p.warehouseCode))]
   const binCodes = [...new Set(parsed.map((p) => p.binCode))]
   const { data: locations } = warehouseCodes.length && binCodes.length
-    ? await admin.from('locations').select('warehouse_code, bin_code, zone_code, pick_sequence, active').in('warehouse_code', warehouseCodes).in('bin_code', binCodes)
+    ? await admin.from('locations').select('warehouse_code, bin_code, zone_code, pick_sequence, active').in('warehouse_code', warehouseCodes).in('bin_code', binCodes).limit(50000)
     : { data: [] as { warehouse_code: string; bin_code: string; zone_code: string | null; pick_sequence: string | null; active: boolean }[] }
   const locationMap = new Map((locations ?? []).map((l) => [`${l.warehouse_code}|${l.bin_code}`, l]))
 

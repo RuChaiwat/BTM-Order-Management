@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { formatDate, formatDateTime } from '@/lib/formatDate'
 
 interface ExportJob {
   id: string
@@ -65,13 +66,13 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
           {exportJobs.map((j) => (
             <tr key={j.id}>
               <td>
-                {j.period_start} – {j.period_end}
+                {formatDate(j.period_start)} – {formatDate(j.period_end)}
               </td>
               <td>
                 <span className={`badge badge-${j.status === 'success' ? 'success' : j.status === 'failed' ? 'danger' : 'warning'}`}>{j.status}</span>
               </td>
               <td>{j.row_count ?? '—'}</td>
-              <td>{j.finished_at ? new Date(j.finished_at).toLocaleString() : '—'}</td>
+              <td>{j.finished_at ? formatDateTime(j.finished_at) : '—'}</td>
               <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {j.error_detail ?? (j.target_ref ? <a href={j.target_ref} target="_blank" rel="noreferrer">{j.target_ref}</a> : '—')}
               </td>
@@ -101,13 +102,13 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
         <tbody>
           {purgeLog.map((p) => (
             <tr key={p.id}>
-              <td>{p.covered_period_start}</td>
+              <td>{formatDate(p.covered_period_start)}</td>
               <td>{p.table_name}</td>
               <td>{p.rows_purged}</td>
               <td>
                 <span className={`badge badge-${p.result === 'success' ? 'success' : 'danger'}`}>{p.result}</span>
               </td>
-              <td>{new Date(p.created_at).toLocaleString()}</td>
+              <td>{formatDateTime(p.created_at)}</td>
             </tr>
           ))}
           {purgeLog.length === 0 && (

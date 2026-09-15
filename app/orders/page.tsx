@@ -6,6 +6,7 @@ import { OrderPoolOverview } from '@/components/orderPool/OrderPoolOverview'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getOrderPoolOverview } from '@/lib/queries/orderPool'
 import { getSessionUser } from '@/lib/auth'
+import { formatDateTime } from '@/lib/formatDate'
 
 // The Recent Imports table must reflect the import that just happened, not a stale server-cached
 // render — force this route to always be server-rendered per request.
@@ -51,7 +52,7 @@ export default async function OrderPoolPage() {
               {(importBatches ?? []).map((b) => (
                 <tr key={b.import_id}>
                   <td>{b.file_name}</td>
-                  <td>{new Date(b.uploaded_at).toLocaleString()}</td>
+                  <td>{formatDateTime(b.uploaded_at)}</td>
                   <td>
                     <span className={`badge badge-${b.status === 'completed' ? 'success' : b.status === 'failed' ? 'danger' : 'warning'}`}>{b.status}</span>
                   </td>

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
+import { formatDate } from '../../lib/formatDate'
 
 const TARGET = 300
 const LOW_MAX = 270
@@ -152,7 +153,7 @@ export function WorkAssignmentBoard({ orders, pickers, warehouseCode, zones }: {
                     </td>
                     <td className="link">{o.order_no}</td>
                     <td>{o.store_code}</td>
-                    <td>{o.original_order_date}</td>
+                    <td>{formatDate(o.original_order_date)}</td>
                     <td>{o.zones.join(', ')}</td>
                     <td>{o.unique_sku_count}</td>
                     <td style={{ fontWeight: 700 }}>{o.planned_pieces}</td>

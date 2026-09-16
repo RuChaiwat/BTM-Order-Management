@@ -2,6 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
+import { getActiveConfig } from './config'
+import { bangkokDateKey } from '../formatDate'
+import { bandForPct } from '../pickerProductivity'
 
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
 // assignment_batches.status is not a reliable "is this picker still working" signal: nothing in
@@ -12,6 +15,11 @@ const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_shor
 // reliable signal is the orders themselves: a picker is active if they have at least one order
 // still sitting in one of these statuses, which is also exactly Pick Completion's own queue.
 const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in_progress'])
+// "Picking done" for Zone Status's Pieces Pending -- once the picker submits, the zone's physical
+// picking work is finished even though Admin hasn't verified it yet, so it should stop counting as
+// pending workload for that zone. Deliberately broader than TERMINAL_CLOSED_STATUSES, which is
+// reserved for the Completed/% Completed KPIs (admin-verified only, on purpose).
+const PICKING_DONE_STATUSES = new Set(['picker_completed_100', 'picker_completed_short', 'final_closed_100', 'final_closed_short'])
 
 function daysBetween(fromDate: string, toDate: string): number {
   const [y1, m1, d1] = fromDate.split('-').map(Number)
@@ -41,18 +49,22 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     getActiveZoneCodes(db, warehouseCode),
   ])
 
-  const orderIds = orders.map((o) => o.order_id)
-  // order_alerts has no warehouse_code column (it's a plain derived view over all orders), so it
-  // must be scoped via order_id here rather than fetched unfiltered — that unfiltered fetch was
-  // also part of the truncation bug, pulling an arbitrary slice of every warehouse's alerts.
-  const [completions, alerts] = await Promise.all([
-    orderIds.length
-      ? fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces, picker_completed_time, result').in('order_id', orderIds).range(from, to))
-      : Promise.resolve([] as { order_id: string; actual_pieces: number; picker_completed_time: string; result: string }[]),
-    orderIds.length
-      ? fetchAllRows((from, to) => db.from('order_alerts').select('order_id, time_alert, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).range(from, to))
-      : Promise.resolve([] as { order_id: string; time_alert: string | null; is_picking_backlog: boolean; is_verification_backlog: boolean }[]),
+  const orderIdSet = new Set(orders.map((o) => o.order_id))
+  // order_alerts/picker_completions have no warehouse_code column (order_alerts is a plain derived
+  // view over all orders; picker_completions likewise), so both used to be scoped via
+  // .in('order_id', orderIds) instead of fetched unfiltered. That's exactly backwards once a
+  // warehouse has thousands of orders: PostgREST encodes an .in() filter's values into the request
+  // URL, and a list of thousands of UUIDs blows past practical URL-length limits -- the request
+  // fails outright, which is why Pending Confirmation/Completed pieces were silently reading 0
+  // (completionByOrderId ended up empty) despite the order counts themselves being correct. Fetch
+  // each table whole (paginated, no ID filter -- immune to both the row cap AND this URL-length
+  // limit) and filter down to this warehouse's own orders in JS instead.
+  const [allCompletions, allAlerts] = await Promise.all([
+    fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces, picker_completed_time, result').range(from, to)),
+    fetchAllRows((from, to) => db.from('order_alerts').select('order_id, time_alert, is_picking_backlog, is_verification_backlog').range(from, to)),
   ])
+  const completions = allCompletions.filter((c) => orderIdSet.has(c.order_id))
+  const alerts = allAlerts.filter((a) => orderIdSet.has(a.order_id))
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
 
   // §management KPI funnel: Total Orders -> Assigned -> Completed (admin-verified only) -> %
@@ -124,19 +136,37 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const zoneStatus = zones.map((zone) => {
     const touching = [...(zoneOrders.get(zone) ?? new Set())]
     const closedIds = touching.filter((id) => orderStatusById.get(id)?.startsWith('final_closed'))
+    const pickingDoneIds = touching.filter((id) => PICKING_DONE_STATUSES.has(orderStatusById.get(id) ?? ''))
     const totalPieces = touching.reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
-    // Pieces Pending drops as Admin confirms each order in this zone -- Total Pieces is the
-    // stable denominator it's shrinking against.
-    const pendingPieces = touching.filter((id) => !closedIds.includes(id)).reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
+    // Pieces Pending drops as soon as the PICKER submits, not only once Admin verifies -- the
+    // physical picking work in this zone is done either way, and waiting on Admin's confirmation
+    // shouldn't make the zone still look like it has picking left to do.
+    const pendingPieces = touching.filter((id) => !pickingDoneIds.includes(id)).reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
     const slaPct = touching.length > 0 ? Math.round((closedIds.length / touching.length) * 1000) / 10 : 100
-    return { zone, orders: touching.length, totalPieces, pendingPieces, slaPct, onTrack: slaPct >= 85 }
+    // Risk level: does this zone have any order still being actively picked that's tripped the
+    // 'overdue'/'critical' time alert -- i.e. which zone's pickers are running behind right now.
+    // Deliberately NOT based on slaPct above (admin-verification %), which trivially reads as 0
+    // for every zone until Admin starts confirming orders late in the day, regardless of how fast
+    // picking itself is going.
+    const activeTouching = touching.filter((id) => ACTIVE_ORDER_STATUSES.has(orderStatusById.get(id) ?? ''))
+    const criticalCount = activeTouching.filter((id) => alertByOrder.get(id)?.time_alert === 'critical').length
+    const overdueCount = activeTouching.filter((id) => alertByOrder.get(id)?.time_alert === 'overdue').length
+    const riskLevel: 'red' | 'yellow' | 'green' = criticalCount > 0 ? 'red' : overdueCount > 0 ? 'yellow' : 'green'
+    return { zone, orders: touching.length, totalPieces, pendingPieces, slaPct, onTrack: slaPct >= 85, riskLevel, criticalCount, overdueCount }
   })
 
   const batchByAssignmentId = new Map(assignmentBatches.map((b) => [b.assignment_batch_id, b]))
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
 
+  // "Today's" Picker Productivity means exactly that -- only completions actually finished today
+  // (Thailand calendar day). An order still being picked has no picker_completions row at all yet
+  // (that's only written on submit), so it can never distort this regardless of how long it's been
+  // open or whether it crosses midnight into tomorrow; the date filter here is what stops a
+  // completion from a PRIOR day still showing up under "today" indefinitely.
+  const todayBangkok = bangkokDateKey(new Date())
   const pickerTotals = new Map<string, { pieces: number; minutes: number }>()
   for (const c of completions) {
+    if (bangkokDateKey(c.picker_completed_time) !== todayBangkok) continue
     const order = orderById.get(c.order_id)
     const pickerId = order?.assignment_batch_id ? batchByAssignmentId.get(order.assignment_batch_id)?.picker_id : null
     if (!pickerId || !order?.assigned_time) continue
@@ -173,8 +203,16 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     : { data: [] as { picker_id: string; name_en: string }[] }
   const nameByPickerId = new Map(unwrap(pickerNamesRes).map((p) => [p.picker_id, p.name_en]))
 
+  // Same target used by the weekly Picker Productivity rating (migration 0020) -- configurable
+  // rather than a hardcoded number baked into the dashboard component.
+  const cfg = await getActiveConfig(db, ['picker_productivity.target_pcs_per_hour'])
+  const targetPcsPerHour = Number(cfg.value('picker_productivity.target_pcs_per_hour') ?? 4500)
+
   const pickerProductivity = [...pickerTotals.entries()]
-    .map(([pickerId, t]) => ({ pickerId, name: nameByPickerId.get(pickerId) ?? pickerId, pcsPerHour: Math.round((t.pieces / t.minutes) * 60) }))
+    .map(([pickerId, t]) => {
+      const pcsPerHour = Math.round((t.pieces / t.minutes) * 60)
+      return { pickerId, name: nameByPickerId.get(pickerId) ?? pickerId, pcsPerHour, level: bandForPct((pcsPerHour / targetPcsPerHour) * 100) }
+    })
     .sort((a, b) => b.pcsPerHour - a.pcsPerHour)
     .slice(0, 6)
 
@@ -204,6 +242,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     statusCounts: Object.fromEntries(statusCounts),
     zoneStatus,
     pickerProductivity,
+    targetPcsPerHour,
     activePickerRoster,
     actionRequired: {
       critical,

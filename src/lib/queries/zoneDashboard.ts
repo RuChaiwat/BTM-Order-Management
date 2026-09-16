@@ -9,6 +9,9 @@ import { fetchAllRows } from './fetchAllRows'
 // checks all three of these instead of trusting 'in_progress' alone.
 const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in_progress'])
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
+// "Picking done" for Pending Pieces -- see dashboard.ts's PICKING_DONE_STATUSES for the full
+// reasoning: once the picker submits, the physical picking work is done even before Admin verifies.
+const PICKING_DONE_STATUSES = new Set(['picker_completed_100', 'picker_completed_short', 'final_closed_100', 'final_closed_short'])
 
 /** §12/§13 Zone Dashboard — a zone-level drill-down of Control Tower's zone overview: which
  * orders touch each zone, who is actively picking there, and each zone's backlog/SLA. */
@@ -23,19 +26,20 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
   const pickerIdByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
 
-  // order_alerts has no warehouse_code column — scope it via this warehouse's own order_ids
-  // rather than fetching every warehouse's alerts unfiltered (part of the original truncation bug).
-  const orderIds = orders.map((o) => o.order_id)
-  const [alerts, completions] = await Promise.all([
-    orderIds.length
-      ? fetchAllRows((from, to) =>
-          db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').in('order_id', orderIds).range(from, to),
-        )
-      : Promise.resolve([] as { order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }[]),
-    orderIds.length
-      ? fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces').in('order_id', orderIds).range(from, to))
-      : Promise.resolve([] as { order_id: string; actual_pieces: number }[]),
+  // order_alerts/picker_completions have no warehouse_code column, so both used to be scoped via
+  // .in('order_id', orderIds) instead of fetched unfiltered. That's exactly backwards at real
+  // scale: PostgREST encodes an .in() filter's values into the request URL, and thousands of UUIDs
+  // blows past practical URL-length limits, failing the request outright. Fetch each table whole
+  // (paginated, no ID filter) and filter to this warehouse's orders in JS instead.
+  const orderIdSet = new Set(orders.map((o) => o.order_id))
+  const [allAlerts, allCompletions] = await Promise.all([
+    fetchAllRows((from, to) =>
+      db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').range(from, to),
+    ),
+    fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces').range(from, to)),
   ])
+  const alerts = allAlerts.filter((a) => orderIdSet.has(a.order_id))
+  const completions = allCompletions.filter((c) => orderIdSet.has(c.order_id))
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
 
@@ -81,8 +85,10 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
       .sort((a, b) => (b.alert?.elapsed_minutes ?? 0) - (a.alert?.elapsed_minutes ?? 0))
 
     const closed = touching.filter((o) => TERMINAL_CLOSED_STATUSES.has(o.status ?? ''))
+    const pickingDone = touching.filter((o) => PICKING_DONE_STATUSES.has(o.status ?? ''))
     const totalPieces = touching.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
-    const pendingPieces = totalPieces - closed.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
+    // Drops once the picker submits, not only once Admin verifies -- see dashboard.ts.
+    const pendingPieces = totalPieces - pickingDone.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
     const slaPct = touching.length > 0 ? Math.round((closed.length / touching.length) * 1000) / 10 : 100
 
     const pickerWork = zonePickerWork.get(zone)

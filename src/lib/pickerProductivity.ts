@@ -16,3 +16,14 @@ export const PRODUCTIVITY_NO_DATA_META = { label: 'No data yet', color: '#6B7280
 export function productivityMeta(level: string | null) {
   return level && level in PRODUCTIVITY_LEVEL_META ? PRODUCTIVITY_LEVEL_META[level as ProductivityLevel] : PRODUCTIVITY_NO_DATA_META
 }
+
+/** Same 4-level thresholds as recompute_picker_productivity() (migration 0020), for the one place
+ * that still bands in JS rather than SQL: Operations Dashboard's "Today's Picker Productivity",
+ * which only ever has completed-today pickers in it -- no "no data yet" case applies there, so it
+ * always resolves to one of the four bands, never null. */
+export function bandForPct(pct: number): ProductivityLevel {
+  if (pct > 100) return 'above_target'
+  if (pct >= 80) return 'target'
+  if (pct >= 60) return 'yellow'
+  return 'red'
+}

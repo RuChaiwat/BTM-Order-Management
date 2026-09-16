@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
+import { fetchAllRows } from './fetchAllRows'
 
 export async function getVerificationData(db: SupabaseClient, warehouseCode: string) {
   const waitingRes = await db
@@ -9,11 +10,16 @@ export async function getVerificationData(db: SupabaseClient, warehouseCode: str
     .in('status', ['picker_completed_100', 'picker_completed_short'])
   const waitingOrders = unwrap(waitingRes)
 
-  const orderIds = waitingOrders.map((o) => o.order_id)
-  const completionsRes = orderIds.length
-    ? await db.from('picker_completions').select('completion_id, order_id, actual_pieces, result, picker_completed_time, remark, short_reason_code').in('order_id', orderIds)
-    : { data: [] as { completion_id: string; order_id: string; actual_pieces: number; result: string; picker_completed_time: string; remark: string | null; short_reason_code: string | null }[] }
-  const completions = unwrap(completionsRes)
+  // picker_completions has no warehouse_code column, so it used to be scoped via
+  // .in('order_id', orderIds) instead of fetched unfiltered -- fine while this queue was small,
+  // but the same URL-length trap as dashboard.ts/controlTower.ts once it grows (a very large
+  // Admin Verification backlog would silently read every piece count as 0). Fetch whole
+  // (paginated, no ID filter) and filter to this warehouse's waiting orders in JS instead.
+  const orderIdSet = new Set(waitingOrders.map((o) => o.order_id))
+  const allCompletions = await fetchAllRows((from, to) =>
+    db.from('picker_completions').select('completion_id, order_id, actual_pieces, result, picker_completed_time, remark, short_reason_code').range(from, to),
+  )
+  const completions = allCompletions.filter((c) => orderIdSet.has(c.order_id))
   const completionByOrder = new Map(completions.map((c) => [c.order_id, c]))
 
   const completionIds = completions.map((c) => c.completion_id)

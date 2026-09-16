@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { KpiCard } from '../KpiCard'
 import { formatDate } from '../../lib/formatDate'
+import { productivityMeta } from '../../lib/pickerProductivity'
 
 interface BacklogRow {
   orderDate: string
@@ -16,12 +17,16 @@ interface ZoneStatus {
   pendingPieces: number
   slaPct: number
   onTrack: boolean
+  riskLevel: 'red' | 'yellow' | 'green'
+  criticalCount: number
+  overdueCount: number
 }
 
 interface PickerProductivity {
   pickerId: string
   name: string
   pcsPerHour: number
+  level: string
 }
 
 interface ActivePickerRow {
@@ -52,6 +57,7 @@ interface DashboardData {
   backlogByDate: BacklogRow[]
   zoneStatus: ZoneStatus[]
   pickerProductivity: PickerProductivity[]
+  targetPcsPerHour: number
   activePickerRoster: ActivePickerRow[]
   actionRequired: {
     critical: number
@@ -174,33 +180,36 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
       <div className="card">
         <div className="card-header" style={{ marginBottom: 10 }}>
           <span className="card-title">Zone Status</span>
-          <span className="card-subtitle">สถานะโซน · Pieces Pending drops as Admin confirms · (non-additive) · คลิกเพื่อดูรายละเอียดโซน</span>
+          <span className="card-subtitle">สถานะโซน · Pieces Pending drops once the picker submits · red/yellow = pickers running late in that zone · คลิกเพื่อดูรายละเอียดโซน</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {data.zoneStatus.map((z) => (
-            <Link
-              key={z.zone}
-              href={`/zone-dashboard?zone=${z.zone}`}
-              className="card"
-              style={{
-                textDecoration: 'none',
-                color: 'inherit',
-                flex: '1 1 150px',
-                minWidth: 150,
-                maxWidth: 200,
-                padding: 12,
-                borderTop: `3px solid ${z.onTrack ? '#16A34A' : '#F59E0B'}`,
-              }}
-            >
-              <div style={{ fontSize: 12, fontWeight: 700 }}>Zone {z.zone}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3 }}>{z.pendingPieces.toLocaleString()}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>pieces pending</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{z.totalPieces.toLocaleString()} total pieces</div>
-              <div style={{ fontSize: 11, marginTop: 6, color: z.onTrack ? '#16A34A' : '#B45309', fontWeight: 500 }}>
-                {z.onTrack ? 'On track' : 'At risk'} · {z.slaPct}%
-              </div>
-            </Link>
-          ))}
+          {data.zoneStatus.map((z) => {
+            const riskColor = { red: '#DC2626', yellow: '#F59E0B', green: '#16A34A' }[z.riskLevel]
+            const riskLabel =
+              z.riskLevel === 'red' ? `${z.criticalCount} critical` : z.riskLevel === 'yellow' ? `${z.overdueCount} overdue` : 'On track'
+            return (
+              <Link
+                key={z.zone}
+                href={`/zone-dashboard?zone=${z.zone}`}
+                className="card"
+                style={{
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  flex: '1 1 150px',
+                  minWidth: 150,
+                  maxWidth: 200,
+                  padding: 12,
+                  borderTop: `3px solid ${riskColor}`,
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 700 }}>Zone {z.zone}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3 }}>{z.pendingPieces.toLocaleString()}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>pieces pending</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{z.totalPieces.toLocaleString()} total pieces</div>
+                <div style={{ fontSize: 11, marginTop: 6, color: riskColor, fontWeight: 500 }}>{riskLabel}</div>
+              </Link>
+            )
+          })}
           {data.zoneStatus.length === 0 && <span style={{ color: 'var(--color-text-secondary)' }}>No zones found — import Location Master data first.</span>}
         </div>
       </div>
@@ -212,24 +221,28 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
             ผลิตภาพผู้หยิบสินค้า · pieces per hour
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 11, fontSize: 12.5 }}>
-            {data.pickerProductivity.map((p) => (
-              <div key={p.pickerId} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ width: 100 }}>{p.name}</span>
-                <span
-                  style={{
-                    height: 10,
-                    borderRadius: 5,
-                    background: p.pcsPerHour >= 4500 ? '#16A34A' : p.pcsPerHour >= 3150 ? '#F59E0B' : '#DC2626',
-                    width: Math.max(8, Math.min(100, (p.pcsPerHour / 4500) * 100)),
-                  }}
-                />
-                <span style={{ fontWeight: 700, marginLeft: 'auto' }}>{p.pcsPerHour.toLocaleString()}</span>
-              </div>
-            ))}
+            {data.pickerProductivity.map((p) => {
+              const meta = productivityMeta(p.level)
+              return (
+                <div key={p.pickerId} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 100 }}>{p.name}</span>
+                  <span
+                    style={{
+                      height: 10,
+                      borderRadius: 5,
+                      background: meta.color,
+                      width: Math.max(8, Math.min(100, (p.pcsPerHour / data.targetPcsPerHour) * 100)),
+                    }}
+                  />
+                  <span style={{ fontWeight: 700, marginLeft: 'auto' }}>{p.pcsPerHour.toLocaleString()}</span>
+                </div>
+              )
+            })}
             {data.pickerProductivity.length === 0 && <span style={{ color: 'var(--color-text-secondary)' }}>No completed picks yet today.</span>}
           </div>
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed var(--color-border)', fontSize: 11.5, color: 'var(--color-text-secondary)' }}>
-            Target 4,500 pcs/hr · green ≥ target, yellow within 30%, red below
+            Target {data.targetPcsPerHour.toLocaleString()} pcs/hr · dark green above target, green 80–100%, yellow 60–80%, red below 60% — adjustable via Configuration
+            (picker_productivity.target_pcs_per_hour)
           </div>
         </div>
 

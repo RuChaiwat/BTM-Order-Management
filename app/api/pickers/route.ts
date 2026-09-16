@@ -7,11 +7,13 @@ import { isValidUserId, USER_ID_MAX_LENGTH } from '@/lib/authEmail'
 // Same admin-role set as /api/users -- Pickers are master data, not self-service.
 const ADMIN_ROLES = ['system_admin', 'warehouse_manager', 'supervisor']
 
-/** Create a Picker: no Supabase Auth account, no login -- just a roster row identified by an
- * Admin-assigned badge_code, which Work Assignment scans to resolve a name (see
- * /api/assignments and WorkAssignmentBoard). This is the entire reason Pickers were split out of
- * employees_users (migration 0015): they must not be able to log into the order management
- * system at all. */
+/** Create a Picker: no Supabase Auth account, no login -- just a roster row identified by
+ * Picker ID, which Work Assignment scans directly (from the employee's own ID card) to resolve a
+ * name (see /api/assignments and WorkAssignmentBoard). A separate "Badge Code" was tried first
+ * and dropped after UAT feedback: it read like an internal achievement badge, not an ID card
+ * number, and having it differ from Picker ID was confusing in practice (migration 0018) -- this
+ * is the entire reason Pickers were split out of employees_users (migration 0015): they must not
+ * be able to log into the order management system at all. */
 export async function POST(request: Request) {
   let caller
   try {
@@ -21,10 +23,10 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { picker_id, badge_code, name_en, name_th, warehouse_code, zone_scope, shift_label } = body
+  const { picker_id, name_en, name_th, warehouse_code, zone_scope, shift_label } = body
 
-  if (!picker_id || !badge_code || !name_en) {
-    return NextResponse.json({ error: 'picker_id, badge_code and name_en are required' }, { status: 400 })
+  if (!picker_id || !name_en) {
+    return NextResponse.json({ error: 'picker_id and name_en are required' }, { status: 400 })
   }
   if (!isValidUserId(picker_id)) {
     return NextResponse.json({ error: `picker_id must be 1-${USER_ID_MAX_LENGTH} characters (letters, numbers, - or _)` }, { status: 400 })
@@ -35,7 +37,6 @@ export async function POST(request: Request) {
     .from('pickers')
     .insert({
       picker_id,
-      badge_code: String(badge_code).trim(),
       name_en,
       name_th: name_th ?? null,
       warehouse_code: warehouse_code ?? null,
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    const message = error.code === '23505' ? 'That Picker ID or Badge Code is already in use' : error.message
+    const message = error.code === '23505' ? 'That Picker ID is already in use' : error.message
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
   return NextResponse.json({ picker }, { status: 201 })
 }
 
-/** Update a Picker's badge code, name, scope, or active status. */
+/** Update a Picker's name, scope, or active status. */
 export async function PATCH(request: Request) {
   let caller
   try {
@@ -70,7 +71,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'picker_id is required' }, { status: 400 })
   }
 
-  const allowed = ['badge_code', 'name_en', 'name_th', 'warehouse_code', 'zone_scope', 'active', 'shift_label']
+  const allowed = ['name_en', 'name_th', 'warehouse_code', 'zone_scope', 'active', 'shift_label']
   const patch = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)))
 
   const admin = createAdminClient()
@@ -78,8 +79,7 @@ export async function PATCH(request: Request) {
 
   const { data: after, error } = await admin.from('pickers').update(patch).eq('picker_id', picker_id).select().single()
   if (error) {
-    const message = error.code === '23505' ? 'That Badge Code is already in use' : error.message
-    return NextResponse.json({ error: message }, { status: 400 })
+    return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
   await writeAudit(admin, { userId: caller.user_id, action: 'picker.update', entityType: 'pickers', entityId: picker_id, before, after })

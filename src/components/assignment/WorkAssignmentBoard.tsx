@@ -47,7 +47,6 @@ interface SelectedOrder extends PoolOrder {
 
 interface Picker {
   picker_id: string
-  badge_code: string
   name_en: string
   zone_scope: string[]
   active: boolean
@@ -88,8 +87,9 @@ function compatibleZonesOf(orders: SelectedOrder[]): string[] | null {
  *   2. Unassigned Order Pool — the orders matching whatever Criteria selection is active,
  *      sortable and paginated (15/page) entirely server-side.
  *   3. Assignment Summary — unchanged workload band/confirm flow, except "Assign to worker" is
- *      now a Badge Code scan (resolved against the already-loaded active picker roster) instead
- *      of a login-account dropdown, since Pickers no longer have login accounts at all.
+ *      now a Picker ID scan (the same ID printed on the picker's employee card, resolved against
+ *      the already-loaded active picker roster) instead of a login-account dropdown, since
+ *      Pickers no longer have login accounts at all.
  */
 export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, pickers }: { warehouseCode: string; initialBacklogByDate: BacklogByDate[]; pickers: Picker[] }) {
   const [backlogByDate] = useState(initialBacklogByDate)
@@ -259,9 +259,9 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     const value = pickerScanValue.trim()
     if (!value) return
     setPickerScanError(null)
-    const match = pickers.find((p) => p.badge_code === value)
+    const match = pickers.find((p) => p.picker_id === value.toUpperCase())
     if (!match) {
-      setPickerScanError(`No active picker with badge '${value}'`)
+      setPickerScanError(`No active picker with ID '${value}'`)
       return
     }
     if (effectiveZone && match.zone_scope.length > 0 && !match.zone_scope.includes(effectiveZone)) {
@@ -537,9 +537,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '10px 12px' }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 13 }}>{scannedPicker.name_en}</div>
-                <div style={{ fontSize: 11, color: '#6B7280' }}>
-                  {scannedPicker.picker_id} · Badge {scannedPicker.badge_code}
-                </div>
+                <div style={{ fontSize: 11, color: '#6B7280' }}>{scannedPicker.picker_id}</div>
               </div>
               <button className="btn btn-secondary btn-sm" onClick={() => setScannedPicker(null)}>
                 Change
@@ -549,7 +547,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
             <div style={{ display: 'flex', gap: 6 }}>
               <input
                 className="control"
-                placeholder="Scan picker badge…"
+                placeholder="Scan picker ID…"
                 value={pickerScanValue}
                 onChange={(e) => setPickerScanValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handlePickerScan()}

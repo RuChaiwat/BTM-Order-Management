@@ -9,7 +9,6 @@ import { formatDateTime } from '../../lib/formatDate'
 
 interface PickerRow {
   picker_id: string
-  badge_code: string
   name_en: string
   name_th: string | null
   warehouse_code: string | null
@@ -20,8 +19,10 @@ interface PickerRow {
 }
 
 /** Pickers have their own table (migration 0015) with no login capability at all -- no auth
- * account, no password, no email. Admin manages them here purely as a roster: a Picker ID,
- * a name, and a Badge Code that Work Assignment resolves by barcode scan when assigning work. */
+ * account, no password, no email. Admin manages them here purely as a roster: a Picker ID (the
+ * same ID printed on the picker's employee card) and a name -- Work Assignment scans that same ID
+ * directly to resolve a name when assigning work (migration 0018 dropped a separate "Badge Code"
+ * after UAT feedback that it read like an achievement badge, not an ID card number). */
 export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: PickerRow[]; warehouseCode: string }) {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState(pickers[0]?.picker_id ?? '')
@@ -94,7 +95,6 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
             <tr>
               <th>PICKER ID</th>
               <th>NAME</th>
-              <th>BADGE CODE</th>
               <th>SCOPE</th>
               <th>STATUS</th>
             </tr>
@@ -107,16 +107,13 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
                   {p.name_en}
                   {p.name_th && <div style={{ fontSize: 11, color: '#6B7280' }}>{p.name_th}</div>}
                 </td>
-                <td>
-                  <span className="badge badge-info">{p.badge_code}</span>
-                </td>
                 <td>{p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'All zones'}</td>
                 <td>{p.active ? <span style={{ color: '#16A34A' }}>● Active</span> : <span style={{ color: '#9CA3AF' }}>● Inactive</span>}</td>
               </tr>
             ))}
             {pickers.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
+                <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
                   No pickers yet — add one to get started.
                 </td>
               </tr>
@@ -135,9 +132,6 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
                 <div style={{ fontSize: 11.5, color: '#6B7280' }}>
                   {selected.name_th ?? ''} · {selected.picker_id}
                 </div>
-                <span className="badge badge-info" style={{ marginTop: 4 }}>
-                  Badge {selected.badge_code}
-                </span>
               </div>
             </div>
 
@@ -192,7 +186,6 @@ function PickerModal({
   const isEdit = Boolean(picker)
   const [form, setForm] = useState({
     picker_id: picker?.picker_id ?? '',
-    badge_code: picker?.badge_code ?? '',
     name_en: picker?.name_en ?? '',
     name_th: picker?.name_th ?? '',
   })
@@ -205,7 +198,7 @@ function PickerModal({
     const res = await fetch('/api/pickers', {
       method: isEdit ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isEdit ? { picker_id: form.picker_id, badge_code: form.badge_code, name_en: form.name_en, name_th: form.name_th || null } : { ...form, warehouse_code: warehouseCode }),
+      body: JSON.stringify(isEdit ? { picker_id: form.picker_id, name_en: form.name_en, name_th: form.name_th || null } : { ...form, warehouse_code: warehouseCode }),
     })
     const body = await res.json()
     setBusy(false)
@@ -218,7 +211,7 @@ function PickerModal({
       <div style={{ padding: '16px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="field">
           <label className="field-label">
-            Picker ID <span className="field-hint">max {USER_ID_MAX_LENGTH} characters — cannot be changed later</span>
+            Picker ID <span className="field-hint">max {USER_ID_MAX_LENGTH} characters — same ID printed on the picker's employee card, scanned directly at Assignment time — cannot be changed later</span>
           </label>
           <input
             className="field-input"
@@ -227,18 +220,6 @@ function PickerModal({
             disabled={isEdit}
             onChange={(e) => setForm({ ...form, picker_id: e.target.value.toUpperCase() })}
             placeholder="e.g. P020"
-            style={{ border: '1px solid var(--color-border)' }}
-          />
-        </div>
-        <div className="field">
-          <label className="field-label">
-            Badge Code <span className="field-hint">value on the picker's badge — scanned at Assignment time</span>
-          </label>
-          <input
-            className="field-input"
-            value={form.badge_code}
-            onChange={(e) => setForm({ ...form, badge_code: e.target.value })}
-            placeholder="e.g. 8850001234567"
             style={{ border: '1px solid var(--color-border)' }}
           />
         </div>
@@ -261,7 +242,7 @@ function PickerModal({
         <button
           className="modal-footer-btn btn-primary"
           style={{ minWidth: 140, border: 0 }}
-          disabled={busy || !form.picker_id || !form.badge_code || !form.name_en}
+          disabled={busy || !form.picker_id || !form.name_en}
           onClick={submit}
         >
           {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Create picker'}

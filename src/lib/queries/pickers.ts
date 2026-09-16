@@ -9,14 +9,16 @@ export interface PickerRow {
   zone_scope: string[]
   active: boolean
   shift_label: string | null
+  note: string | null
   created_at: string
 }
 
-/** Full roster for the Picker Management page. */
+/** Full roster for the Picker Management page. `note` is purely informational (e.g. employee
+ * type/distinction) -- never required, never used to look a picker up (see migration 0019). */
 export async function getPickers(db: SupabaseClient, warehouseCode: string): Promise<PickerRow[]> {
   const res = await db
     .from('pickers')
-    .select('picker_id, name_en, name_th, warehouse_code, zone_scope, active, shift_label, created_at')
+    .select('picker_id, name_en, name_th, warehouse_code, zone_scope, active, shift_label, note, created_at')
     .eq('warehouse_code', warehouseCode)
     .order('picker_id')
   return unwrap(res)
@@ -29,7 +31,7 @@ export async function getPickers(db: SupabaseClient, warehouseCode: string): Pro
 export async function getActivePickers(db: SupabaseClient, warehouseCode: string): Promise<PickerRow[]> {
   const res = await db
     .from('pickers')
-    .select('picker_id, name_en, name_th, warehouse_code, zone_scope, active, shift_label, created_at')
+    .select('picker_id, name_en, name_th, warehouse_code, zone_scope, active, shift_label, note, created_at')
     .eq('warehouse_code', warehouseCode)
     .eq('active', true)
     .order('name_en')

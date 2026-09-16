@@ -15,6 +15,7 @@ interface PickerRow {
   zone_scope: string[]
   active: boolean
   shift_label: string | null
+  note: string | null
   created_at: string
 }
 
@@ -135,6 +136,12 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
               </div>
             </div>
 
+            {selected.note && (
+              <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12.5, color: '#374151', whiteSpace: 'pre-wrap' }}>
+                {selected.note}
+              </div>
+            )}
+
             {error && <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -188,6 +195,7 @@ function PickerModal({
     picker_id: picker?.picker_id ?? '',
     name_en: picker?.name_en ?? '',
     name_th: picker?.name_th ?? '',
+    note: picker?.note ?? '',
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -198,7 +206,11 @@ function PickerModal({
     const res = await fetch('/api/pickers', {
       method: isEdit ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isEdit ? { picker_id: form.picker_id, name_en: form.name_en, name_th: form.name_th || null } : { ...form, warehouse_code: warehouseCode }),
+      body: JSON.stringify(
+        isEdit
+          ? { picker_id: form.picker_id, name_en: form.name_en, name_th: form.name_th || null, note: form.note || null }
+          : { ...form, note: form.note || null, warehouse_code: warehouseCode },
+      ),
     })
     const body = await res.json()
     setBusy(false)
@@ -232,6 +244,18 @@ function PickerModal({
             Name (TH) <span className="field-hint">optional</span>
           </label>
           <input className="field-input" value={form.name_th} onChange={(e) => setForm({ ...form, name_th: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
+        </div>
+        <div className="field">
+          <label className="field-label">
+            Note <span className="field-hint">optional — e.g. employee type, distinction, certification. Informational only, not used to look the picker up</span>
+          </label>
+          <textarea
+            className="field-input"
+            rows={3}
+            value={form.note}
+            onChange={(e) => setForm({ ...form, note: e.target.value })}
+            style={{ border: '1px solid var(--color-border)', resize: 'vertical' }}
+          />
         </div>
         {error && <div style={{ fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
       </div>

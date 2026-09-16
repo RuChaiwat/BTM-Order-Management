@@ -6,6 +6,7 @@ import { Modal, ModalFooter } from '../Modal'
 import { createClient } from '../../lib/supabase/client'
 import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
 import { formatDateTime } from '../../lib/formatDate'
+import { productivityMeta } from '../../lib/pickerProductivity'
 
 interface PickerRow {
   picker_id: string
@@ -16,7 +17,23 @@ interface PickerRow {
   active: boolean
   shift_label: string | null
   note: string | null
+  productivity_level: string | null
+  productivity_pcs_per_hour: number | null
+  productivity_updated_at: string | null
   created_at: string
+}
+
+function ProductivityBadge({ picker }: { picker: PickerRow }) {
+  const meta = productivityMeta(picker.productivity_level)
+  return (
+    <span
+      className="badge"
+      style={{ background: meta.bg, color: meta.color, fontWeight: 700 }}
+      title={picker.productivity_pcs_per_hour ? `${picker.productivity_pcs_per_hour.toLocaleString()} pcs/hr avg` : undefined}
+    >
+      {meta.label}
+    </span>
+  )
 }
 
 /** Pickers have their own table (migration 0015) with no login capability at all -- no auth
@@ -97,6 +114,7 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
               <th>PICKER ID</th>
               <th>NAME</th>
               <th>SCOPE</th>
+              <th>PRODUCTIVITY</th>
               <th>STATUS</th>
             </tr>
           </thead>
@@ -109,12 +127,15 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
                   {p.name_th && <div style={{ fontSize: 11, color: '#6B7280' }}>{p.name_th}</div>}
                 </td>
                 <td>{p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'All zones'}</td>
+                <td>
+                  <ProductivityBadge picker={p} />
+                </td>
                 <td>{p.active ? <span style={{ color: '#16A34A' }}>● Active</span> : <span style={{ color: '#9CA3AF' }}>● Inactive</span>}</td>
               </tr>
             ))}
             {pickers.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
+                <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
                   No pickers yet — add one to get started.
                 </td>
               </tr>
@@ -133,6 +154,17 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
                 <div style={{ fontSize: 11.5, color: '#6B7280' }}>
                   {selected.name_th ?? ''} · {selected.picker_id}
                 </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Productivity rating</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ProductivityBadge picker={selected} />
+                {selected.productivity_pcs_per_hour != null && <span style={{ fontSize: 12, color: '#6B7280' }}>{selected.productivity_pcs_per_hour.toLocaleString()} pcs/hr avg</span>}
+              </div>
+              <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
+                {selected.productivity_updated_at ? `Updated ${formatDateTime(selected.productivity_updated_at)}` : 'Not yet computed'} · auto-calculated every Sunday, not editable
               </div>
             </div>
 

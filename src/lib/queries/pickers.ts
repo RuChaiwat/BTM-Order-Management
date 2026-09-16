@@ -10,17 +10,20 @@ export interface PickerRow {
   active: boolean
   shift_label: string | null
   note: string | null
+  productivity_level: string | null
+  productivity_pcs_per_hour: number | null
+  productivity_updated_at: string | null
   created_at: string
 }
 
+const PICKER_COLUMNS = 'picker_id, name_en, name_th, warehouse_code, zone_scope, active, shift_label, note, productivity_level, productivity_pcs_per_hour, productivity_updated_at, created_at'
+
 /** Full roster for the Picker Management page. `note` is purely informational (e.g. employee
- * type/distinction) -- never required, never used to look a picker up (see migration 0019). */
+ * type/distinction) -- never required, never used to look a picker up (see migration 0019).
+ * `productivity_*` is the weekly auto-computed rating (migration 0020) -- read-only, recomputed
+ * every Sunday by /api/cron/picker-productivity, never set through this page's form. */
 export async function getPickers(db: SupabaseClient, warehouseCode: string): Promise<PickerRow[]> {
-  const res = await db
-    .from('pickers')
-    .select('picker_id, name_en, name_th, warehouse_code, zone_scope, active, shift_label, note, created_at')
-    .eq('warehouse_code', warehouseCode)
-    .order('picker_id')
+  const res = await db.from('pickers').select(PICKER_COLUMNS).eq('warehouse_code', warehouseCode).order('picker_id')
   return unwrap(res)
 }
 
@@ -29,11 +32,6 @@ export async function getPickers(db: SupabaseClient, warehouseCode: string): Pro
  * is the sole identifier (see migration 0018) -- it's what's printed/scanned on the employee's own
  * ID card, not a separate assigned code. */
 export async function getActivePickers(db: SupabaseClient, warehouseCode: string): Promise<PickerRow[]> {
-  const res = await db
-    .from('pickers')
-    .select('picker_id, name_en, name_th, warehouse_code, zone_scope, active, shift_label, note, created_at')
-    .eq('warehouse_code', warehouseCode)
-    .eq('active', true)
-    .order('name_en')
+  const res = await db.from('pickers').select(PICKER_COLUMNS).eq('warehouse_code', warehouseCode).eq('active', true).order('name_en')
   return unwrap(res)
 }

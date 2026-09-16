@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Modal, ModalFooter } from '../Modal'
 import { formatDate } from '../../lib/formatDate'
+import { productivityMeta } from '../../lib/pickerProductivity'
 
 const TARGET = 300
 const LOW_MAX = 270
@@ -50,6 +51,8 @@ interface Picker {
   name_en: string
   zone_scope: string[]
   active: boolean
+  productivity_level: string | null
+  productivity_pcs_per_hour: number | null
 }
 
 const BAND_META: Record<Band, { label: string; color: string; bg: string }> = {
@@ -536,7 +539,17 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
           {scannedPicker ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '10px 12px' }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 13 }}>{scannedPicker.name_en}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{scannedPicker.name_en}</span>
+                  {(() => {
+                    const meta = productivityMeta(scannedPicker.productivity_level)
+                    return (
+                      <span className="badge" style={{ background: meta.bg, color: meta.color, fontWeight: 700, fontSize: 10.5 }} title={scannedPicker.productivity_pcs_per_hour ? `${scannedPicker.productivity_pcs_per_hour.toLocaleString()} pcs/hr avg` : undefined}>
+                        {meta.label}
+                      </span>
+                    )
+                  })()}
+                </div>
                 <div style={{ fontSize: 11, color: '#6B7280' }}>{scannedPicker.picker_id}</div>
               </div>
               <button className="btn btn-secondary btn-sm" onClick={() => setScannedPicker(null)}>

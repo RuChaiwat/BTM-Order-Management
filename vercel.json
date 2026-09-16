@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/weekly-export", "schedule": "30 16 * * 0" },
+    { "path": "/api/cron/picker-productivity", "schedule": "0 17 * * 0" },
     { "path": "/api/cron/purge", "schedule": "0 18 * * 0" }
   ]
 }

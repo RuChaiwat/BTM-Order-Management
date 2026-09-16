@@ -220,26 +220,44 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
             ผลิตภาพผู้หยิบสินค้า · pieces per hour
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 11, fontSize: 12.5 }}>
-            {data.pickerProductivity.map((p) => {
-              const meta = productivityMeta(p.level)
-              return (
-                <div key={p.pickerId} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ width: 100 }}>{p.name}</span>
-                  <span
-                    style={{
-                      height: 10,
-                      borderRadius: 5,
-                      background: meta.color,
-                      width: Math.max(8, Math.min(100, (p.pcsPerHour / data.targetPcsPerHour) * 100)),
-                    }}
-                  />
-                  <span style={{ fontWeight: 700, marginLeft: 'auto' }}>{p.pcsPerHour.toLocaleString()}</span>
-                </div>
-              )
-            })}
-            {data.pickerProductivity.length === 0 && <span style={{ color: 'var(--color-text-secondary)' }}>No completed picks yet today.</span>}
-          </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>PICKER</th>
+                <th>PCS/HR</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.pickerProductivity.map((p) => {
+                const meta = productivityMeta(p.level)
+                return (
+                  <tr key={p.pickerId}>
+                    <td style={{ fontWeight: 700 }}>{p.name}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            height: 10,
+                            borderRadius: 5,
+                            background: meta.color,
+                            width: Math.max(8, Math.min(100, (p.pcsPerHour / data.targetPcsPerHour) * 100)),
+                          }}
+                        />
+                        <span style={{ fontWeight: 700 }}>{p.pcsPerHour.toLocaleString()}</span>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {data.pickerProductivity.length === 0 && (
+                <tr>
+                  <td colSpan={2} style={{ color: 'var(--color-text-secondary)' }}>
+                    No completed picks yet today.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed var(--color-border)', fontSize: 11.5, color: 'var(--color-text-secondary)' }}>
             Target {data.targetPcsPerHour.toLocaleString()} pcs/hr · dark green above target, green 80–100%, yellow 60–80%, red below 60% — adjustable via Configuration
             (picker_productivity.target_pcs_per_hour)

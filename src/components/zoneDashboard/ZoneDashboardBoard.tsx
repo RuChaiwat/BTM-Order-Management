@@ -104,13 +104,14 @@ function SortHeader<K extends string>({ label, column, active, dir, onSort }: { 
 }
 
 function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
-  if (totalPages <= 1) return null
+  // Always rendered (even for a single page) so the table's bottom edge is always visually
+  // anchored by a "Page X of Y" footer instead of ending abruptly right where the next card begins.
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10, fontSize: 12 }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--color-border-light)', fontSize: 12 }}>
       <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
         Prev
       </button>
-      <span style={{ color: '#6B7280', alignSelf: 'center' }}>
+      <span style={{ color: '#6B7280' }}>
         Page {page} of {totalPages}
       </span>
       <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
@@ -155,8 +156,12 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
               flex: '1 1 150px',
               minWidth: 150,
               maxWidth: 200,
-              border: z.zone === activeZone ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-              borderTop: `3px solid ${RISK_COLOR[z.riskLevel]}`,
+              // Selection is shown via boxShadow (an outline drawn outside the border box), never via
+              // the border itself -- border color is reserved for riskLevel on all 4 sides. Mixing the
+              // two into one `border`/`borderTop` pair previously meant clicking a zone painted 3 of
+              // its 4 sides in --color-primary (which is red), drowning out a green/yellow risk color.
+              border: `2px solid ${RISK_COLOR[z.riskLevel]}`,
+              boxShadow: z.zone === activeZone ? '0 0 0 2px var(--color-info)' : 'none',
               padding: 14,
             }}
           >

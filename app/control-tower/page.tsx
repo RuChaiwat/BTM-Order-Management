@@ -12,12 +12,18 @@ import { getControlTowerData } from '@/lib/queries/controlTower'
 // this route (and its data) to always be fresh.
 export const dynamic = 'force-dynamic'
 
+const ZONE_ROW_STYLE: Record<string, { background?: string }> = {
+  critical: { background: 'var(--color-danger-bg)' },
+  overdue: { background: '#FFF7ED' },
+  warning: { background: 'var(--color-warning-bg)' },
+  none: {},
+}
+
 export default async function ControlTowerPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const admin = createAdminClient()
   const data = await getControlTowerData(admin, user.warehouse_code ?? 'DC002')
-  const totalBacklogPieces = data.kpis.pickingBacklogPieces + data.kpis.verificationBacklogPieces
 
   return (
     <AppLayout activeNavId={10}>
@@ -33,25 +39,33 @@ export default async function ControlTowerPage() {
             style={{ padding: 14, textAlign: 'center' }}
           />
           <KpiCard
+            label="ORDERS COMPLETED (PCS)"
+            value={data.kpis.completedPieces.toLocaleString()}
+            valueColor="#16A34A"
+            sub={`${data.kpis.completedOrders.toLocaleString()} orders`}
+            compact
+            style={{ padding: 14, textAlign: 'center' }}
+          />
+          <KpiCard
+            label="% COMPLETED"
+            value={`${data.kpis.pctPiecesCompleted}%`}
+            valueColor={data.kpis.pctPiecesCompleted >= 85 ? '#16A34A' : data.kpis.pctPiecesCompleted >= 60 ? '#F59E0B' : '#DC2626'}
+            sub={`Completed ${data.kpis.completedPieces.toLocaleString()} · Issue ${data.kpis.issuePieces.toLocaleString()}`}
+            compact
+            style={{ padding: 14, textAlign: 'center' }}
+          />
+          <KpiCard
             label="TOTAL BACKLOG (PCS)"
-            value={totalBacklogPieces.toLocaleString()}
-            valueColor="#F59E0B"
-            sub={`Picking ${data.kpis.pickingBacklog} · Verify ${data.kpis.verificationBacklog} orders`}
-            compact
-            style={{ padding: 14, textAlign: 'center' }}
-          />
-          <KpiCard label="PIECES PICKED" value={data.kpis.piecesPicked.toLocaleString()} valueColor="#16A34A" compact style={{ padding: 14, textAlign: 'center' }} />
-          <KpiCard
-            label="PICKER IN PROGRESS (PCS)"
-            value={data.flow.assignmentPieces.toLocaleString()}
-            sub={`${data.flow.assignment.toLocaleString()} orders`}
+            value={data.kpis.totalBacklogPieces.toLocaleString()}
+            valueColor={data.kpis.totalBacklogPieces > 0 ? '#F59E0B' : undefined}
+            sub={`${data.kpis.totalBacklogOrders.toLocaleString()} orders`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
           <KpiCard
-            label="PICKER COMPLETED"
-            value={data.kpis.pickerCompletedCount}
-            sub={`100% ${data.kpis.pickerCompleted100} · short ${data.kpis.pickerCompletedShort}`}
+            label="ORDERS ASSIGNED (PCS)"
+            value={data.kpis.assignedPieces.toLocaleString()}
+            sub={`${data.kpis.assignedOrders.toLocaleString()} orders`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
@@ -68,18 +82,25 @@ export default async function ControlTowerPage() {
           <KpiCard label="OVERDUE ORDERS" value={data.secondaryKpis.overdueOrders} accentColor="#EA580C" labelColor="#C2410C" valueColor="#C2410C" compact style={{ padding: 14, textAlign: 'center' }} />
           <KpiCard label="CRITICAL ORDERS" value={data.secondaryKpis.criticalOrders} accentColor="#DC2626" valueColor="#DC2626" compact style={{ padding: 14, textAlign: 'center' }} />
           <KpiCard
-            label="PICKER COMPLETED 100% / SHORT"
-            value={`${data.kpis.pickerCompleted100} / ${data.kpis.pickerCompletedShort}`}
+            label="PENDING CONFIRMATION (PCS)"
+            value={data.kpis.waitingVerifyPieces.toLocaleString()}
+            valueColor={data.kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
+            sub={`${data.kpis.waitingVerifyOrders.toLocaleString()} orders`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 14, flex: 1, minHeight: 0 }}>
-          <div className="card" style={{ minHeight: 0 }}>
+        {/* No minHeight:0 anywhere below -- .app-shell is a fixed 100vh flex column with
+            overflow:hidden, so a flex item allowed to shrink below its content gets squeezed by the
+            flex algorithm once total page content exceeds the viewport, and a table's overflow rows
+            spill visually into the next card instead of the page just scrolling (see the same fix
+            on Zone Dashboard). */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 14, flex: 1 }}>
+          <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone Overview</span>
-              <span className="card-subtitle">Orders/Pieces Touching Zone — do not sum across zones</span>
+              <span className="card-subtitle">Orders/Pieces Touching Zone — do not sum across zones · row highlighted if the zone has a Warning, Overdue, or Critical order</span>
             </div>
             <table className="table">
               <thead>
@@ -87,7 +108,7 @@ export default async function ControlTowerPage() {
                   <th>ZONE</th>
                   <th>ORDERS</th>
                   <th>PIECES</th>
-                  <th>BACKLOG P/V</th>
+                  <th>PENDING P/V</th>
                   <th>ACTIVE</th>
                   <th>COMPLETED</th>
                   <th>SLA</th>
@@ -95,7 +116,7 @@ export default async function ControlTowerPage() {
               </thead>
               <tbody>
                 {data.zoneOverview.map((z) => (
-                  <tr key={z.zone}>
+                  <tr key={z.zone} style={ZONE_ROW_STYLE[z.riskLevel]}>
                     <td style={{ fontWeight: 700 }}>{z.zone}</td>
                     <td>{z.orders}</td>
                     <td>{z.totalPieces.toLocaleString()}</td>
@@ -112,13 +133,14 @@ export default async function ControlTowerPage() {
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '18px 0 10px' }}>
               <span className="card-title">Top Overdue Orders</span>
-              <span className="card-subtitle">ordered by elapsed time</span>
+              <span className="card-subtitle">top 20 by elapsed time, longest first</span>
             </div>
             <table className="table">
               <thead>
                 <tr>
                   <th>ORDER NO.</th>
                   <th>PICKER</th>
+                  <th>ZONE TOUCHED</th>
                   <th>ELAPSED</th>
                   <th>STATUS</th>
                 </tr>
@@ -128,6 +150,7 @@ export default async function ControlTowerPage() {
                   <tr key={o.order_id}>
                     <td className="link">{o.order_no}</td>
                     <td>{o.pickerName}</td>
+                    <td>{o.zones.join(', ') || '—'}</td>
                     <td>{Math.round(o.alert?.elapsed_minutes ?? 0)} min</td>
                     <td>
                       <span className={`badge badge-${o.alert?.time_alert === 'critical' ? 'danger' : 'warning'}`}>{o.alert?.time_alert}</span>
@@ -136,7 +159,7 @@ export default async function ControlTowerPage() {
                 ))}
                 {data.topOverdueOrders.length === 0 && (
                   <tr>
-                    <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
+                    <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
                       Nothing overdue right now.
                     </td>
                   </tr>
@@ -145,37 +168,44 @@ export default async function ControlTowerPage() {
             </table>
           </div>
 
-          <div className="card" style={{ minHeight: 0 }}>
+          <div className="card">
             <div className="card-header">
               <span className="card-title">Alerts &amp; Notifications</span>
-              <span className="card-subtitle">การแจ้งเตือน</span>
+              <span className="card-subtitle">List of Pending Verification — top 20, longest waiting first</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5 }}>
-              {data.secondaryKpis.criticalOrders > 0 && <AlertRow color="#DC2626" text={`${data.secondaryKpis.criticalOrders} Critical orders`} />}
-              {data.secondaryKpis.overdueOrders > 0 && <AlertRow color="#F59E0B" text={`${data.secondaryKpis.overdueOrders} Overdue orders`} />}
-              {data.kpis.verificationBacklog > 0 && (
-                <AlertRow color="#2563EB" text={`Verification backlog: ${data.kpis.verificationBacklog} orders (${data.kpis.verificationBacklogPieces.toLocaleString()} pcs) waiting`} />
-              )}
-              {data.actionRequired.invalidBinCode > 0 && <AlertRow color="#6B7280" text={`${data.actionRequired.invalidBinCode} Invalid Bin Code errors in import queue`} />}
-              {data.secondaryKpis.criticalOrders === 0 && data.secondaryKpis.overdueOrders === 0 && data.kpis.verificationBacklog === 0 && data.actionRequired.invalidBinCode === 0 && (
-                <span style={{ color: 'var(--color-text-secondary)' }}>No active alerts.</span>
-              )}
-            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>ORDER NO.</th>
+                  <th>PICKER</th>
+                  <th>PIECES</th>
+                  <th>WAITING</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.pendingVerification.map((o) => (
+                  <tr key={o.orderId}>
+                    <td className="link">{o.orderNo}</td>
+                    <td>{o.pickerName}</td>
+                    <td>{o.pieces.toLocaleString()}</td>
+                    <td>{o.waitMinutes} min</td>
+                  </tr>
+                ))}
+                {data.pendingVerification.length === 0 && (
+                  <tr>
+                    <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
+                      No orders waiting on Admin verification.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
             <div style={{ marginTop: 'auto', paddingTop: 12, fontSize: 11.5, color: 'var(--color-text-secondary)' }}>
-              Total Backlog = Picking Backlog + Verification Backlog, always shown separately.
+              Backlog = orders whose work isn&apos;t finished yet. Pending P/V (Zone Overview) = Picking backlog + Verification backlog for that zone.
             </div>
           </div>
         </div>
       </div>
     </AppLayout>
-  )
-}
-
-function AlertRow({ color, text }: { color: string; text: string }) {
-  return (
-    <div style={{ display: 'flex', gap: 10 }}>
-      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, marginTop: 5, flex: 'none' }} />
-      <div style={{ flex: 1 }}>{text}</div>
-    </div>
   )
 }

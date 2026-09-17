@@ -39,7 +39,7 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     fetchAllRows((from, to) =>
       db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').range(from, to),
     ),
-    fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces, result').range(from, to)),
+    fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces, result, picker_completed_time').range(from, to)),
   ])
   const alerts = allAlerts.filter((a) => orderIdSet.has(a.order_id))
   const completions = allCompletions.filter((c) => orderIdSet.has(c.order_id))
@@ -63,16 +63,38 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     const verificationBacklog = touching.filter((id) => alertByOrder.get(id)?.is_verification_backlog).length
     const totalPieces = touching.reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
     const slaPct = touching.length > 0 ? Math.round((completed / touching.length) * 1000) / 10 : 100
-    return { zone, orders: touching.length, totalPieces, pickingBacklog, verificationBacklog, active, completed, slaPct }
+    // Row highlight: does any order touching this zone currently carry a warning/overdue/critical
+    // time alert, worst-first -- lets Admin spot which zones need attention at a glance without
+    // opening Zone Dashboard for each one.
+    const criticalCount = touching.filter((id) => alertByOrder.get(id)?.time_alert === 'critical').length
+    const overdueCount = touching.filter((id) => alertByOrder.get(id)?.time_alert === 'overdue').length
+    const warningCount = touching.filter((id) => alertByOrder.get(id)?.time_alert === 'warning').length
+    const riskLevel: 'critical' | 'overdue' | 'warning' | 'none' = criticalCount > 0 ? 'critical' : overdueCount > 0 ? 'overdue' : warningCount > 0 ? 'warning' : 'none'
+    return { zone, orders: touching.length, totalPieces, pickingBacklog, verificationBacklog, active, completed, slaPct, riskLevel, criticalCount, overdueCount, warningCount }
   })
 
+  const zonesByOrder = new Map<string, Set<string>>()
+  for (const l of lines) {
+    if (!l.zone_code) continue
+    if (!zonesByOrder.has(l.order_id)) zonesByOrder.set(l.order_id, new Set())
+    zonesByOrder.get(l.order_id)!.add(l.zone_code)
+  }
+
   const overdueOrdersRaw = orders
-    .map((o) => ({ ...o, alert: alertByOrder.get(o.order_id) }))
+    .map((o) => ({ ...o, alert: alertByOrder.get(o.order_id), zones: [...(zonesByOrder.get(o.order_id) ?? new Set())] }))
     .filter((o) => o.alert?.time_alert === 'critical' || o.alert?.time_alert === 'overdue')
     .sort((a, b) => (b.alert?.elapsed_minutes ?? 0) - (a.alert?.elapsed_minutes ?? 0))
-    .slice(0, 6)
+    .slice(0, 20)
 
-  const batchIds = [...new Set(overdueOrdersRaw.map((o) => o.assignment_batch_id).filter(Boolean))] as string[]
+  const pendingVerificationRaw = orders
+    .filter((o) => o.status === 'picker_completed_100' || o.status === 'picker_completed_short')
+    .map((o) => ({ ...o, completion: completionByOrderId.get(o.order_id) }))
+    .sort((a, b) => (a.completion?.picker_completed_time ?? '').localeCompare(b.completion?.picker_completed_time ?? ''))
+    .slice(0, 20)
+
+  const batchIds = [
+    ...new Set([...overdueOrdersRaw.map((o) => o.assignment_batch_id), ...pendingVerificationRaw.map((o) => o.assignment_batch_id)].filter(Boolean)),
+  ] as string[]
   const batchesRes = batchIds.length
     ? await db.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', batchIds)
     : { data: [] as { assignment_batch_id: string; picker_id: string | null }[] }
@@ -82,11 +104,20 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     ? await db.from('pickers').select('picker_id, name_en').in('picker_id', pickerIds)
     : { data: [] as { picker_id: string; name_en: string }[] }
   const nameByPickerId = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.name_en]))
+  const pickerNameFor = (batchId: string | null) => {
+    const pickerId = batchId ? pickerIdByBatch.get(batchId) : null
+    return pickerId ? nameByPickerId.get(pickerId) ?? pickerId : '—'
+  }
 
-  const overdueOrders = overdueOrdersRaw.map((o) => {
-    const pickerId = o.assignment_batch_id ? pickerIdByBatch.get(o.assignment_batch_id) : null
-    return { ...o, pickerName: pickerId ? nameByPickerId.get(pickerId) ?? pickerId : '—' }
-  })
+  const overdueOrders = overdueOrdersRaw.map((o) => ({ ...o, pickerName: pickerNameFor(o.assignment_batch_id) }))
+
+  const pendingVerification = pendingVerificationRaw.map((o) => ({
+    orderId: o.order_id,
+    orderNo: o.order_no,
+    pickerName: pickerNameFor(o.assignment_batch_id),
+    pieces: o.completion?.actual_pieces ?? 0,
+    waitMinutes: o.completion ? Math.round((Date.now() - new Date(o.completion.picker_completed_time).getTime()) / 60000) : 0,
+  }))
 
   const pickingBacklogOrders = orders.filter((o) => alertByOrder.get(o.order_id)?.is_picking_backlog)
   const verificationBacklogOrders = orders.filter((o) => alertByOrder.get(o.order_id)?.is_verification_backlog)
@@ -107,6 +138,18 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
       activePickers: base.kpis.activePickers,
       activePickerTotalPieces: base.kpis.activePickerTotalPieces,
       activePickerTotalOrders: base.kpis.activePickerTotalOrders,
+      // Shared 1:1 with Operations Dashboard's management funnel (§ getDashboardData) so both
+      // pages agree on what "Completed"/"Backlog"/"Assigned"/"Pending Confirmation" mean.
+      completedPieces: base.kpis.completedPieces,
+      completedOrders: base.kpis.completedOrders,
+      issuePieces: base.kpis.issuePieces,
+      pctPiecesCompleted: base.kpis.pctPiecesCompleted,
+      totalBacklogPieces: base.kpis.totalBacklogPieces,
+      totalBacklogOrders: base.kpis.totalBacklogOrders,
+      assignedPieces: base.kpis.assignedPieces,
+      assignedOrders: base.kpis.assignedOrders,
+      waitingVerifyPieces: base.kpis.waitingVerifyPieces,
+      waitingVerifyOrders: base.kpis.waitingVerifyOrders,
     },
     flow: {
       assignment: inPickingOrders.length,
@@ -115,6 +158,7 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     actionRequired: base.actionRequired,
     zoneOverview,
     topOverdueOrders: overdueOrders,
+    pendingVerification,
     secondaryKpis: {
       warningOrders: orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'warning').length,
       overdueOrders: orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'overdue').length,

@@ -103,7 +103,7 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
       <div className="card" style={{ minHeight: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span className="card-title">Picker List</span>
-          <span className="card-subtitle">{pickers.length} pickers · {warehouseCode}</span>
+          <span className="card-subtitle">รายชื่อพนักงานหยิบสินค้า · {pickers.length} pickers · {warehouseCode}</span>
           <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setShowAdd(true)}>
             + Add picker
           </button>
@@ -159,6 +159,7 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Productivity rating</div>
+              <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: -4, marginBottom: 6 }}>ระดับผลิตภาพ</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ProductivityBadge picker={selected} />
                 {selected.productivity_pcs_per_hour != null && <span style={{ fontSize: 12, color: '#6B7280' }}>{selected.productivity_pcs_per_hour.toLocaleString()} pcs/hr avg</span>}

@@ -119,6 +119,10 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     waitMinutes: o.completion ? Math.round((Date.now() - new Date(o.completion.picker_completed_time).getTime()) / 60000) : 0,
   }))
 
+  const warningOrdersList = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'warning')
+  const overdueOrdersList = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'overdue')
+  const criticalOrdersList = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'critical')
+
   const pickingBacklogOrders = orders.filter((o) => alertByOrder.get(o.order_id)?.is_picking_backlog)
   const verificationBacklogOrders = orders.filter((o) => alertByOrder.get(o.order_id)?.is_verification_backlog)
   const inPickingOrders = orders.filter((o) => ACTIVE_ORDER_STATUSES.has(o.status))
@@ -160,9 +164,12 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     topOverdueOrders: overdueOrders,
     pendingVerification,
     secondaryKpis: {
-      warningOrders: orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'warning').length,
-      overdueOrders: orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'overdue').length,
-      criticalOrders: orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'critical').length,
+      warningOrders: warningOrdersList.length,
+      warningPieces: warningOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),
+      overdueOrders: overdueOrdersList.length,
+      overduePieces: overdueOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),
+      criticalOrders: criticalOrdersList.length,
+      criticalPieces: criticalOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),
     },
   }
 }

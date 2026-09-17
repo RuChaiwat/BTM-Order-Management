@@ -185,12 +185,14 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
             <KpiCard
               label="TOTAL PIECES (PCS)"
+              labelTh="จำนวนชิ้นทั้งหมดในโซน"
               value={selected.totalPieces.toLocaleString()}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />
             <KpiCard
               label="PENDING PIECES (PCS)"
+              labelTh="จำนวนชิ้นที่ยังค้างอยู่"
               value={selected.pendingPieces.toLocaleString()}
               valueColor={selected.pendingPieces > 0 ? '#F59E0B' : undefined}
               compact
@@ -198,6 +200,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             />
             <KpiCard
               label="SLA"
+              labelTh="% ปิดงานสำเร็จของโซน"
               value={`${selected.slaPct}%`}
               valueColor={selected.slaPct >= 85 ? '#16A34A' : '#DC2626'}
               compact
@@ -205,6 +208,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             />
             <KpiCard
               label="ACTIVE PICKERS (PCS)"
+              labelTh="ผู้หยิบที่กำลังทำงานในโซน"
               value={selected.activePickerTotalPieces.toLocaleString()}
               sub={`${selected.activePickers} picker(s) · ${selected.activePickerTotalOrders} orders in hand`}
               compact
@@ -212,6 +216,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             />
             <KpiCard
               label="PICKING / VERIFY"
+              labelTh="รอหยิบ / รอ Admin ยืนยัน"
               value={`${selected.pickingBacklog} / ${selected.verificationBacklog}`}
               valueColor="#F59E0B"
               sub={`${selected.verificationBacklogPieces.toLocaleString()} pcs waiting verify`}
@@ -220,6 +225,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             />
             <KpiCard
               label="QTY SHORT (PCS)"
+              labelTh="จำนวนชิ้นที่ขาด (Short)"
               value={selected.qtyShortPieces.toLocaleString()}
               valueColor={selected.qtyShortPieces > 0 ? '#DC2626' : undefined}
               sub={`${selected.qtyShortOrders.toLocaleString()} order(s)`}
@@ -235,7 +241,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
           <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone {selected.zone} — Active Picker Orders</span>
-              <span className="card-subtitle">{orderTable.total} orders currently being picked · click a column to sort</span>
+              <span className="card-subtitle">ออเดอร์ที่กำลังหยิบอยู่ในโซนนี้ · {orderTable.total} orders currently being picked · click a column to sort</span>
             </div>
             <table className="table">
               <thead>
@@ -278,7 +284,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
           <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone {selected.zone} — Confirmed Short Picks</span>
-              <span className="card-subtitle">{shortTable.total} short-picked line(s) · click a column to sort</span>
+              <span className="card-subtitle">รายการที่ยืนยันว่าหยิบขาดในโซนนี้ · {shortTable.total} short-picked line(s) · click a column to sort</span>
             </div>
             <table className="table">
               <thead>

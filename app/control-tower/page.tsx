@@ -33,6 +33,7 @@ export default async function ControlTowerPage() {
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
           <KpiCard
             label="TOTAL ORDERS (PCS)"
+            labelTh="ออเดอร์ทั้งหมดที่ Import"
             value={data.kpis.totalPlannedPieces.toLocaleString()}
             sub={`${data.kpis.totalOrders.toLocaleString()} orders`}
             compact
@@ -40,6 +41,7 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="ORDERS COMPLETED (PCS)"
+            labelTh="ปิดงานแล้ว (Admin Verified)"
             value={data.kpis.completedPieces.toLocaleString()}
             valueColor="#16A34A"
             sub={`${data.kpis.completedOrders.toLocaleString()} orders`}
@@ -48,6 +50,7 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="% COMPLETED"
+            labelTh="% ความสำเร็จ (ชิ้น)"
             value={`${data.kpis.pctPiecesCompleted}%`}
             valueColor={data.kpis.pctPiecesCompleted >= 85 ? '#16A34A' : data.kpis.pctPiecesCompleted >= 60 ? '#F59E0B' : '#DC2626'}
             sub={`Completed ${data.kpis.completedPieces.toLocaleString()} · Issue ${data.kpis.issuePieces.toLocaleString()}`}
@@ -56,6 +59,7 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="TOTAL BACKLOG (PCS)"
+            labelTh="งานคงค้างทั้งหมด"
             value={data.kpis.totalBacklogPieces.toLocaleString()}
             valueColor={data.kpis.totalBacklogPieces > 0 ? '#F59E0B' : undefined}
             sub={`${data.kpis.totalBacklogOrders.toLocaleString()} orders`}
@@ -64,6 +68,7 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="ORDERS ASSIGNED (PCS)"
+            labelTh="มอบหมายงานแล้ว"
             value={data.kpis.assignedPieces.toLocaleString()}
             sub={`${data.kpis.assignedOrders.toLocaleString()} orders`}
             compact
@@ -71,6 +76,7 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="ACTIVE PICKERS (PCS)"
+            labelTh="ผู้หยิบที่ทำงานอยู่"
             value={data.kpis.activePickerTotalPieces.toLocaleString()}
             sub={`${data.kpis.activePickerTotalOrders.toLocaleString()} orders in hand`}
             compact
@@ -78,11 +84,41 @@ export default async function ControlTowerPage() {
           />
         </div>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          <KpiCard label="WARNING ORDERS" value={data.secondaryKpis.warningOrders} accentColor="#F59E0B" labelColor="#B45309" valueColor="#B45309" compact style={{ padding: 14, textAlign: 'center' }} />
-          <KpiCard label="OVERDUE ORDERS" value={data.secondaryKpis.overdueOrders} accentColor="#EA580C" labelColor="#C2410C" valueColor="#C2410C" compact style={{ padding: 14, textAlign: 'center' }} />
-          <KpiCard label="CRITICAL ORDERS" value={data.secondaryKpis.criticalOrders} accentColor="#DC2626" valueColor="#DC2626" compact style={{ padding: 14, textAlign: 'center' }} />
+          <KpiCard
+            label="WARNING ORDERS (PCS)"
+            labelTh="ออเดอร์เตือน (Warning)"
+            value={data.secondaryKpis.warningPieces.toLocaleString()}
+            sub={`${data.secondaryKpis.warningOrders.toLocaleString()} orders`}
+            accentColor="#F59E0B"
+            labelColor="#B45309"
+            valueColor="#B45309"
+            compact
+            style={{ padding: 14, textAlign: 'center' }}
+          />
+          <KpiCard
+            label="OVERDUE ORDERS (PCS)"
+            labelTh="ออเดอร์เกินกำหนด (Overdue)"
+            value={data.secondaryKpis.overduePieces.toLocaleString()}
+            sub={`${data.secondaryKpis.overdueOrders.toLocaleString()} orders`}
+            accentColor="#EA580C"
+            labelColor="#C2410C"
+            valueColor="#C2410C"
+            compact
+            style={{ padding: 14, textAlign: 'center' }}
+          />
+          <KpiCard
+            label="CRITICAL ORDERS (PCS)"
+            labelTh="ออเดอร์วิกฤต (Critical)"
+            value={data.secondaryKpis.criticalPieces.toLocaleString()}
+            sub={`${data.secondaryKpis.criticalOrders.toLocaleString()} orders`}
+            accentColor="#DC2626"
+            valueColor="#DC2626"
+            compact
+            style={{ padding: 14, textAlign: 'center' }}
+          />
           <KpiCard
             label="PENDING CONFIRMATION (PCS)"
+            labelTh="รอ Admin Confirm"
             value={data.kpis.waitingVerifyPieces.toLocaleString()}
             valueColor={data.kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
             sub={`${data.kpis.waitingVerifyOrders.toLocaleString()} orders`}
@@ -100,7 +136,7 @@ export default async function ControlTowerPage() {
           <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone Overview</span>
-              <span className="card-subtitle">Orders/Pieces Touching Zone — do not sum across zones · row highlighted if the zone has a Warning, Overdue, or Critical order</span>
+              <span className="card-subtitle">ภาพรวมโซน · Orders/Pieces Touching Zone — do not sum across zones · row highlighted if the zone has a Warning, Overdue, or Critical order</span>
             </div>
             <table className="table">
               <thead>
@@ -133,7 +169,7 @@ export default async function ControlTowerPage() {
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '18px 0 10px' }}>
               <span className="card-title">Top Overdue Orders</span>
-              <span className="card-subtitle">top 20 by elapsed time, longest first</span>
+              <span className="card-subtitle">ออเดอร์ที่ล่าช้าที่สุด · top 20 by elapsed time, longest first</span>
             </div>
             <table className="table">
               <thead>
@@ -170,8 +206,8 @@ export default async function ControlTowerPage() {
 
           <div className="card">
             <div className="card-header">
-              <span className="card-title">Alerts &amp; Notifications</span>
-              <span className="card-subtitle">List of Pending Verification — top 20, longest waiting first</span>
+              <span className="card-title">Top Pending Confirmations</span>
+              <span className="card-subtitle">รายการรอ Admin ยืนยันสูงสุด · top 20 by waiting time, longest first</span>
             </div>
             <table className="table">
               <thead>

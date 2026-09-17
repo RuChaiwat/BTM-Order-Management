@@ -228,7 +228,11 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             />
           </div>
 
-          <div className="card" style={{ minHeight: 0 }}>
+          {/* No minHeight:0 here -- .app-shell is a fixed 100vh flex column with overflow:hidden, so a
+              flex-item card allowed to shrink below its content (minHeight:0) gets squeezed by the
+              flex algorithm once the page's total content exceeds the viewport, and the table's
+              overflow rows spill visually into the next card instead of the page just scrolling. */}
+          <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone {selected.zone} — Active Picker Orders</span>
               <span className="card-subtitle">{orderTable.total} orders currently being picked · click a column to sort</span>
@@ -271,7 +275,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             <Pagination page={orderTable.page} totalPages={orderTable.totalPages} onChange={orderTable.setPage} />
           </div>
 
-          <div className="card" style={{ minHeight: 0 }}>
+          <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone {selected.zone} — Confirmed Short Picks</span>
               <span className="card-subtitle">{shortTable.total} short-picked line(s) · click a column to sort</span>

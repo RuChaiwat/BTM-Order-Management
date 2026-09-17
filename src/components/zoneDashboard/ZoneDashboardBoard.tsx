@@ -1,33 +1,45 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { KpiCard } from '../KpiCard'
 
-interface ZoneOrder {
-  order_id: string
-  order_no: string
+interface ZoneActiveOrderRow {
+  orderId: string
+  orderNo: string
   status: string
   pickerName: string
-  alert?: { time_alert: string | null; elapsed_minutes: number } | null
+  elapsedMinutes: number
+  timeAlert: string | null
+}
+
+interface ZoneShortPickRow {
+  orderId: string
+  orderNo: string
+  sku: string
+  pickerName: string
+  orderedQty: number
+  shortQty: number
+  reason: string
 }
 
 interface ZoneDetail {
   zone: string
-  orders: ZoneOrder[]
+  activeOrders: ZoneActiveOrderRow[]
+  shortPickRows: ZoneShortPickRow[]
   activePickers: number
   activePickerTotalPieces: number
   activePickerTotalOrders: number
-  assigned: number
-  correctionInProgress: number
-  completed: number
   pickingBacklog: number
   verificationBacklog: number
   verificationBacklogPieces: number
-  critical: number
-  overdue: number
+  qtyShortPieces: number
+  qtyShortOrders: number
   totalPieces: number
   pendingPieces: number
   slaPct: number
+  riskLevel: 'red' | 'yellow' | 'green'
+  criticalCount: number
+  overdueCount: number
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -42,9 +54,92 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
+const RISK_COLOR: Record<ZoneDetail['riskLevel'], string> = { red: '#DC2626', yellow: '#F59E0B', green: '#16A34A' }
+const PAGE_SIZE = 15
+
+type OrderSortColumn = 'orderNo' | 'pickerName' | 'status' | 'elapsedMinutes' | 'timeAlert'
+type ShortSortColumn = 'orderNo' | 'sku' | 'pickerName' | 'orderedQty' | 'shortQty' | 'reason'
+
+function useSortedPage<T, K extends string>(rows: T[], initialSort: K, getters: Record<K, (row: T) => string | number>) {
+  const [sortColumn, setSortColumn] = useState<K>(initialSort)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [page, setPage] = useState(1)
+
+  function changeSort(column: K) {
+    if (column === sortColumn) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(column)
+      setSortDir('asc')
+    }
+    setPage(1)
+  }
+
+  const sorted = useMemo(() => {
+    const get = getters[sortColumn]
+    const copy = [...rows]
+    copy.sort((a, b) => {
+      const av = get(a)
+      const bv = get(b)
+      const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return copy
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, sortColumn, sortDir])
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const clampedPage = Math.min(page, totalPages)
+  const pageRows = sorted.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE)
+
+  return { sortColumn, sortDir, changeSort, page: clampedPage, setPage, totalPages, pageRows, total: sorted.length }
+}
+
+function SortHeader<K extends string>({ label, column, active, dir, onSort }: { label: string; column: K; active: K; dir: 'asc' | 'desc'; onSort: (c: K) => void }) {
+  return (
+    <th onClick={() => onSort(column)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+      {label} {active === column ? (dir === 'asc' ? '▲' : '▼') : ''}
+    </th>
+  )
+}
+
+function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10, fontSize: 12 }}>
+      <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+        Prev
+      </button>
+      <span style={{ color: '#6B7280', alignSelf: 'center' }}>
+        Page {page} of {totalPages}
+      </span>
+      <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
+        Next
+      </button>
+    </div>
+  )
+}
+
 export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: ZoneDetail[]; initialZone?: string }) {
   const [activeZone, setActiveZone] = useState(() => (initialZone && zoneDetail.some((z) => z.zone === initialZone) ? initialZone : (zoneDetail[0]?.zone ?? '')))
   const selected = zoneDetail.find((z) => z.zone === activeZone) ?? zoneDetail[0]
+
+  const orderTable = useSortedPage<ZoneActiveOrderRow, OrderSortColumn>(selected?.activeOrders ?? [], 'elapsedMinutes', {
+    orderNo: (o) => o.orderNo,
+    pickerName: (o) => o.pickerName,
+    status: (o) => o.status,
+    elapsedMinutes: (o) => o.elapsedMinutes,
+    timeAlert: (o) => o.timeAlert ?? '',
+  })
+
+  const shortTable = useSortedPage<ZoneShortPickRow, ShortSortColumn>(selected?.shortPickRows ?? [], 'shortQty', {
+    orderNo: (r) => r.orderNo,
+    sku: (r) => r.sku,
+    pickerName: (r) => r.pickerName,
+    orderedQty: (r) => r.orderedQty,
+    shortQty: (r) => r.shortQty,
+    reason: (r) => r.reason,
+  })
 
   return (
     <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
@@ -55,25 +150,25 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             onClick={() => setActiveZone(z.zone)}
             className="card"
             style={{
-              textAlign: 'left',
+              textAlign: 'center',
               cursor: 'pointer',
               flex: '1 1 150px',
               minWidth: 150,
               maxWidth: 200,
               border: z.zone === activeZone ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+              borderTop: `3px solid ${RISK_COLOR[z.riskLevel]}`,
               padding: 14,
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 700 }}>Zone {z.zone}</div>
             <div style={{ fontSize: 22, fontWeight: 700, margin: '4px 0' }}>{z.pendingPieces.toLocaleString()}</div>
             <div style={{ fontSize: 11, color: '#6B7280' }}>pieces pending</div>
-            <div style={{ fontSize: 11, color: '#6B7280' }}>
-              {z.totalPieces.toLocaleString()} total pieces · {z.activePickers} active picker(s)
-            </div>
-            <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
-              {z.critical > 0 && <span className="badge badge-danger">{z.critical} critical</span>}
-              {z.overdue > 0 && <span className="badge badge-warning">{z.overdue} overdue</span>}
-              {z.critical === 0 && z.overdue === 0 && <span className="badge badge-success">On track</span>}
+            <div style={{ fontSize: 11, color: '#6B7280' }}>{z.totalPieces.toLocaleString()} total pieces</div>
+            <div style={{ fontSize: 11, color: '#6B7280' }}>{z.activePickers} active picker(s)</div>
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, justifyContent: 'center' }}>
+              {z.criticalCount > 0 && <span className="badge badge-danger">{z.criticalCount} critical</span>}
+              {z.criticalCount === 0 && z.overdueCount > 0 && <span className="badge badge-warning">{z.overdueCount} overdue</span>}
+              {z.criticalCount === 0 && z.overdueCount === 0 && <span className="badge badge-success">On track</span>}
             </div>
           </button>
         ))}
@@ -86,7 +181,6 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             <KpiCard
               label="TOTAL PIECES (PCS)"
               value={selected.totalPieces.toLocaleString()}
-              sub={`${selected.orders.length.toLocaleString()} orders`}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />
@@ -94,7 +188,13 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
               label="PENDING PIECES (PCS)"
               value={selected.pendingPieces.toLocaleString()}
               valueColor={selected.pendingPieces > 0 ? '#F59E0B' : undefined}
-              sub={`${selected.orders.length - selected.completed} orders`}
+              compact
+              style={{ padding: 14, textAlign: 'center' }}
+            />
+            <KpiCard
+              label="SLA"
+              value={`${selected.slaPct}%`}
+              valueColor={selected.slaPct >= 85 ? '#16A34A' : '#DC2626'}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />
@@ -106,14 +206,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
               style={{ padding: 14, textAlign: 'center' }}
             />
             <KpiCard
-              label="ASSIGNED / CORRECTION"
-              value={`${selected.assigned} / ${selected.correctionInProgress}`}
-              sub="orders"
-              compact
-              style={{ padding: 14, textAlign: 'center' }}
-            />
-            <KpiCard
-              label="BACKLOG P/V"
+              label="PICKING / VERIFY"
               value={`${selected.pickingBacklog} / ${selected.verificationBacklog}`}
               valueColor="#F59E0B"
               sub={`${selected.verificationBacklogPieces.toLocaleString()} pcs waiting verify`}
@@ -121,9 +214,10 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
               style={{ padding: 14, textAlign: 'center' }}
             />
             <KpiCard
-              label="SLA"
-              value={`${selected.slaPct}%`}
-              valueColor={selected.slaPct >= 85 ? '#16A34A' : '#DC2626'}
+              label="QTY SHORT (PCS)"
+              value={selected.qtyShortPieces.toLocaleString()}
+              valueColor={selected.qtyShortPieces > 0 ? '#DC2626' : undefined}
+              sub={`${selected.qtyShortOrders.toLocaleString()} order(s)`}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />
@@ -131,44 +225,84 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
 
           <div className="card" style={{ minHeight: 0 }}>
             <div className="card-header" style={{ marginBottom: 10 }}>
-              <span className="card-title">Zone {selected.zone} — Orders</span>
-              <span className="card-subtitle">sorted by elapsed time, most overdue first</span>
+              <span className="card-title">Zone {selected.zone} — Active Picker Orders</span>
+              <span className="card-subtitle">{orderTable.total} orders currently being picked · click a column to sort</span>
             </div>
             <table className="table">
               <thead>
                 <tr>
-                  <th>ORDER NO.</th>
-                  <th>STATUS</th>
-                  <th>PICKER</th>
-                  <th>ELAPSED</th>
-                  <th>ALERT</th>
+                  <SortHeader label="ORDER NO." column="orderNo" active={orderTable.sortColumn} dir={orderTable.sortDir} onSort={orderTable.changeSort} />
+                  <SortHeader label="PICKER" column="pickerName" active={orderTable.sortColumn} dir={orderTable.sortDir} onSort={orderTable.changeSort} />
+                  <SortHeader label="STATUS" column="status" active={orderTable.sortColumn} dir={orderTable.sortDir} onSort={orderTable.changeSort} />
+                  <SortHeader label="ELAPSED" column="elapsedMinutes" active={orderTable.sortColumn} dir={orderTable.sortDir} onSort={orderTable.changeSort} />
+                  <SortHeader label="ALERT" column="timeAlert" active={orderTable.sortColumn} dir={orderTable.sortDir} onSort={orderTable.changeSort} />
                 </tr>
               </thead>
               <tbody>
-                {selected.orders.map((o) => (
-                  <tr key={o.order_id}>
-                    <td className="link">{o.order_no}</td>
-                    <td>{STATUS_LABEL[o.status] ?? o.status}</td>
+                {orderTable.pageRows.map((o) => (
+                  <tr key={o.orderId}>
+                    <td className="link">{o.orderNo}</td>
                     <td>{o.pickerName}</td>
-                    <td>{o.alert ? `${Math.round(o.alert.elapsed_minutes)} min` : '—'}</td>
+                    <td>{STATUS_LABEL[o.status] ?? o.status}</td>
+                    <td>{o.elapsedMinutes} min</td>
                     <td>
-                      {o.alert?.time_alert ? (
-                        <span className={`badge badge-${o.alert.time_alert === 'critical' ? 'danger' : o.alert.time_alert === 'overdue' ? 'warning' : 'info'}`}>{o.alert.time_alert}</span>
+                      {o.timeAlert ? (
+                        <span className={`badge badge-${o.timeAlert === 'critical' ? 'danger' : o.timeAlert === 'overdue' ? 'warning' : 'info'}`}>{o.timeAlert}</span>
                       ) : (
                         <span style={{ color: '#9CA3AF' }}>—</span>
                       )}
                     </td>
                   </tr>
                 ))}
-                {selected.orders.length === 0 && (
+                {orderTable.pageRows.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                      No orders touch Zone {selected.zone} right now.
+                      No orders being actively picked in Zone {selected.zone} right now.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            <Pagination page={orderTable.page} totalPages={orderTable.totalPages} onChange={orderTable.setPage} />
+          </div>
+
+          <div className="card" style={{ minHeight: 0 }}>
+            <div className="card-header" style={{ marginBottom: 10 }}>
+              <span className="card-title">Zone {selected.zone} — Confirmed Short Picks</span>
+              <span className="card-subtitle">{shortTable.total} short-picked line(s) · click a column to sort</span>
+            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <SortHeader label="ORDER" column="orderNo" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
+                  <SortHeader label="SKU" column="sku" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
+                  <SortHeader label="PICKER" column="pickerName" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
+                  <SortHeader label="ORDER QTY" column="orderedQty" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
+                  <SortHeader label="QTY SHORT" column="shortQty" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
+                  <SortHeader label="REASON" column="reason" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
+                </tr>
+              </thead>
+              <tbody>
+                {shortTable.pageRows.map((r, i) => (
+                  <tr key={`${r.orderId}-${r.sku}-${i}`}>
+                    <td className="link">{r.orderNo}</td>
+                    <td>{r.sku}</td>
+                    <td>{r.pickerName}</td>
+                    <td>{r.orderedQty}</td>
+                    <td style={{ fontWeight: 700, color: '#DC2626' }}>{r.shortQty}</td>
+                    <td>{r.reason}</td>
+                  </tr>
+                ))}
+                {shortTable.pageRows.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
+                      No confirmed short picks in Zone {selected.zone}.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <Pagination page={shortTable.page} totalPages={shortTable.totalPages} onChange={shortTable.setPage} />
           </div>
         </>
       )}

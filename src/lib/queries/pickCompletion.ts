@@ -1,39 +1,30 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { AppUser } from '../auth'
 import { unwrap } from './unwrap'
-import { fetchAllRows } from './fetchAllRows'
 
-/** Orders + lines available for the picker's own Pick Completion screen (§12.2 flow:
- * scan order → show all lines → mark short items → reason + qty → confirm). Pickers only see
- * orders on their own active Assignment Batches; office roles see the whole warehouse queue
- * (useful for support/testing, but the API still enforces the real scoping on write). */
-export async function getPickCompletionData(db: SupabaseClient, warehouseCode: string, user: AppUser) {
-  let orders = await fetchAllRows((from, to) =>
-    db
-      .from('orders')
-      .select('order_id, order_no, store_code, planned_pieces, status, assignment_batch_id, assigned_time')
-      .eq('warehouse_code', warehouseCode)
-      .in('status', ['assigned', 'in_progress', 'correction_in_progress'])
-      .range(from, to),
-  )
+export interface PickerActiveOrder {
+  order_id: string
+  order_no: string
+  store_code: string
+  planned_pieces: number
+  status: string
+  assigned_time: string | null
+}
 
-  if (user.role === 'picker') {
-    const batchesRes = await db.from('assignment_batches').select('assignment_batch_id').eq('picker_id', user.user_id)
-    const myBatchIds = new Set(unwrap(batchesRes).map((b) => b.assignment_batch_id))
-    orders = orders.filter((o) => o.assignment_batch_id && myBatchIds.has(o.assignment_batch_id))
-  }
+/** Orders currently assigned to one picker, for the office-operated Pick Completion screen.
+ * Pickers never log in themselves (see migration 0015) -- an office role (System Admin/Warehouse
+ * Manager/Supervisor/Zone Controller) scans or types the Picker ID here on their behalf, the same
+ * way Work Assignment resolves a scanned Picker ID against the `pickers` table. Sorted oldest
+ * assigned first, so the picker naturally works through their list in order. */
+export async function getPickerActiveOrders(db: SupabaseClient, warehouseCode: string, pickerId: string): Promise<PickerActiveOrder[]> {
+  const batchesRes = await db.from('assignment_batches').select('assignment_batch_id').eq('warehouse_code', warehouseCode).eq('picker_id', pickerId)
+  const batchIds = unwrap(batchesRes).map((b) => b.assignment_batch_id)
+  if (batchIds.length === 0) return []
 
-  const orderIds = orders.map((o) => o.order_id)
-  const lines = (
-    orderIds.length
-      ? await fetchAllRows((from, to) =>
-          db.from('order_lines').select('line_id, order_id, sku, sku_barcode, item_description, bin_code, qty, uom_code, zone_code, pick_sequence').in('order_id', orderIds).range(from, to),
-        )
-      : []
-  ).sort((a, b) => (a.pick_sequence ?? '').localeCompare(b.pick_sequence ?? ''))
-
-  const reasonsRes = await db.from('reason_master').select('reason_code, label_en').eq('reason_type', 'short_pick').eq('active', true)
-  const shortPickReasons = unwrap(reasonsRes)
-
-  return { orders, lines, shortPickReasons }
+  const ordersRes = await db
+    .from('orders')
+    .select('order_id, order_no, store_code, planned_pieces, status, assigned_time')
+    .in('assignment_batch_id', batchIds)
+    .in('status', ['assigned', 'in_progress', 'correction_in_progress'])
+    .order('assigned_time')
+  return unwrap(ordersRes)
 }

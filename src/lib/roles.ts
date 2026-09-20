@@ -25,7 +25,7 @@ export const ROLE_LABELS: Record<string, string> = {
 // (office-only confirm/reject); id 17 = Picker Management (Admin-only picker CRUD).
 export const ROLE_MENU_ACCESS: Record<string, number[]> = {
   system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
-  warehouse_manager: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 14, 15, 16, 17],
+  warehouse_manager: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17],
   supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17],
   planner_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16],
   zone_controller: [1, 3, 8, 9, 10, 11, 12],

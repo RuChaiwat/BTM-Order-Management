@@ -2,6 +2,24 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { fetchAllRows } from './fetchAllRows'
 
+export interface VerificationLine {
+  line_id: string
+  sku: string
+  sku_barcode: string | null
+  item_description: string | null
+  bin_code: string
+  qty: number
+  uom_code: string | null
+}
+
+/**
+ * Admin Verification redesign: the picker only reported a coarse result (§12.2), so the per-line
+ * short quantity/reason no longer exists yet when an order lands in this queue -- Admin enters it
+ * here, against the real WMS confirmation. Every line on every waiting order is fetched fresh from
+ * order_lines (not picker_completion_lines, which is now Admin's own write target, not a read
+ * source) so the verification screen always starts from the actual order, not from anything the
+ * picker guessed at.
+ */
 export async function getVerificationData(db: SupabaseClient, warehouseCode: string) {
   const waitingRes = await db
     .from('orders')
@@ -12,35 +30,28 @@ export async function getVerificationData(db: SupabaseClient, warehouseCode: str
 
   // picker_completions has no warehouse_code column, so it used to be scoped via
   // .in('order_id', orderIds) instead of fetched unfiltered -- fine while this queue was small,
-  // but the same URL-length trap as dashboard.ts/controlTower.ts once it grows (a very large
-  // Admin Verification backlog would silently read every piece count as 0). Fetch whole
+  // but the same URL-length trap as dashboard.ts/controlTower.ts once it grows. Fetch whole
   // (paginated, no ID filter) and filter to this warehouse's waiting orders in JS instead.
   const orderIdSet = new Set(waitingOrders.map((o) => o.order_id))
   const allCompletions = await fetchAllRows((from, to) =>
-    db.from('picker_completions').select('completion_id, order_id, actual_pieces, result, picker_completed_time, remark, short_reason_code').range(from, to),
+    db.from('picker_completions').select('completion_id, order_id, actual_pieces, result, picker_completed_time').range(from, to),
   )
   const completions = allCompletions.filter((c) => orderIdSet.has(c.order_id))
   const completionByOrder = new Map(completions.map((c) => [c.order_id, c]))
 
-  const completionIds = completions.map((c) => c.completion_id)
-  const shortLinesRes = completionIds.length
-    ? await db.from('picker_completion_lines').select('completion_id, line_id, ordered_qty, picked_qty, short_reason_code, remark').in('completion_id', completionIds).eq('is_short', true)
-    : { data: [] as { completion_id: string; line_id: string; ordered_qty: number; picked_qty: number; short_reason_code: string | null; remark: string | null }[] }
-  const shortLineRows = unwrap(shortLinesRes)
-
-  const shortLineIds = shortLineRows.map((l) => l.line_id)
-  const orderLinesRes = shortLineIds.length
-    ? await db.from('order_lines').select('line_id, sku, item_description').in('line_id', shortLineIds)
-    : { data: [] as { line_id: string; sku: string; item_description: string | null }[] }
-  const orderLineById = new Map(unwrap(orderLinesRes).map((l) => [l.line_id, l]))
-
-  const shortLinesByCompletion = new Map<string, (typeof shortLineRows[number] & { sku: string; item_description: string | null })[]>()
-  for (const l of shortLineRows) {
-    const detail = orderLineById.get(l.line_id)
-    const arr = shortLinesByCompletion.get(l.completion_id) ?? []
-    arr.push({ ...l, sku: detail?.sku ?? l.line_id, item_description: detail?.item_description ?? null })
-    shortLinesByCompletion.set(l.completion_id, arr)
+  const orderIds = waitingOrders.map((o) => o.order_id)
+  const linesRes = orderIds.length
+    ? await db.from('order_lines').select('line_id, order_id, sku, sku_barcode, item_description, bin_code, qty, uom_code').in('order_id', orderIds)
+    : { data: [] as (VerificationLine & { order_id: string })[] }
+  const linesByOrder = new Map<string, VerificationLine[]>()
+  for (const l of unwrap(linesRes)) {
+    const arr = linesByOrder.get(l.order_id) ?? []
+    arr.push({ line_id: l.line_id, sku: l.sku, sku_barcode: l.sku_barcode, item_description: l.item_description, bin_code: l.bin_code, qty: l.qty, uom_code: l.uom_code })
+    linesByOrder.set(l.order_id, arr)
   }
+
+  const reasonsRes = await db.from('reason_master').select('reason_code, label_en').eq('reason_type', 'short_pick').eq('active', true)
+  const shortPickReasons = unwrap(reasonsRes)
 
   const batchIds = [...new Set(waitingOrders.map((o) => o.assignment_batch_id).filter(Boolean))] as string[]
   const batchesRes = batchIds.length
@@ -61,12 +72,11 @@ export async function getVerificationData(db: SupabaseClient, warehouseCode: str
       return {
         ...o,
         completion,
-        shortLines: completion ? shortLinesByCompletion.get(completion.completion_id) ?? [] : [],
         pickerName: batch?.picker_id ? nameByPicker.get(batch.picker_id) ?? batch.picker_id : '—',
         waitMinutes: completion ? Math.round((Date.now() - new Date(completion.picker_completed_time).getTime()) / 60000) : 0,
       }
     })
     .sort((a, b) => (a.completion?.picker_completed_time ?? '').localeCompare(b.completion?.picker_completed_time ?? ''))
 
-  return { queue }
+  return { queue, linesByOrder: Object.fromEntries(linesByOrder), shortPickReasons }
 }

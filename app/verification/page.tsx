@@ -21,7 +21,7 @@ export default async function AdminVerificationPage() {
   return (
     <AppLayout activeNavId={16}>
       <TopBar title="Admin Verification" subtitle={`รอตรวจสอบยืนยัน (สำนักงาน) · ${data.queue.length} orders`} />
-      <AdminVerificationBoard queue={data.queue} />
+      <AdminVerificationBoard queue={data.queue} linesByOrder={data.linesByOrder} shortPickReasons={data.shortPickReasons} />
     </AppLayout>
   )
 }

@@ -524,6 +524,9 @@ table { border-collapse: collapse; width: 100%; }
 .btn-success { background: var(--color-success); color: #fff; }
 .btn-success:hover { background: var(--color-success-dark); }
 
+.btn-warning { background: var(--color-warning); color: #fff; }
+.btn-warning:hover { background: var(--color-warning-dark); }
+
 .btn-danger-outline {
   background: var(--color-surface);
   border: 1px solid var(--color-danger-border-strong);

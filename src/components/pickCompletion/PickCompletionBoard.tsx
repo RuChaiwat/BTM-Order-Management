@@ -1,212 +1,150 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 
-interface ActiveOrder {
+interface Picker {
+  picker_id: string
+  name_en: string
+  name_th: string | null
+}
+
+interface PickerOrder {
   order_id: string
   order_no: string
   store_code: string
   planned_pieces: number
   status: string
+  assigned_time: string | null
 }
 
-interface OrderLine {
-  line_id: string
-  order_id: string
-  sku: string
-  sku_barcode: string | null
-  item_description: string | null
-  bin_code: string
-  qty: number
-  uom_code: string | null
-  zone_code: string | null
+const STATUS_LABEL: Record<string, string> = {
+  assigned: 'Assigned',
+  in_progress: 'In Progress',
+  correction_in_progress: 'Returned for correction',
 }
 
-interface Reason {
-  reason_code: string
-  label_en: string
-}
-
-interface LineState {
-  isShort: boolean
-  pickedQty: string
-  reasonCode: string
-  remark: string
-}
-
-/** §12.2 Pick Completion — the picker's field/PDA-style flow:
- * 1. scan the order number off the Pick Slip
- * 2. see every line on the order
- * 3. mark the item(s) that were short-picked
- * 4. pick a reason + enter the actual quantity for each short item
- * 5. confirm
- * 6. submit stops the order's clock and moves it to Waiting Admin Verification
+/**
+ * §12.2 Pick Completion redesign — pickers use a Handheld to do the actual picking and never log
+ * into this app themselves (see migration 0015), so this screen is operated by office staff on
+ * their behalf: scan/type the Picker ID, see that picker's assigned orders, and mark each one
+ * Completed or Completed with Short. No per-line quantity/reason entry here anymore -- that moves
+ * to Admin Verification, checked against the real WMS confirmation. Confirming stops the order's
+ * clock and forwards it to Admin Verification.
+ *
+ * Built as one responsive layout rather than a separate Handheld app: order rows are flex "cards"
+ * with large tap targets that wrap to a single column on a narrow screen and lay out as a wider
+ * row on a PC monitor, so the same page serves both without a second codebase to maintain.
  */
-export function PickCompletionBoard({ orders, lines, shortPickReasons }: { orders: ActiveOrder[]; lines: OrderLine[]; shortPickReasons: Reason[] }) {
+export function PickCompletionBoard() {
   const router = useRouter()
   const [scanValue, setScanValue] = useState('')
   const [scanError, setScanError] = useState<string | null>(null)
-  const [orderId, setOrderId] = useState<string | null>(null)
-  const [lineState, setLineState] = useState<Record<string, LineState>>({})
-  const [remark, setRemark] = useState('')
-  const [showConfirm, setShowConfirm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [picker, setPicker] = useState<Picker | null>(null)
+  const [orders, setOrders] = useState<PickerOrder[]>([])
+  const [pending, setPending] = useState<{ orderId: string; result: '100_percent' | 'short' } | null>(null)
+  const [showCompletedAll, setShowCompletedAll] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const order = orders.find((o) => o.order_id === orderId) ?? null
-  const orderLines = useMemo(() => lines.filter((l) => l.order_id === orderId), [lines, orderId])
-
-  function selectOrder(id: string) {
-    setOrderId(id)
+  async function lookupPicker() {
+    const value = scanValue.trim().toUpperCase()
+    if (!value) return
+    setLoading(true)
     setScanError(null)
-    setSubmitError(null)
-    setRemark('')
-    const initial: Record<string, LineState> = {}
-    for (const l of lines.filter((ln) => ln.order_id === id)) {
-      initial[l.line_id] = { isShort: false, pickedQty: String(l.qty), reasonCode: shortPickReasons[0]?.reason_code ?? '', remark: '' }
-    }
-    setLineState(initial)
-  }
-
-  function handleScan() {
-    const match = orders.find((o) => o.order_no === scanValue.trim())
-    if (!match) {
-      setScanError(`No in-progress order '${scanValue}' found for you`)
+    const res = await fetch(`/api/picker-completions?picker_id=${encodeURIComponent(value)}`)
+    const body = await res.json()
+    setLoading(false)
+    if (!res.ok) {
+      setScanError(body.error)
       return
     }
-    selectOrder(match.order_id)
+    setPicker(body.picker)
+    setOrders(body.orders)
     setScanValue('')
   }
 
-  function toggleShort(lineId: string, qty: number) {
-    setLineState((prev) => {
-      const cur = prev[lineId]
-      const isShort = !cur.isShort
-      return { ...prev, [lineId]: { ...cur, isShort, pickedQty: isShort ? '' : String(qty) } }
-    })
+  function switchPicker() {
+    setPicker(null)
+    setOrders([])
+    setSubmitError(null)
   }
 
-  function updateLine(lineId: string, patch: Partial<LineState>) {
-    setLineState((prev) => ({ ...prev, [lineId]: { ...prev[lineId], ...patch } }))
+  async function refreshOrders() {
+    if (!picker) return
+    const res = await fetch(`/api/picker-completions?picker_id=${encodeURIComponent(picker.picker_id)}`)
+    const body = await res.json()
+    if (res.ok) setOrders(body.orders)
   }
 
-  const shortLines = orderLines.filter((l) => lineState[l.line_id]?.isShort)
-  const readyToConfirm =
-    order !== null &&
-    shortLines.every((l) => {
-      const st = lineState[l.line_id]
-      const qty = Number(st.pickedQty)
-      return st.reasonCode && st.pickedQty !== '' && Number.isFinite(qty) && qty >= 0 && qty < l.qty
-    })
-
-  const totalOrdered = orderLines.reduce((s, l) => s + l.qty, 0)
-  const totalPicked = orderLines.reduce((s, l) => {
-    const st = lineState[l.line_id]
-    return s + (st?.isShort ? Number(st.pickedQty || 0) : l.qty)
-  }, 0)
-
-  async function confirm() {
-    if (!order) return
+  async function submitOne(orderId: string, result: '100_percent' | 'short') {
+    if (!picker) return
     setSubmitting(true)
     setSubmitError(null)
     const res = await fetch('/api/picker-completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        order_id: order.order_id,
-        remark: remark || undefined,
-        lines: orderLines.map((l) => {
-          const st = lineState[l.line_id]
-          return {
-            line_id: l.line_id,
-            picked_qty: st.isShort ? Number(st.pickedQty) : l.qty,
-            short_reason_code: st.isShort ? st.reasonCode : undefined,
-            remark: st.isShort ? st.remark || undefined : undefined,
-          }
-        }),
-      }),
+      body: JSON.stringify({ order_id: orderId, picker_id: picker.picker_id, result }),
     })
     const body = await res.json()
     setSubmitting(false)
+    setPending(null)
     if (!res.ok) {
       setSubmitError(body.error)
       return
     }
-    setShowConfirm(false)
-    setOrderId(null)
-    setLineState({})
+    await refreshOrders()
     router.refresh()
   }
 
-  if (!order) {
+  async function completeAll() {
+    if (!picker) return
+    setSubmitting(true)
+    setSubmitError(null)
+    const failures: string[] = []
+    for (const o of orders) {
+      const res = await fetch('/api/picker-completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: o.order_id, picker_id: picker.picker_id, result: '100_percent' }),
+      })
+      if (!res.ok) {
+        const body = await res.json()
+        failures.push(`${o.order_no}: ${body.error}`)
+      }
+    }
+    setSubmitting(false)
+    setShowCompletedAll(false)
+    if (failures.length > 0) setSubmitError(failures.join('; '))
+    await refreshOrders()
+    router.refresh()
+  }
+
+  if (!picker) {
     return (
       <div className="page-body" style={{ gap: 16 }}>
         <div className="card">
-          <div className="card-title">Scan order</div>
+          <div className="card-title">Scan Picker ID</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            สแกน Order Number จาก Pick Slip เพื่อเริ่มบันทึกผลการหยิบ
+            สแกนหรือพิมพ์รหัส Picker เพื่อดูรายการงานที่มอบหมายให้พนักงานคนนั้น
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
               className="control"
-              placeholder="Scan or type order number…"
+              placeholder="Scan or type Picker ID…"
               value={scanValue}
               onChange={(e) => setScanValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleScan()}
-              style={{ flex: 1, maxWidth: 320 }}
+              onKeyDown={(e) => e.key === 'Enter' && lookupPicker()}
+              style={{ flex: '1 1 240px', maxWidth: 320, fontSize: 16, padding: '12px 14px' }}
               autoFocus
             />
-            <button className="btn btn-primary btn-sm" onClick={handleScan}>
-              Open order
+            <button className="btn btn-primary" style={{ padding: '12px 24px', fontSize: 15 }} disabled={loading} onClick={lookupPicker}>
+              {loading ? 'Looking up…' : 'Open picker'}
             </button>
           </div>
           {scanError && <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-danger)' }}>{scanError}</div>}
-        </div>
-
-        <div className="card" style={{ minHeight: 0 }}>
-          <div className="card-title">My in-progress orders</div>
-          <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            {orders.length} orders assigned and awaiting pick completion
-          </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>ORDER NO.</th>
-                <th>STORE</th>
-                <th>PLANNED PCS</th>
-                <th>STATUS</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((o) => (
-                <tr key={o.order_id}>
-                  <td className="link">{o.order_no}</td>
-                  <td>{o.store_code}</td>
-                  <td>{o.planned_pieces}</td>
-                  <td>
-                    <span className={`badge badge-${o.status === 'correction_in_progress' ? 'warning' : 'info'}`}>
-                      {o.status === 'correction_in_progress' ? 'Returned for correction' : o.status === 'in_progress' ? 'In Progress' : 'Assigned'}
-                    </span>
-                  </td>
-                  <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => selectOrder(o.order_id)}>
-                      Open
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {orders.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                    Nothing assigned to you right now.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
     )
@@ -214,144 +152,115 @@ export function PickCompletionBoard({ orders, lines, shortPickReasons }: { order
 
   return (
     <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div className="page-body" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
-        <div className="card" style={{ minHeight: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <span className="card-title">{order.order_no}</span>
-            <span className="card-subtitle">{order.store_code}</span>
-            <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setOrderId(null)}>
-              ← Back to scan
-            </button>
+      <div className="page-body" style={{ gap: 16 }}>
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700 }}>
+                {picker.name_en} <span style={{ fontWeight: 400, color: '#6B7280', fontSize: 13 }}>({picker.picker_id})</span>
+              </div>
+              {picker.name_th && <div style={{ fontSize: 12, color: '#6B7280' }}>{picker.name_th}</div>}
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-success btn-sm" disabled={orders.length === 0 || submitting} onClick={() => setShowCompletedAll(true)}>
+                Completed All ({orders.length})
+              </button>
+              <button className="btn btn-secondary btn-sm" onClick={switchPicker}>
+                ← Switch picker
+              </button>
+            </div>
           </div>
-          <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            Tick any item that was short-picked, then set its reason and actual quantity.
+          <div className="card-subtitle" style={{ marginTop: 8 }}>
+            {orders.length} order(s) assigned and awaiting pick completion
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: 28 }} />
-                <th>SKU</th>
-                <th>BIN</th>
-                <th>ORDERED</th>
-                <th>REASON</th>
-                <th>ACTUAL QTY</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orderLines.map((l) => {
-                const st = lineState[l.line_id]
-                if (!st) return null
-                return (
-                  <tr key={l.line_id} className={st.isShort ? 'row-flag' : undefined}>
-                    <td>
-                      <button
-                        onClick={() => toggleShort(l.line_id, l.qty)}
-                        className={`checkbox-box${st.isShort ? ' checked' : ''}`}
-                        style={{ border: st.isShort ? 'none' : undefined, cursor: 'pointer', padding: 0 }}
-                        title="Short picked?"
-                      >
-                        {st.isShort ? '✓' : ''}
-                      </button>
-                    </td>
-                    <td>
-                      {l.sku}
-                      {l.sku_barcode && <div style={{ fontSize: 11, color: '#6B7280' }}>Barcode: {l.sku_barcode}</div>}
-                      {l.item_description && <div style={{ fontSize: 11, color: '#6B7280' }}>{l.item_description}</div>}
-                    </td>
-                    <td>{l.bin_code}</td>
-                    <td style={{ fontWeight: 700 }}>
-                      {l.qty} {l.uom_code}
-                    </td>
-                    <td>
-                      {st.isShort ? (
-                        <select className="control" value={st.reasonCode} onChange={(e) => updateLine(l.line_id, { reasonCode: e.target.value })} style={{ width: 150 }}>
-                          {shortPickReasons.map((r) => (
-                            <option key={r.reason_code} value={r.reason_code}>
-                              {r.label_en}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span style={{ color: '#9CA3AF' }}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      {st.isShort ? (
-                        <input
-                          className="control"
-                          type="number"
-                          min={0}
-                          max={l.qty - 1}
-                          value={st.pickedQty}
-                          onChange={(e) => updateLine(l.line_id, { pickedQty: e.target.value })}
-                          style={{ width: 90 }}
-                        />
-                      ) : (
-                        <span>{l.qty}</span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-              {orderLines.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
-                    No lines found for this order.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </div>
 
-        <div className="card" style={{ minHeight: 0 }}>
-          <div className="card-title">Completion Summary</div>
-          <div className="card-subtitle" style={{ marginBottom: 14 }}>
-            สรุปผลการหยิบ
+        {submitError && (
+          <div className="card" style={{ padding: '10px 14px', color: 'var(--color-danger)', fontSize: 12.5 }}>
+            {submitError}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5, marginBottom: 14 }}>
-            <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
-              <span style={{ color: '#6B7280', fontSize: 11 }}>Ordered pcs</span>
-              <div style={{ fontWeight: 700, fontSize: 17 }}>{totalOrdered}</div>
+        )}
+
+        {/* Card-per-order, not a <table> -- flex rows wrap naturally on a narrow Handheld screen
+            instead of forcing horizontal scroll, so this same page works on PC and Handheld. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {orders.map((o) => (
+            <div key={o.order_id} className="card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '14px 18px' }}>
+              <div style={{ flex: '1 1 160px' }}>
+                <div className="link" style={{ fontWeight: 700, fontSize: 15 }}>
+                  {o.order_no}
+                </div>
+                <div style={{ fontSize: 12, color: '#6B7280' }}>{o.store_code}</div>
+              </div>
+              <div style={{ flex: '0 0 auto', textAlign: 'center' }}>
+                <div style={{ fontSize: 17, fontWeight: 700 }}>{o.planned_pieces}</div>
+                <div style={{ fontSize: 11, color: '#6B7280' }}>planned pcs</div>
+              </div>
+              <div style={{ flex: '0 0 auto' }}>
+                <span className={`badge badge-${o.status === 'correction_in_progress' ? 'warning' : 'info'}`}>{STATUS_LABEL[o.status] ?? o.status}</span>
+              </div>
+              <div style={{ flex: '1 1 260px', display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-success"
+                  style={{ padding: '12px 18px', fontSize: 14, flex: '1 1 auto', minWidth: 130 }}
+                  disabled={submitting}
+                  onClick={() => setPending({ orderId: o.order_id, result: '100_percent' })}
+                >
+                  ✓ Completed
+                </button>
+                <button
+                  className="btn btn-warning"
+                  style={{ padding: '12px 18px', fontSize: 14, flex: '1 1 auto', minWidth: 170 }}
+                  disabled={submitting}
+                  onClick={() => setPending({ orderId: o.order_id, result: 'short' })}
+                >
+                  Completed with Short
+                </button>
+              </div>
             </div>
-            <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
-              <span style={{ color: '#6B7280', fontSize: 11 }}>Actual pcs</span>
-              <div style={{ fontWeight: 700, fontSize: 17, color: totalPicked < totalOrdered ? '#F59E0B' : '#16A34A' }}>{totalPicked}</div>
-            </div>
-          </div>
-          <div style={{ marginBottom: 14 }}>
-            <span className={`badge badge-${shortLines.length > 0 ? 'warning' : 'success'}`}>{shortLines.length > 0 ? `${shortLines.length} item(s) short` : 'Full pick — 100%'}</span>
-          </div>
-          <div className="field">
-            <label className="field-label">Overall remark (optional)</label>
-            <textarea
-              value={remark}
-              onChange={(e) => setRemark(e.target.value)}
-              style={{ width: '100%', minHeight: 64, border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 13, fontFamily: 'inherit' }}
-            />
-          </div>
-          {submitError && <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-danger)' }}>{submitError}</div>}
-          <div className="mt-auto" style={{ paddingTop: 16 }}>
-            <button className="btn btn-primary" disabled={!readyToConfirm} onClick={() => setShowConfirm(true)}>
-              Confirm completion · หยุดเวลา
-            </button>
-            <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'center', marginTop: 6 }}>Confirming stops this order's clock and sends it to Admin Verification.</div>
-          </div>
+          ))}
+          {orders.length === 0 && <div className="card" style={{ color: 'var(--color-text-secondary)' }}>Nothing assigned to {picker.name_en} right now.</div>}
         </div>
       </div>
 
-      {showConfirm && (
-        <Modal title="Confirm pick completion?" subtitle="ยืนยันผลการหยิบ">
+      {pending && (
+        <Modal title={pending.result === '100_percent' ? 'Confirm Completed?' : 'Confirm Completed with Short?'} subtitle="ยืนยันผลการหยิบ · หยุดเวลา">
           <div className="modal-body">
-            <strong>{order.order_no}</strong> · {totalPicked} of {totalOrdered} pieces picked
-            {shortLines.length > 0 ? `, ${shortLines.length} item(s) short` : ' — full pick'}. This sends the order to Admin Verification and cannot be edited afterward.
+            {orders.find((o) => o.order_id === pending.orderId)?.order_no}
+            {pending.result === '100_percent'
+              ? ' will be marked fully picked and sent to Admin Verification.'
+              : ' will be marked short-picked and sent to Admin Verification, where the short quantity and reason are recorded.'}
+            {' '}
+            This stops the order&apos;s clock and cannot be edited afterward.
           </div>
           <ModalFooter>
-            <button className="modal-footer-btn btn-secondary" onClick={() => setShowConfirm(false)}>
+            <button className="modal-footer-btn btn-secondary" onClick={() => setPending(null)}>
               Cancel
             </button>
-            <button className="modal-footer-btn btn-primary" style={{ minWidth: 190, border: 0 }} disabled={submitting} onClick={confirm}>
+            <button
+              className={`modal-footer-btn ${pending.result === '100_percent' ? 'btn-success' : 'btn-warning'}`}
+              style={{ minWidth: 190, border: 0 }}
+              disabled={submitting}
+              onClick={() => submitOne(pending.orderId, pending.result)}
+            >
               {submitting ? 'Submitting…' : 'Confirm & submit'}
+            </button>
+          </ModalFooter>
+        </Modal>
+      )}
+
+      {showCompletedAll && (
+        <Modal title={`Mark all ${orders.length} orders Completed?`} subtitle="ยืนยันปิดงานทั้งหมด (100%)">
+          <div className="modal-body">
+            Every order currently assigned to <strong>{picker.name_en}</strong> will be marked fully picked (100%) and sent to Admin Verification. Use this only when nothing was short-picked
+            today — a short-picked order should be confirmed individually with &quot;Completed with Short&quot; instead.
+          </div>
+          <ModalFooter>
+            <button className="modal-footer-btn btn-secondary" onClick={() => setShowCompletedAll(false)}>
+              Cancel
+            </button>
+            <button className="modal-footer-btn btn-success" style={{ minWidth: 190, border: 0 }} disabled={submitting} onClick={completeAll}>
+              {submitting ? 'Submitting…' : `Complete all ${orders.length}`}
             </button>
           </ModalFooter>
         </Modal>

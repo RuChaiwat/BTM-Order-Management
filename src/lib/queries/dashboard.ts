@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
-import { fetchScopedByOrderIds } from './scopedFetch'
+import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
 import { getActiveConfig } from './config'
 import { bangkokDateKey } from '../formatDate'
 import { bandForPct } from '../pickerProductivity'
@@ -42,7 +42,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
         .eq('warehouse_code', warehouseCode)
         .range(from, to),
     ),
-    fetchAllRows((from, to) => db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
+    fetchOrderZoneTouches(db, warehouseCode),
     fetchAllRows((from, to) => db.from('assignment_batches').select('assignment_batch_id, picker_id, status, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
     // Only the count is used below -- a head request returns it via Content-Range without
     // transferring any rows, so it's naturally immune to the row cap rather than needing paging.

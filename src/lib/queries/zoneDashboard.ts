@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
-import { fetchScopedByOrderIds } from './scopedFetch'
+import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists) -- every live order/batch just sits
@@ -36,8 +36,11 @@ export interface ZoneShortPickRow {
 /** §12/§13 Zone Dashboard — a zone-level drill-down of Control Tower's zone overview: which
  * orders touch each zone, who is actively picking there, and each zone's backlog/SLA. */
 export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: string) {
-  const [lines, orders, batches, zones] = await Promise.all([
-    fetchAllRows((from, to) => db.from('order_lines').select('order_id, line_id, sku, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
+  const [zoneTouches, orders, batches, zones] = await Promise.all([
+    // order_lines is by far the largest table in this schema (many lines per order) -- a lightweight
+    // RPC (migration 0023) returns only the DISTINCT (order_id, zone_code) pairs this needs for the
+    // "which zone(s) does this order touch" map below, instead of pulling every line.
+    fetchOrderZoneTouches(db, warehouseCode),
     fetchAllRows((from, to) => db.from('orders').select('order_id, order_no, status, assignment_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).range(from, to)),
     fetchAllRows((from, to) => db.from('assignment_batches').select('assignment_batch_id, picker_id, zone_code, status').eq('warehouse_code', warehouseCode).range(from, to)),
     getActiveZoneCodes(db, warehouseCode),
@@ -67,8 +70,16 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const completionById = new Map(completions.map((c) => [c.completion_id, c]))
-  const lineById = new Map(lines.map((l) => [l.line_id, l]))
   const reasonLabelByCode = new Map(unwrap(reasonRows).map((r) => [r.reason_code, r.label_en]))
+
+  // lineById only ever needs to resolve the specific lines that were actually short-picked (a
+  // small fraction of all lines), not every order_line in the warehouse -- fetched by exact
+  // line_id instead of pulling the whole table.
+  const shortLineIds = [...new Set(allShortLines.map((l) => l.line_id))]
+  const lineDetailRes = shortLineIds.length
+    ? await db.from('order_lines').select('line_id, sku, zone_code').in('line_id', shortLineIds)
+    : { data: [] as { line_id: string; sku: string; zone_code: string | null }[] }
+  const lineById = new Map(unwrap(lineDetailRes).map((l) => [l.line_id, l]))
 
   const pickerIds = [...new Set(batches.map((b) => b.picker_id).filter(Boolean))] as string[]
   const pickersRes = pickerIds.length ? await db.from('pickers').select('picker_id, name_en').in('picker_id', pickerIds) : { data: [] as { picker_id: string; name_en: string }[] }
@@ -79,10 +90,9 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   }
 
   const zoneOrderIds = new Map<string, Set<string>>()
-  for (const l of lines) {
-    if (!l.zone_code) continue
-    if (!zoneOrderIds.has(l.zone_code)) zoneOrderIds.set(l.zone_code, new Set())
-    zoneOrderIds.get(l.zone_code)!.add(l.order_id)
+  for (const t of zoneTouches) {
+    if (!zoneOrderIds.has(t.zone_code)) zoneOrderIds.set(t.zone_code, new Set())
+    zoneOrderIds.get(t.zone_code)!.add(t.order_id)
   }
 
   // Short-pick line detail, warehouse-wide, attributed to the SPECIFIC zone the short line's own

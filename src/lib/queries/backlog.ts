@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { fetchAllRows } from './fetchAllRows'
-import { fetchScopedByOrderIds } from './scopedFetch'
+import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
 
 /** §13 Backlog Monitor — orders flagged by order_alerts as Picking Backlog (still open past
  * original_order_date) or Verification Backlog (picker done, waiting on Admin), sorted by how
@@ -15,7 +15,7 @@ export async function getBacklogData(db: SupabaseClient, warehouseCode: string) 
         .eq('warehouse_code', warehouseCode)
         .range(from, to),
     ),
-    fetchAllRows((from, to) => db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
+    fetchOrderZoneTouches(db, warehouseCode),
   ])
 
   // order_alerts has no warehouse_code column, so it's fetched via an RPC scoped to exactly this

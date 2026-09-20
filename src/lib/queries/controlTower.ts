@@ -3,7 +3,7 @@ import { getDashboardData } from './dashboard'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
-import { fetchScopedByOrderIds } from './scopedFetch'
+import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists), so treating it as a distinct state
@@ -26,7 +26,7 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     fetchAllRows((from, to) =>
       db.from('orders').select('order_id, order_no, status, planned_pieces, assigned_time, warehouse_code, assignment_batch_id').eq('warehouse_code', warehouseCode).range(from, to),
     ),
-    fetchAllRows((from, to) => db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
+    fetchOrderZoneTouches(db, warehouseCode),
   ])
 
   // order_alerts/picker_completions have no warehouse_code column, so both are fetched via an RPC

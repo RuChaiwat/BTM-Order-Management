@@ -21,3 +21,22 @@ export async function fetchScopedByOrderIds<T>(db: SupabaseClient, rpcName: 'get
     (from, to) => db.rpc(rpcName, { p_order_ids: orderIds }).select(columns).range(from, to) as unknown as PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
   )
 }
+
+export interface OrderZoneTouch {
+  order_id: string
+  zone_code: string
+}
+
+/**
+ * order_lines is the single largest table in this schema (an order's WMS export can carry many
+ * more lines than orders) -- pulling every line just to learn which zone(s) an order touches
+ * (order_id, zone_code only) transfers far more rows than needed once real volume accumulates.
+ * get_order_zone_touches (migration 0023) aggregates that server-side to DISTINCT (order_id,
+ * zone_code) pairs, the same way get_order_pool_zone_density (migration 0014) does for the Order
+ * Pool overview.
+ */
+export async function fetchOrderZoneTouches(db: SupabaseClient, warehouseCode: string): Promise<OrderZoneTouch[]> {
+  return fetchAllRows<OrderZoneTouch>(
+    (from, to) => db.rpc('get_order_zone_touches', { p_warehouse_code: warehouseCode }).range(from, to) as unknown as PromiseLike<{ data: OrderZoneTouch[] | null; error: { message: string } | null }>,
+  )
+}

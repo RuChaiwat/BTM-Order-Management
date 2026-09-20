@@ -27,7 +27,7 @@ export default async function ConsolidationHistoryPage() {
   if (error) console.error('[consolidation-history] consolidation_batches error', error.message)
 
   return (
-    <AppLayout activeNavId={6}>
+    <AppLayout activeNavId={6} user={user}>
       <TopBar title="Consolidation History" subtitle="ประวัติการรวมออเดอร์ · released, completed and cancelled batches" />
       <div className="page-body">
         <div className="card" style={{ flex: 1, minHeight: 0 }}>

@@ -21,7 +21,7 @@ export default async function BacklogPage() {
   const data = await getBacklogData(admin, warehouseCode)
 
   return (
-    <AppLayout activeNavId={11}>
+    <AppLayout activeNavId={11} user={user}>
       <TopBar title="Backlog Monitor" subtitle={`งานคงค้าง · ${data.rows.length} orders backlogged`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>

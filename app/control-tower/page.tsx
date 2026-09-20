@@ -26,7 +26,7 @@ export default async function ControlTowerPage() {
   const data = await getControlTowerData(admin, user.warehouse_code ?? 'DC002')
 
   return (
-    <AppLayout activeNavId={10}>
+    <AppLayout activeNavId={10} user={user}>
       <TopBar title="Control Tower" subtitle={`ศูนย์ควบคุม · ${user.warehouse_code ?? ''}`} />
 
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>

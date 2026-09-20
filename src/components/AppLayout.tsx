@@ -1,19 +1,22 @@
 import type { ReactNode } from 'react'
-import { redirect } from 'next/navigation'
 import { Sidebar } from './Sidebar'
 import { GlobalLoadingBar } from './GlobalLoadingBar'
-import { getSessionUser } from '../lib/auth'
+import type { AppUser } from '../lib/auth'
 import { createAdminClient } from '../lib/supabase/admin'
 
 interface AppLayoutProps {
   activeNavId: number
+  user: AppUser
   children: ReactNode
 }
 
-export async function AppLayout({ activeNavId, children }: AppLayoutProps) {
-  const user = await getSessionUser()
-  if (!user) redirect('/login')
-
+// `user` is passed in rather than fetched here -- every page already calls getSessionUser() itself
+// to decide whether to redirect to /login before rendering anything, and getSessionUser() does two
+// network round trips (a live auth.getUser() revalidation, then an employees_users lookup by
+// auth_user_id). Having AppLayout call it AGAIN independently meant every single page paid for
+// that twice, on top of middleware's own auth.getUser() call -- real, avoidable latency on every
+// navigation, not just the pages with heavy data queries.
+export async function AppLayout({ activeNavId, user, children }: AppLayoutProps) {
   const admin = createAdminClient()
   const [orderPool, assignable, backlog, verificationQueue] = await Promise.all([
     admin.from('orders').select('order_id', { count: 'exact', head: true }).eq('status', 'new'),

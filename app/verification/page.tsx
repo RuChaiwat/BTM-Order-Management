@@ -19,7 +19,7 @@ export default async function AdminVerificationPage() {
   const data = await getVerificationData(admin, user.warehouse_code ?? 'DC002')
 
   return (
-    <AppLayout activeNavId={16}>
+    <AppLayout activeNavId={16} user={user}>
       <TopBar title="Admin Verification" subtitle={`รอตรวจสอบยืนยัน (สำนักงาน) · ${data.queue.length} orders`} />
       <AdminVerificationBoard queue={data.queue} linesByOrder={data.linesByOrder} shortPickReasons={data.shortPickReasons} />
     </AppLayout>

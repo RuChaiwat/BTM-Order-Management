@@ -27,7 +27,7 @@ export default async function MatchingAnalysisPage({ searchParams }: { searchPar
   const { batches, unmatchedPendingCount } = await getMatchingDashboardData(admin, warehouseCode, orderDate)
 
   return (
-    <AppLayout activeNavId={4}>
+    <AppLayout activeNavId={4} user={user}>
       <TopBar title="Matching Analysis & Batch Review" subtitle={`วิเคราะห์การจับคู่ / ตรวจแบตช์ · ${warehouseCode}`} />
       <MatchingBoard batches={batches} warehouseCode={warehouseCode} unmatchedPendingCount={unmatchedPendingCount} orderDate={orderDate} />
     </AppLayout>

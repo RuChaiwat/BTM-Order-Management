@@ -11,7 +11,7 @@ export default async function PickCompletionPage() {
   if (!user) redirect('/login')
 
   return (
-    <AppLayout activeNavId={8}>
+    <AppLayout activeNavId={8} user={user}>
       <TopBar title="Pick Completion" subtitle={`ปิดงานหยิบแทนพนักงาน (สแกนรหัส Picker) · ${user.warehouse_code ?? ''}`} />
       <PickCompletionBoard />
     </AppLayout>

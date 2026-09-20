@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { UploadForm } from '@/components/UploadForm'
@@ -17,7 +18,8 @@ const RESULT_LIMIT = 100
 
 export default async function LocationMasterPage({ searchParams }: { searchParams: { warehouse?: string; bin?: string; zone?: string } }) {
   const user = await getSessionUser()
-  const warehouseCode = user?.warehouse_code ?? 'DC002'
+  if (!user) redirect('/login')
+  const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
 
   let query = admin
@@ -42,7 +44,7 @@ export default async function LocationMasterPage({ searchParams }: { searchParam
   const total = count ?? 0
 
   return (
-    <AppLayout activeNavId={14}>
+    <AppLayout activeNavId={14} user={user}>
       <TopBar title="Location Master" subtitle="ข้อมูลตำแหน่งจัดเก็บ · Bin → Zone → Pick Sequence" />
       <div className="page-body">
         <UploadForm

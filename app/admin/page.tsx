@@ -1,9 +1,11 @@
+import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { ReasonMasterManager } from '@/components/admin/ReasonMasterManager'
 import { ConfigEditor } from '@/components/admin/ConfigEditor'
 import { HousekeepingPanel } from '@/components/admin/HousekeepingPanel'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getSessionUser } from '@/lib/auth'
 import { formatDateTime } from '@/lib/formatDate'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
@@ -13,6 +15,8 @@ import { formatDateTime } from '@/lib/formatDate'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
+  const user = await getSessionUser()
+  if (!user) redirect('/login')
   const admin = createAdminClient()
 
   const [
@@ -39,7 +43,7 @@ export default async function AdminPage() {
   }
 
   return (
-    <AppLayout activeNavId={15}>
+    <AppLayout activeNavId={15} user={user}>
       <TopBar title="Configuration / Audit" subtitle="ตั้งค่า / ตรวจสอบ · Reason Master, thresholds, audit trail" />
       <div className="page-body">
         <ReasonMasterManager reasons={reasons ?? []} />

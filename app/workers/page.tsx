@@ -24,7 +24,7 @@ export default async function WorkerManagementPage() {
   const roles = new Set(users.map((u) => u.role)).size
 
   return (
-    <AppLayout activeNavId={13}>
+    <AppLayout activeNavId={13} user={user}>
       <TopBar title="User Management" subtitle={`จัดการผู้ใช้งาน · ${warehouseCode}`} />
       <div className="page-body">
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>

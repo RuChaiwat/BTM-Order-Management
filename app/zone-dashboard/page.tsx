@@ -20,7 +20,7 @@ export default async function ZoneDashboardPage({ searchParams }: { searchParams
   const data = await getZoneDashboardData(admin, warehouseCode)
 
   return (
-    <AppLayout activeNavId={9}>
+    <AppLayout activeNavId={9} user={user}>
       <TopBar title="Zone Dashboard" subtitle={`แดชบอร์ดโซน · ${data.zoneDetail.length} zones · ${warehouseCode}`} />
       <ZoneDashboardBoard zoneDetail={data.zoneDetail} initialZone={searchParams.zone} />
     </AppLayout>

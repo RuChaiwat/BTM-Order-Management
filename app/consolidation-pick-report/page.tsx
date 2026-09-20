@@ -24,7 +24,7 @@ export default async function ConsolidationPickReportPage() {
   const oldestAgeHours = batches[0]?.released_at ? Math.round((Date.now() - new Date(batches[0].released_at).getTime()) / 3600000) : null
 
   return (
-    <AppLayout activeNavId={5}>
+    <AppLayout activeNavId={5} user={user}>
       <TopBar title="Consolidation Pick Report" subtitle={`รายงานหยิบรวม · ${batches.length} batch(es) active at consolidation`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>

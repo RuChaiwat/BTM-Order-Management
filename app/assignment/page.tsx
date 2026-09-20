@@ -22,7 +22,7 @@ export default async function WorkAssignmentPage() {
   const [backlogByDate, pickers] = await Promise.all([getAssignmentBacklogByDate(admin, warehouseCode), getActivePickers(admin, warehouseCode)])
 
   return (
-    <AppLayout activeNavId={7}>
+    <AppLayout activeNavId={7} user={user}>
       <TopBar title="Work Assignment" subtitle={`มอบหมายงาน · ${warehouseCode}`} />
       <WorkAssignmentBoard warehouseCode={warehouseCode} initialBacklogByDate={backlogByDate} pickers={pickers} />
     </AppLayout>

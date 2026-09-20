@@ -20,7 +20,7 @@ export default async function ProductivityPage() {
   const data = await getProductivityData(admin, warehouseCode)
 
   return (
-    <AppLayout activeNavId={12}>
+    <AppLayout activeNavId={12} user={user}>
       <TopBar title="Productivity / SLA / Short Pick" subtitle={`ผลิตภาพ / SLA / หยิบขาด · ${data.windowDays}-day window · ${warehouseCode}`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { TopBar } from '@/components/TopBar'
 import { OrderImportForm } from '@/components/orderPool/OrderImportForm'
@@ -14,7 +15,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function OrderPoolPage() {
   const user = await getSessionUser()
-  const warehouseCode = user?.warehouse_code ?? 'DC002'
+  if (!user) redirect('/login')
+  const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
 
   const [{ data: importBatches, error: importsError }, overview] = await Promise.all([
@@ -24,7 +26,7 @@ export default async function OrderPoolPage() {
   if (importsError) console.error('[orders] import_batches error', importsError.message)
 
   return (
-    <AppLayout activeNavId={2}>
+    <AppLayout activeNavId={2} user={user}>
       <TopBar title="Order Pool / Import Status" subtitle="พูลออเดอร์ / สถานะนำเข้า · WMS Transfer Order export" />
       <div className="page-body">
         <OrderImportForm

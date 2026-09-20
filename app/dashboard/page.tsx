@@ -19,7 +19,7 @@ export default async function OperationsDashboardPage() {
   const data = await getDashboardData(admin, user.warehouse_code ?? 'DC002')
 
   return (
-    <AppLayout activeNavId={1}>
+    <AppLayout activeNavId={1} user={user}>
       <TopBar title="Operations Dashboard" subtitle={`ภาพรวมการดำเนินงาน · ${user.warehouse_code ?? ''}`}>
         <div className="control">
           <span style={{ fontWeight: 500 }}>{user.warehouse_code ?? '—'}</span>

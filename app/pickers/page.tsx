@@ -23,7 +23,7 @@ export default async function PickerManagementPage() {
   const active = pickers.filter((p) => p.active).length
 
   return (
-    <AppLayout activeNavId={17}>
+    <AppLayout activeNavId={17} user={user}>
       <TopBar title="Picker Management" subtitle={`จัดการพนักงานหยิบสินค้า · ${warehouseCode}`} />
       <div className="page-body">
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>

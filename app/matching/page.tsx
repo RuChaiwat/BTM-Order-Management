@@ -28,7 +28,7 @@ export default async function MatchingDashboardPage({ searchParams }: { searchPa
   const data = await getMatchingOverviewData(admin, warehouseCode, orderDate)
 
   return (
-    <AppLayout activeNavId={3}>
+    <AppLayout activeNavId={3} user={user}>
       <TopBar title="Matching Dashboard" subtitle={`แดชบอร์ดการจับคู่ · ${warehouseCode}`}>
         <MatchingDateFilter orderDate={orderDate} />
       </TopBar>

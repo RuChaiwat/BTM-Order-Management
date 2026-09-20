@@ -7,14 +7,12 @@ import type { AppUser } from '../lib/auth'
 import { canAccessMenuItem, ROLE_LABELS } from '../lib/roles'
 
 interface SidebarProps {
-  /** nav item id to highlight — screens sometimes highlight an item that isn't their own route (matches the source mockups) */
-  activeId: number
   user: AppUser
-  /** live counts keyed by nav item id, computed server-side in AppLayout — replaces any static item.badge */
+  /** live counts keyed by nav item id, computed server-side in the (app) layout — replaces any static item.badge */
   badges?: Record<number, string>
 }
 
-export function Sidebar({ activeId, user, badges }: SidebarProps) {
+export function Sidebar({ user, badges }: SidebarProps) {
   const pathname = usePathname()
 
   // Menu item ids are stable keys (used for role access / badges / activeNavId) but aren't
@@ -45,7 +43,7 @@ export function Sidebar({ activeId, user, badges }: SidebarProps) {
             <div className="nav-group-label">{group.label}</div>
             {group.items.map((item) => {
               if (!canAccessMenuItem(user.role, item.id)) return null
-              const isActive = item.id === activeId
+              const isActive = item.path === pathname
               const badge = badges?.[item.id] ?? item.badge
               const content = (
                 <>

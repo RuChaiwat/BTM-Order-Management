@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
+import { Spinner } from '../Spinner'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface Picker {
   picker_id: string
@@ -54,7 +56,7 @@ export function PickCompletionBoard() {
     if (!value) return
     setLoading(true)
     setScanError(null)
-    const res = await fetch(`/api/picker-completions?picker_id=${encodeURIComponent(value)}`)
+    const res = await apiFetch(`/api/picker-completions?picker_id=${encodeURIComponent(value)}`)
     const body = await res.json()
     setLoading(false)
     if (!res.ok) {
@@ -74,28 +76,34 @@ export function PickCompletionBoard() {
 
   async function refreshOrders() {
     if (!picker) return
-    const res = await fetch(`/api/picker-completions?picker_id=${encodeURIComponent(picker.picker_id)}`)
+    const res = await apiFetch(`/api/picker-completions?picker_id=${encodeURIComponent(picker.picker_id)}`)
     const body = await res.json()
     if (res.ok) setOrders(body.orders)
   }
 
+  // Deliberately keeps `submitting` true (buttons stay disabled, modal stays open) through the
+  // list refresh too, not just the POST itself -- closing the modal / re-enabling buttons before
+  // the order list has actually been re-fetched left a window where the just-completed order was
+  // still showing as actionable, and clicking it again raced a real request against stale UI.
   async function submitOne(orderId: string, result: '100_percent' | 'short') {
     if (!picker) return
     setSubmitting(true)
     setSubmitError(null)
-    const res = await fetch('/api/picker-completions', {
+    const res = await apiFetch('/api/picker-completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order_id: orderId, picker_id: picker.picker_id, result }),
     })
     const body = await res.json()
-    setSubmitting(false)
-    setPending(null)
     if (!res.ok) {
+      setSubmitting(false)
+      setPending(null)
       setSubmitError(body.error)
       return
     }
     await refreshOrders()
+    setSubmitting(false)
+    setPending(null)
     router.refresh()
   }
 
@@ -105,7 +113,7 @@ export function PickCompletionBoard() {
     setSubmitError(null)
     const failures: string[] = []
     for (const o of orders) {
-      const res = await fetch('/api/picker-completions', {
+      const res = await apiFetch('/api/picker-completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order_id: o.order_id, picker_id: picker.picker_id, result: '100_percent' }),
@@ -115,10 +123,10 @@ export function PickCompletionBoard() {
         failures.push(`${o.order_no}: ${body.error}`)
       }
     }
+    await refreshOrders()
     setSubmitting(false)
     setShowCompletedAll(false)
     if (failures.length > 0) setSubmitError(failures.join('; '))
-    await refreshOrders()
     router.refresh()
   }
 
@@ -141,6 +149,7 @@ export function PickCompletionBoard() {
               autoFocus
             />
             <button className="btn btn-primary" style={{ padding: '12px 24px', fontSize: 15 }} disabled={loading} onClick={lookupPicker}>
+              {loading && <Spinner />}
               {loading ? 'Looking up…' : 'Open picker'}
             </button>
           </div>
@@ -243,6 +252,7 @@ export function PickCompletionBoard() {
               disabled={submitting}
               onClick={() => submitOne(pending.orderId, pending.result)}
             >
+              {submitting && <Spinner />}
               {submitting ? 'Submitting…' : 'Confirm & submit'}
             </button>
           </ModalFooter>
@@ -260,6 +270,7 @@ export function PickCompletionBoard() {
               Cancel
             </button>
             <button className="modal-footer-btn btn-success" style={{ minWidth: 190, border: 0 }} disabled={submitting} onClick={completeAll}>
+              {submitting && <Spinner />}
               {submitting ? 'Submitting…' : `Complete all ${orders.length}`}
             </button>
           </ModalFooter>

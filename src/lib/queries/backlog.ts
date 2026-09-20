@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { fetchAllRows } from './fetchAllRows'
+import { fetchScopedByOrderIds } from './scopedFetch'
 
 /** §13 Backlog Monitor — orders flagged by order_alerts as Picking Backlog (still open past
  * original_order_date) or Verification Backlog (picker done, waiting on Admin), sorted by how
@@ -17,16 +18,14 @@ export async function getBacklogData(db: SupabaseClient, warehouseCode: string) 
     fetchAllRows((from, to) => db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
   ])
 
-  // order_alerts has no warehouse_code column, so it used to be scoped via
-  // .in('order_id', orderIds) instead of fetched unfiltered. That's exactly backwards at real
-  // scale: PostgREST encodes an .in() filter's values into the request URL, and thousands of UUIDs
-  // blows past practical URL-length limits, failing the request outright. Fetch the table whole
-  // (paginated, no ID filter) and filter to this warehouse's orders in JS instead.
-  const orderIdSet = new Set(orders.map((o) => o.order_id))
-  const allAlerts = await fetchAllRows((from, to) =>
-    db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').range(from, to),
+  // order_alerts has no warehouse_code column, so it's fetched via an RPC scoped to exactly this
+  // warehouse's order_ids (migration 0022) instead of the whole table.
+  const alerts = await fetchScopedByOrderIds<{ order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
+    db,
+    'get_order_alerts_by_ids',
+    'order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog',
+    orders.map((o) => o.order_id),
   )
-  const alerts = allAlerts.filter((a) => orderIdSet.has(a.order_id))
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
 
   const zonesByOrder = new Map<string, Set<string>>()

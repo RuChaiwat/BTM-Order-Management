@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
+import { fetchScopedByOrderIds } from './scopedFetch'
 import { getActiveConfig } from './config'
 import { bangkokDateKey } from '../formatDate'
 import { bandForPct } from '../pickerProductivity'
@@ -49,22 +50,25 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     getActiveZoneCodes(db, warehouseCode),
   ])
 
-  const orderIdSet = new Set(orders.map((o) => o.order_id))
-  // order_alerts/picker_completions have no warehouse_code column (order_alerts is a plain derived
-  // view over all orders; picker_completions likewise), so both used to be scoped via
-  // .in('order_id', orderIds) instead of fetched unfiltered. That's exactly backwards once a
-  // warehouse has thousands of orders: PostgREST encodes an .in() filter's values into the request
-  // URL, and a list of thousands of UUIDs blows past practical URL-length limits -- the request
-  // fails outright, which is why Pending Confirmation/Completed pieces were silently reading 0
-  // (completionByOrderId ended up empty) despite the order counts themselves being correct. Fetch
-  // each table whole (paginated, no ID filter -- immune to both the row cap AND this URL-length
-  // limit) and filter down to this warehouse's own orders in JS instead.
-  const [allCompletions, allAlerts] = await Promise.all([
-    fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces, picker_completed_time, result').range(from, to)),
-    fetchAllRows((from, to) => db.from('order_alerts').select('order_id, time_alert, is_picking_backlog, is_verification_backlog').range(from, to)),
+  // order_alerts/picker_completions have no warehouse_code column, so both are fetched via an RPC
+  // scoped to exactly this warehouse's order_ids (migration 0022) -- sent in the POST body, not the
+  // URL, so it stays correct no matter how many orders this warehouse has, and only transfers rows
+  // that are actually relevant instead of the whole table on every page load.
+  const orderIds = orders.map((o) => o.order_id)
+  const [completions, alerts] = await Promise.all([
+    fetchScopedByOrderIds<{ order_id: string; actual_pieces: number | null; picker_completed_time: string; result: string }>(
+      db,
+      'get_picker_completions_by_ids',
+      'order_id, actual_pieces, picker_completed_time, result',
+      orderIds,
+    ),
+    fetchScopedByOrderIds<{ order_id: string; time_alert: string | null; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
+      db,
+      'get_order_alerts_by_ids',
+      'order_id, time_alert, is_picking_backlog, is_verification_backlog',
+      orderIds,
+    ),
   ])
-  const completions = allCompletions.filter((c) => orderIdSet.has(c.order_id))
-  const alerts = allAlerts.filter((a) => orderIdSet.has(a.order_id))
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
 
   // §management KPI funnel: Total Orders -> Assigned -> Completed (admin-verified only) -> %

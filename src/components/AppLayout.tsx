@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { Sidebar } from './Sidebar'
+import { GlobalLoadingBar } from './GlobalLoadingBar'
 import { getSessionUser } from '../lib/auth'
 import { createAdminClient } from '../lib/supabase/admin'
 
@@ -30,6 +31,7 @@ export async function AppLayout({ activeNavId, children }: AppLayoutProps) {
 
   return (
     <div className="app-shell">
+      <GlobalLoadingBar />
       <Sidebar activeId={activeNavId} user={user} badges={badges} />
       <div className="app-main">{children}</div>
     </div>

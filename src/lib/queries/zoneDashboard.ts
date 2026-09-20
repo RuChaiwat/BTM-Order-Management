@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
+import { fetchScopedByOrderIds } from './scopedFetch'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists) -- every live order/batch just sits
@@ -45,26 +46,27 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
   const pickerIdByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
 
-  // order_alerts/picker_completions/picker_completion_lines have no warehouse_code column, so
-  // these used to be scoped via .in('order_id'/'completion_id', <every id in the warehouse>)
-  // instead of fetched unfiltered. That's exactly backwards at real scale: PostgREST encodes an
-  // .in() filter's values into the request URL, and thousands of UUIDs blows past practical
-  // URL-length limits, failing the request outright. Fetch each table whole (paginated, no ID
-  // filter) and filter to this warehouse's orders in JS instead.
-  const orderIdSet = new Set(orders.map((o) => o.order_id))
-  const [allAlerts, allCompletions, allShortLines, reasonRows] = await Promise.all([
-    fetchAllRows((from, to) =>
-      db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').range(from, to),
+  // order_alerts/picker_completions have no warehouse_code column, so both are fetched via an RPC
+  // scoped to exactly this warehouse's order_ids (migration 0022) instead of the whole table.
+  // picker_completion_lines has neither warehouse_code nor order_id, only completion_id -- fetched
+  // whole (its own row count is bounded by how many lines were ever short-picked, not by total
+  // order volume) and matched back to an order via completionById below, which is itself already
+  // scoped to this warehouse.
+  const orderIds = orders.map((o) => o.order_id)
+  const [alerts, completions, allShortLines, reasonRows] = await Promise.all([
+    fetchScopedByOrderIds<{ order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
+      db,
+      'get_order_alerts_by_ids',
+      'order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog',
+      orderIds,
     ),
-    fetchAllRows((from, to) => db.from('picker_completions').select('completion_id, order_id, actual_pieces').range(from, to)),
+    fetchScopedByOrderIds<{ completion_id: string; order_id: string; actual_pieces: number | null }>(db, 'get_picker_completions_by_ids', 'completion_id, order_id, actual_pieces', orderIds),
     fetchAllRows((from, to) => db.from('picker_completion_lines').select('completion_id, line_id, ordered_qty, picked_qty, short_reason_code').eq('is_short', true).range(from, to)),
     db.from('reason_master').select('reason_code, label_en').eq('reason_type', 'short_pick'),
   ])
-  const alerts = allAlerts.filter((a) => orderIdSet.has(a.order_id))
-  const completions = allCompletions.filter((c) => orderIdSet.has(c.order_id))
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
-  const completionById = new Map(allCompletions.map((c) => [c.completion_id, c]))
+  const completionById = new Map(completions.map((c) => [c.completion_id, c]))
   const lineById = new Map(lines.map((l) => [l.line_id, l]))
   const reasonLabelByCode = new Map(unwrap(reasonRows).map((r) => [r.reason_code, r.label_en]))
 

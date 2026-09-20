@@ -1,8 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
+import { Spinner } from '../Spinner'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface VerificationLine {
   line_id: string
@@ -54,6 +56,7 @@ export function AdminVerificationBoard({
   shortPickReasons: Reason[]
 }) {
   const router = useRouter()
+  const [isRefreshing, startRefresh] = useTransition()
   const [selectedId, setSelectedId] = useState(queue[0]?.order_id ?? '')
   const [lineState, setLineState] = useState<Record<string, LineState>>({})
   const [initializedFor, setInitializedFor] = useState<string | null>(null)
@@ -62,6 +65,11 @@ export function AdminVerificationBoard({
   const [rejectReason, setRejectReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Combined so a button stays disabled/spinning through the network request AND the
+  // router.refresh() that follows it, not just the request -- closing the modal / re-enabling
+  // buttons before the queue has actually re-rendered with fresh data left a window where the
+  // just-closed order still looked actionable.
+  const working = busy || isRefreshing
 
   const selected = queue.find((o) => o.order_id === selectedId) ?? queue[0]
   const orderLines = useMemo(() => (selected ? linesByOrder[selected.order_id] ?? [] : []), [selected, linesByOrder])
@@ -112,7 +120,7 @@ export function AdminVerificationBoard({
   }, 0)
 
   async function postFinalClose(orderId: string, lines: { line_id: string; picked_qty: number; short_reason_code?: string; remark?: string }[]) {
-    const res = await fetch('/api/admin-verifications', {
+    const res = await apiFetch('/api/admin-verifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order_id: orderId, decision: 'final_close', lines }),
@@ -133,11 +141,11 @@ export function AdminVerificationBoard({
         return { line_id: l.line_id, picked_qty: st.isShort ? Number(st.pickedQty) : l.qty, short_reason_code: st.isShort ? st.reasonCode : undefined, remark: st.isShort ? st.remark || undefined : undefined }
       })
       await postFinalClose(selected.order_id, lines)
-      router.refresh()
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
       setBusy(false)
+      startRefresh(() => router.refresh())
+    } catch (e) {
+      setBusy(false)
+      setError((e as Error).message)
     }
   }
 
@@ -146,7 +154,7 @@ export function AdminVerificationBoard({
     setBusy(true)
     setError(null)
     try {
-      const res = await fetch('/api/admin-verifications', {
+      const res = await apiFetch('/api/admin-verifications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order_id: selected.order_id, decision: 'reject', reject_reason: rejectReason || 'Rejected for correction' }),
@@ -157,11 +165,11 @@ export function AdminVerificationBoard({
       }
       setShowReject(false)
       setRejectReason('')
-      router.refresh()
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
       setBusy(false)
+      startRefresh(() => router.refresh())
+    } catch (e) {
+      setBusy(false)
+      setError((e as Error).message)
     }
   }
 
@@ -185,7 +193,7 @@ export function AdminVerificationBoard({
     setBusy(false)
     setShowConfirmAll(false)
     if (failures.length > 0) setError(failures.join('; '))
-    router.refresh()
+    startRefresh(() => router.refresh())
   }
 
   return (
@@ -196,7 +204,7 @@ export function AdminVerificationBoard({
           <div className="card-subtitle" style={{ marginBottom: 10 }}>
             คิวรอตรวจสอบ · เรียงตามเวลาที่ picker ปิดงาน
           </div>
-          <button className="btn btn-success btn-sm btn-block" style={{ marginBottom: 10 }} disabled={fullyPickedOrders.length === 0 || busy} onClick={() => setShowConfirmAll(true)}>
+          <button className="btn btn-success btn-sm btn-block" style={{ marginBottom: 10 }} disabled={fullyPickedOrders.length === 0 || working} onClick={() => setShowConfirmAll(true)}>
             Confirm All 100% ({fullyPickedOrders.length})
           </button>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 560, overflowY: 'auto' }}>
@@ -359,10 +367,11 @@ export function AdminVerificationBoard({
               </div>
               {error && <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
               <div className="mt-auto" style={{ paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button className="btn btn-success" disabled={!readyToConfirm || busy} onClick={confirm}>
-                  Final Close
+                <button className="btn btn-success" disabled={!readyToConfirm || working} onClick={confirm}>
+                  {working && <Spinner />}
+                  {working ? 'Working…' : 'Final Close'}
                 </button>
-                <button className="btn btn-danger-outline" style={{ fontWeight: 700 }} onClick={() => setShowReject(true)}>
+                <button className="btn btn-danger-outline" style={{ fontWeight: 700 }} disabled={working} onClick={() => setShowReject(true)}>
                   Reject for correction
                 </button>
               </div>
@@ -383,8 +392,9 @@ export function AdminVerificationBoard({
             <button className="modal-footer-btn btn-secondary" onClick={() => setShowConfirmAll(false)}>
               Cancel
             </button>
-            <button className="modal-footer-btn btn-success" style={{ minWidth: 170, border: 0 }} disabled={busy} onClick={confirmAll}>
-              {busy ? 'Confirming…' : `Confirm all ${fullyPickedOrders.length}`}
+            <button className="modal-footer-btn btn-success" style={{ minWidth: 170, border: 0 }} disabled={working} onClick={confirmAll}>
+              {working && <Spinner />}
+              {working ? 'Confirming…' : `Confirm all ${fullyPickedOrders.length}`}
             </button>
           </ModalFooter>
         </Modal>
@@ -410,7 +420,8 @@ export function AdminVerificationBoard({
             <button className="modal-footer-btn btn-secondary" onClick={() => setShowReject(false)}>
               Cancel
             </button>
-            <button className="modal-footer-btn btn-danger" style={{ minWidth: 170, border: 0 }} disabled={!rejectReason || busy} onClick={reject}>
+            <button className="modal-footer-btn btn-danger" style={{ minWidth: 170, border: 0 }} disabled={!rejectReason || working} onClick={reject}>
+              {working && <Spinner />}
               Reject &amp; notify picker
             </button>
           </ModalFooter>

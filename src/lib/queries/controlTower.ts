@@ -3,6 +3,7 @@ import { getDashboardData } from './dashboard'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
+import { fetchScopedByOrderIds } from './scopedFetch'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists), so treating it as a distinct state
@@ -28,21 +29,23 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     fetchAllRows((from, to) => db.from('order_lines').select('order_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
   ])
 
-  // order_alerts/picker_completions have no warehouse_code column, so both used to be scoped via
-  // .in('order_id', orderIds) instead of fetched unfiltered. That's exactly backwards at real
-  // scale: PostgREST encodes an .in() filter's values into the request URL, and thousands of UUIDs
-  // blows past practical URL-length limits, failing the request outright (this silently zeroed out
-  // pieces-picked/verification-backlog-pieces once a warehouse passed roughly a thousand orders).
-  // Fetch each table whole (paginated, no ID filter) and filter to this warehouse's orders in JS.
-  const orderIdSet = new Set(orders.map((o) => o.order_id))
-  const [allAlerts, allCompletions] = await Promise.all([
-    fetchAllRows((from, to) =>
-      db.from('order_alerts').select('order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog').range(from, to),
+  // order_alerts/picker_completions have no warehouse_code column, so both are fetched via an RPC
+  // scoped to exactly this warehouse's order_ids (migration 0022) instead of the whole table.
+  const orderIds = orders.map((o) => o.order_id)
+  const [alerts, completions] = await Promise.all([
+    fetchScopedByOrderIds<{ order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
+      db,
+      'get_order_alerts_by_ids',
+      'order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog',
+      orderIds,
     ),
-    fetchAllRows((from, to) => db.from('picker_completions').select('order_id, actual_pieces, result, picker_completed_time').range(from, to)),
+    fetchScopedByOrderIds<{ order_id: string; actual_pieces: number | null; result: string; picker_completed_time: string }>(
+      db,
+      'get_picker_completions_by_ids',
+      'order_id, actual_pieces, result, picker_completed_time',
+      orderIds,
+    ),
   ])
-  const alerts = allAlerts.filter((a) => orderIdSet.has(a.order_id))
-  const completions = allCompletions.filter((c) => orderIdSet.has(c.order_id))
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))

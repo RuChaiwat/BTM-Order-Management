@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
-import { fetchAllRows } from './fetchAllRows'
+import { fetchScopedByOrderIds } from './scopedFetch'
 
 export interface VerificationLine {
   line_id: string
@@ -28,15 +28,14 @@ export async function getVerificationData(db: SupabaseClient, warehouseCode: str
     .in('status', ['picker_completed_100', 'picker_completed_short'])
   const waitingOrders = unwrap(waitingRes)
 
-  // picker_completions has no warehouse_code column, so it used to be scoped via
-  // .in('order_id', orderIds) instead of fetched unfiltered -- fine while this queue was small,
-  // but the same URL-length trap as dashboard.ts/controlTower.ts once it grows. Fetch whole
-  // (paginated, no ID filter) and filter to this warehouse's waiting orders in JS instead.
-  const orderIdSet = new Set(waitingOrders.map((o) => o.order_id))
-  const allCompletions = await fetchAllRows((from, to) =>
-    db.from('picker_completions').select('completion_id, order_id, actual_pieces, result, picker_completed_time').range(from, to),
+  // picker_completions has no warehouse_code column, so it's fetched via an RPC scoped to exactly
+  // this queue's order_ids (migration 0022) instead of the whole table.
+  const completions = await fetchScopedByOrderIds<{ completion_id: string; order_id: string; actual_pieces: number | null; result: string; picker_completed_time: string }>(
+    db,
+    'get_picker_completions_by_ids',
+    'completion_id, order_id, actual_pieces, result, picker_completed_time',
+    waitingOrders.map((o) => o.order_id),
   )
-  const completions = allCompletions.filter((c) => orderIdSet.has(c.order_id))
   const completionByOrder = new Map(completions.map((c) => [c.order_id, c]))
 
   const orderIds = waitingOrders.map((o) => o.order_id)

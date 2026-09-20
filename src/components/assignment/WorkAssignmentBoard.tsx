@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react'
 import { Modal, ModalFooter } from '../Modal'
 import { formatDate } from '../../lib/formatDate'
 import { productivityMeta } from '../../lib/pickerProductivity'
+import { Spinner } from '../Spinner'
+import { apiFetch } from '../../lib/apiFetch'
 
 const TARGET = 300
 const LOW_MAX = 270
@@ -129,7 +131,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     setLoadingPool(true)
     const params = new URLSearchParams({ order_date: date, zone_code: zone, page: String(page), sort, sort_dir: dir })
     if (band) params.set('band', band)
-    const res = await fetch(`/api/assignment-pool?${params.toString()}`)
+    const res = await apiFetch(`/api/assignment-pool?${params.toString()}`)
     const body = await res.json()
     setLoadingPool(false)
     setComplexity(body.complexity ?? null)
@@ -146,7 +148,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     setPoolOrders([])
     setPoolTotal(0)
     setLoadingZones(true)
-    const res = await fetch(`/api/assignment-pool?order_date=${encodeURIComponent(date)}`)
+    const res = await apiFetch(`/api/assignment-pool?order_date=${encodeURIComponent(date)}`)
     const body = await res.json()
     setLoadingZones(false)
     setZoneDensity(body.zoneDensity ?? [])
@@ -227,7 +229,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     const value = orderScanValue.trim()
     if (!value) return
     setOrderScanError(null)
-    const res = await fetch(`/api/assignment-pool?order_no=${encodeURIComponent(value)}`)
+    const res = await apiFetch(`/api/assignment-pool?order_no=${encodeURIComponent(value)}`)
     const body = await res.json()
     const match: PoolOrder | null = body.scannedOrder
       ? {
@@ -286,7 +288,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     if (!effectiveZone || !scannedPicker) return
     setSubmitting(true)
     setSubmitError(null)
-    const res = await fetch('/api/assignments', {
+    const res = await apiFetch('/api/assignments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -298,20 +300,24 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       }),
     })
     const body = await res.json()
-    setSubmitting(false)
     if (!res.ok) {
+      setSubmitting(false)
       setSubmitError(body.error)
       return
     }
+    // Refresh the pool for the SAME Criteria selection (rather than resetting it) -- assigning one
+    // picker's batch is usually the first of several against the same date/zone, so the admin can
+    // keep going against an accurate remaining list without re-clicking through Criteria again.
+    // Awaited (and submitting stays true) before closing the modal/clearing selection, so the pool
+    // is never shown stale for the instant right after confirming -- clicking a just-assigned order
+    // in a stale list raced a real request against data that was already out of date.
+    if (orderDate && zoneCode) await fetchPool(orderDate, zoneCode, poolPage, bandFilter, sortColumn, sortDir)
+    setSubmitting(false)
     setShowConfirm(false)
     setSelected(new Set())
     setSelectedDetails(new Map())
     setOrderScanUsed(false)
     setScannedPicker(null)
-    // Refresh the pool for the SAME Criteria selection (rather than resetting it) -- assigning one
-    // picker's batch is usually the first of several against the same date/zone, so the admin can
-    // keep going against an accurate remaining list without re-clicking through Criteria again.
-    if (orderDate && zoneCode) fetchPool(orderDate, zoneCode, poolPage, bandFilter, sortColumn, sortDir)
   }
 
   const totalPages = Math.max(1, Math.ceil(poolTotal / PAGE_SIZE))
@@ -626,6 +632,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
               Cancel
             </button>
             <button className="modal-footer-btn btn-primary" style={{ minWidth: 190, border: 0 }} disabled={submitting} onClick={confirmAssignment}>
+              {submitting && <Spinner />}
               {submitting ? 'Confirming…' : 'Confirm & start timer'}
             </button>
           </ModalFooter>

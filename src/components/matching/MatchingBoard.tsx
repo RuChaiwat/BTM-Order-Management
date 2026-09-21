@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
 import { formatDate } from '@/lib/formatDate'
+import { DateInput } from '@/components/DateInput'
 
 interface Batch {
   consol_batch_id: string
@@ -66,19 +67,27 @@ export function MatchingBoard({
     setRunning(true)
     setError(null)
     setResult(null)
-    const res = await fetch('/api/matching/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ warehouse_code: warehouseCode, order_date: dateInput }),
-    })
-    const body = await res.json()
-    setRunning(false)
-    if (!res.ok) return setError(body.error)
-    setResult(body)
-    // Run and review always show the same Order Date — jump the review list to whatever date was
-    // just run, or just refresh in place if it was already the date being reviewed.
-    if (dateInput !== orderDate) goToDate(dateInput)
-    else router.refresh()
+    try {
+      const res = await fetch('/api/matching/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ warehouse_code: warehouseCode, order_date: dateInput }),
+      })
+      // A route crash (rather than a handled { error } response) sends back an HTML error page,
+      // not JSON -- res.json() would throw and previously left the button stuck on "Matching…"
+      // forever with no visible error, reading as "the button did nothing" rather than a failure.
+      const body = await res.json().catch(() => ({ error: `Request failed (HTTP ${res.status})` }))
+      if (!res.ok) return setError(body.error ?? `Request failed (HTTP ${res.status})`)
+      setResult(body)
+      // Run and review always show the same Order Date — jump the review list to whatever date was
+      // just run, or just refresh in place if it was already the date being reviewed.
+      if (dateInput !== orderDate) goToDate(dateInput)
+      else router.refresh()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setRunning(false)
+    }
   }
 
   async function act(batchId: string, action: 'cancel') {
@@ -186,13 +195,7 @@ export function MatchingBoard({
         <div style={{ display: 'flex', gap: 10, alignItems: 'end' }}>
           <div className="field">
             <label className="field-label">Order Date</label>
-            <input
-              type="date"
-              className="field-input"
-              value={dateInput}
-              onChange={(e) => setDateInput(e.target.value)}
-              style={{ border: '1px solid var(--color-border)' }}
-            />
+            <DateInput className="field-input" value={dateInput} onChange={setDateInput} style={{ border: '1px solid var(--color-border)' }} />
           </div>
           <button className="btn btn-primary btn-sm" disabled={running} onClick={runMatching}>
             {running ? 'Matching…' : 'Run matching'}
@@ -208,6 +211,15 @@ export function MatchingBoard({
           <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
             {String(result.eligible_count)} eligible · {String(result.excluded_over_max_sku)} excluded (over max SKU) · {(result.batches as unknown[]).length} batch(es) created ·{' '}
             {String(result.single_order_count)} routed to Single Order
+            {Number(result.already_assigned_or_consolidated ?? 0) > 0 && (
+              <>
+                {' '}
+                · {String(result.already_assigned_or_consolidated)} of {String(result.total_orders_for_date)} order(s) for this date already assigned/consolidated, skipped
+              </>
+            )}
+            {Number(result.eligible_count) === 0 && Number(result.total_orders_for_date ?? 0) === 0 && (
+              <div style={{ marginTop: 4, color: 'var(--color-text-secondary)' }}>No orders at all imported for this date/warehouse yet.</div>
+            )}
           </div>
         )}
       </div>

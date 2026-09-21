@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
 import { getActiveConfig, MATCHING_CONFIG_KEYS } from '@/lib/queries/config'
 import { runMatching, splitGroupIfNeeded, type MatchableOrder, type MatchingConfig } from '@/lib/matching/engine'
+import { fetchAllRows } from '@/lib/queries/fetchAllRows'
 
 /** §10 pre-screen + P1-P4 matching for one Order Date / Warehouse. Creates consolidation_batches
  * as 'candidate' — nothing is released to a pick report yet, that's a separate approve step. */
@@ -22,22 +23,50 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  const { data: orders, error: ordersError } = await admin
-    .from('orders')
-    .select('order_id, store_code, unique_sku_count, planned_pieces')
-    .eq('warehouse_code', warehouse_code)
-    .eq('original_order_date', order_date)
-    .eq('status', 'new')
-    .is('consolidation_batch_id', null)
+  // Only 'new' orders with no consolidation_batch_id yet are eligible -- an order already assigned
+  // to a picker (or previously consolidated) is correctly left out of THIS run, not a reason the
+  // whole run should come back empty. Also count how many orders for this date/warehouse were
+  // excluded for exactly that reason, so a 0-eligible result can say why instead of looking like
+  // the click did nothing.
+  const [{ data: orders, error: ordersError }, { count: totalForDate }] = await Promise.all([
+    admin
+      .from('orders')
+      .select('order_id, store_code, unique_sku_count, planned_pieces')
+      .eq('warehouse_code', warehouse_code)
+      .eq('original_order_date', order_date)
+      .eq('status', 'new')
+      .is('consolidation_batch_id', null),
+    admin
+      .from('orders')
+      .select('order_id', { count: 'exact', head: true })
+      .eq('warehouse_code', warehouse_code)
+      .eq('original_order_date', order_date)
+      .neq('status', 'cancelled'),
+  ])
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 400 })
+  const alreadyAssignedOrConsolidated = (totalForDate ?? 0) - (orders?.length ?? 0)
   if (!orders || orders.length === 0) {
-    return NextResponse.json({ groups: [], message: 'No eligible orders for this date/warehouse' })
+    return NextResponse.json({
+      eligible_count: 0,
+      excluded_over_max_sku: 0,
+      single_order_count: 0,
+      batches: [],
+      total_orders_for_date: totalForDate ?? 0,
+      already_assigned_or_consolidated: alreadyAssignedOrConsolidated,
+    })
   }
 
   const orderIds = orders.map((o) => o.order_id)
-  const { data: lines } = await admin.from('order_lines').select('order_id, sku').in('order_id', orderIds)
+  // Must page through with fetchAllRows, not a plain select -- a day with more than Supabase's
+  // project "Max Rows" cap worth of lines (order_lines is by far the largest table; ~10 lines per
+  // order on average) previously got silently truncated, so orders past the cut lost their lines
+  // entirely, read as uniqueSkuCount>0 but skus:[] below, and were dropped from `eligible` even
+  // though they were genuinely new/unassigned -- Run Matching looked like it did nothing.
+  const lines = await fetchAllRows<{ order_id: string; sku: string }>((from, to) =>
+    admin.from('order_lines').select('order_id, sku').in('order_id', orderIds).range(from, to),
+  )
   const skusByOrder = new Map<string, string[]>()
-  for (const l of lines ?? []) {
+  for (const l of lines) {
     if (!skusByOrder.has(l.order_id)) skusByOrder.set(l.order_id, [])
     skusByOrder.get(l.order_id)!.push(l.sku)
   }
@@ -137,5 +166,7 @@ export async function POST(request: Request) {
     excluded_over_max_sku: result.excludedOverMaxSku.length,
     single_order_count: result.singleOrders.length,
     batches: createdBatches,
+    total_orders_for_date: totalForDate ?? 0,
+    already_assigned_or_consolidated: alreadyAssignedOrConsolidated,
   })
 }

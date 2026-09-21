@@ -20,13 +20,14 @@ const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in
  * accidentally couple to the same shape and break each other when one is redesigned.
  */
 export async function getControlTowerData(db: SupabaseClient, warehouseCode: string) {
-  const [base, zones, orders, lines] = await Promise.all([
+  const [base, zones, orders, lines, assignmentBatches] = await Promise.all([
     getDashboardData(db, warehouseCode),
     getActiveZoneCodes(db, warehouseCode),
     fetchAllRows((from, to) =>
       db.from('orders').select('order_id, order_no, status, planned_pieces, assigned_time, warehouse_code, assignment_batch_id').eq('warehouse_code', warehouseCode).range(from, to),
     ),
     fetchOrderZoneTouches(db, warehouseCode),
+    fetchAllRows((from, to) => db.from('assignment_batches').select('assignment_batch_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
   ])
 
   // order_alerts/picker_completions have no warehouse_code column, so both are fetched via an RPC
@@ -58,6 +59,21 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     zoneOrders.get(l.zone_code)!.add(l.order_id)
   }
 
+  // Row highlight must key off the SAME "which zone is this order really being picked in"
+  // definition Zone Dashboard uses (the order's assignment batch's own zone_code), not "any zone
+  // this order's lines touch" -- otherwise this row can flag a zone red/yellow for an order that's
+  // actually late in a DIFFERENT zone, disagreeing with what Zone Dashboard itself would show for
+  // that same zone (see the identical fix in dashboard.ts).
+  const zoneOfBatch = new Map(assignmentBatches.filter((b) => b.zone_code).map((b) => [b.assignment_batch_id, b.zone_code as string]))
+  const activeOrderIdsByZone = new Map<string, string[]>()
+  for (const o of orders) {
+    if (!o.assignment_batch_id || !ACTIVE_ORDER_STATUSES.has(o.status)) continue
+    const zone = zoneOfBatch.get(o.assignment_batch_id)
+    if (!zone) continue
+    if (!activeOrderIdsByZone.has(zone)) activeOrderIdsByZone.set(zone, [])
+    activeOrderIdsByZone.get(zone)!.push(o.order_id)
+  }
+
   const zoneOverview = zones.map((zone) => {
     const touching = [...(zoneOrders.get(zone) ?? new Set())]
     const active = touching.filter((id) => ACTIVE_ORDER_STATUSES.has(orderStatusById.get(id) ?? '')).length
@@ -66,12 +82,13 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     const verificationBacklog = touching.filter((id) => alertByOrder.get(id)?.is_verification_backlog).length
     const totalPieces = touching.reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
     const slaPct = touching.length > 0 ? Math.round((completed / touching.length) * 1000) / 10 : 100
-    // Row highlight: does any order touching this zone currently carry a warning/overdue/critical
-    // time alert, worst-first -- lets Admin spot which zones need attention at a glance without
-    // opening Zone Dashboard for each one.
-    const criticalCount = touching.filter((id) => alertByOrder.get(id)?.time_alert === 'critical').length
-    const overdueCount = touching.filter((id) => alertByOrder.get(id)?.time_alert === 'overdue').length
-    const warningCount = touching.filter((id) => alertByOrder.get(id)?.time_alert === 'warning').length
+    // Row highlight: does any order actively being picked IN this zone right now carry a
+    // warning/overdue/critical time alert, worst-first -- lets Admin spot which zones need
+    // attention at a glance, consistent with Zone Dashboard's own risk badge for the same zone.
+    const activeInZone = activeOrderIdsByZone.get(zone) ?? []
+    const criticalCount = activeInZone.filter((id) => alertByOrder.get(id)?.time_alert === 'critical').length
+    const overdueCount = activeInZone.filter((id) => alertByOrder.get(id)?.time_alert === 'overdue').length
+    const warningCount = activeInZone.filter((id) => alertByOrder.get(id)?.time_alert === 'warning').length
     const riskLevel: 'critical' | 'overdue' | 'warning' | 'none' = criticalCount > 0 ? 'critical' : overdueCount > 0 ? 'overdue' : warningCount > 0 ? 'warning' : 'none'
     return { zone, orders: touching.length, totalPieces, pickingBacklog, verificationBacklog, active, completed, slaPct, riskLevel, criticalCount, overdueCount, warningCount }
   })

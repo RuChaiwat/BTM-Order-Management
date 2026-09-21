@@ -137,6 +137,21 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   }
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
   const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
+  // Risk level must key off the SAME "which zone is this order really being picked in" definition
+  // Zone Dashboard uses (the order's assignment batch's own zone_code -- FR-030 confines an active
+  // order to being picked as part of ONE batch in ONE zone), not "any zone this order's lines
+  // touch". Using the broader line-based set here previously flagged a zone red/yellow for an
+  // order that was actually late in a DIFFERENT zone, just because one of its SKUs also happened to
+  // be stored there -- a real disagreement with Zone Dashboard's own risk badges for the same data.
+  const zoneOfBatch = new Map(assignmentBatches.filter((b) => b.zone_code).map((b) => [b.assignment_batch_id, b.zone_code as string]))
+  const activeOrderIdsByZone = new Map<string, string[]>()
+  for (const o of orders) {
+    if (!o.assignment_batch_id || !ACTIVE_ORDER_STATUSES.has(o.status)) continue
+    const zone = zoneOfBatch.get(o.assignment_batch_id)
+    if (!zone) continue
+    if (!activeOrderIdsByZone.has(zone)) activeOrderIdsByZone.set(zone, [])
+    activeOrderIdsByZone.get(zone)!.push(o.order_id)
+  }
   const zoneStatus = zones.map((zone) => {
     const touching = [...(zoneOrders.get(zone) ?? new Set())]
     const closedIds = touching.filter((id) => orderStatusById.get(id)?.startsWith('final_closed'))
@@ -147,14 +162,14 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     // shouldn't make the zone still look like it has picking left to do.
     const pendingPieces = touching.filter((id) => !pickingDoneIds.includes(id)).reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
     const slaPct = touching.length > 0 ? Math.round((closedIds.length / touching.length) * 1000) / 10 : 100
-    // Risk level: does this zone have any order still being actively picked that's tripped the
-    // 'overdue'/'critical' time alert -- i.e. which zone's pickers are running behind right now.
-    // Deliberately NOT based on slaPct above (admin-verification %), which trivially reads as 0
-    // for every zone until Admin starts confirming orders late in the day, regardless of how fast
+    // Risk level: does this zone have any order still being actively picked THERE that's tripped
+    // the 'overdue'/'critical' time alert -- i.e. which zone's pickers are running behind right
+    // now. Deliberately NOT based on slaPct above (admin-verification %), which trivially reads as
+    // 0 for every zone until Admin starts confirming orders late in the day, regardless of how fast
     // picking itself is going.
-    const activeTouching = touching.filter((id) => ACTIVE_ORDER_STATUSES.has(orderStatusById.get(id) ?? ''))
-    const criticalCount = activeTouching.filter((id) => alertByOrder.get(id)?.time_alert === 'critical').length
-    const overdueCount = activeTouching.filter((id) => alertByOrder.get(id)?.time_alert === 'overdue').length
+    const activeInZone = activeOrderIdsByZone.get(zone) ?? []
+    const criticalCount = activeInZone.filter((id) => alertByOrder.get(id)?.time_alert === 'critical').length
+    const overdueCount = activeInZone.filter((id) => alertByOrder.get(id)?.time_alert === 'overdue').length
     const riskLevel: 'red' | 'yellow' | 'green' = criticalCount > 0 ? 'red' : overdueCount > 0 ? 'yellow' : 'green'
     return { zone, orders: touching.length, totalPieces, pendingPieces, slaPct, onTrack: slaPct >= 85, riskLevel, criticalCount, overdueCount }
   })

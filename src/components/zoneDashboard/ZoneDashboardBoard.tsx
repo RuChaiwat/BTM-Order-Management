@@ -156,11 +156,12 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
               flex: '1 1 150px',
               minWidth: 150,
               maxWidth: 200,
-              // Selection is shown via boxShadow (an outline drawn outside the border box), never via
-              // the border itself -- border color is reserved for riskLevel on all 4 sides. Mixing the
-              // two into one `border`/`borderTop` pair previously meant clicking a zone painted 3 of
-              // its 4 sides in --color-primary (which is red), drowning out a green/yellow risk color.
-              border: `2px solid ${RISK_COLOR[z.riskLevel]}`,
+              // Same "colored top strip" risk treatment as Operations Dashboard's Zone Status cards
+              // (borderTop only, default .card border on the other 3 sides) so the two pages read as
+              // one visual language instead of Zone Status using a strip and this page a full-box
+              // outline for the same red/yellow/green meaning. Selection is shown separately via
+              // boxShadow (an outline drawn outside the border box), never via the border itself.
+              borderTop: `3px solid ${RISK_COLOR[z.riskLevel]}`,
               boxShadow: z.zone === activeZone ? '0 0 0 2px var(--color-info)' : 'none',
               padding: 14,
             }}

@@ -46,12 +46,20 @@ export async function getMatchingOverviewData(db: SupabaseClient, warehouseCode:
   ])
   const oversizedThreshold = Number(cfg.value('matching.p4_min_pieces') ?? 150)
 
+  const activeOrders = orders.filter((o) => o.status !== 'cancelled')
+  const matchedOrders = activeOrders.filter((o) => o.consolidation_batch_id)
+  const unmatchedOrders = activeOrders.filter((o) => !o.consolidation_batch_id)
+
+  // Scoped to MATCHED orders only -- Zone Distribution is meant to show where the consolidated
+  // demand actually is, not raw unfiltered demand for the date; including every order (matched or
+  // not) let a zone's total run higher than Matched Orders' own pieces total, which read as a
+  // contradiction between the two cards.
   // A plain `.in('order_id', orderIds)` puts every id in the request URL, which fails outright
   // once one Order Date has hundreds/thousands of orders -- same root cause as the Run Matching
   // bug (see migration 0024/0025's own comments), just for Zone Distribution instead. The RPC
   // sends orderIds in the POST body instead.
-  const orderIds = orders.map((o) => o.order_id)
-  const lines = await fetchScopedByOrderIds<{ order_id: string; zone_code: string | null }>(db, 'get_order_line_zones_by_ids', 'order_id, zone_code', orderIds)
+  const matchedOrderIds = matchedOrders.map((o) => o.order_id)
+  const lines = await fetchScopedByOrderIds<{ order_id: string; zone_code: string | null }>(db, 'get_order_line_zones_by_ids', 'order_id, zone_code', matchedOrderIds)
   const zoneOrderIds = new Map<string, Set<string>>()
   for (const l of lines) {
     if (!l.zone_code) continue
@@ -67,9 +75,6 @@ export async function getMatchingOverviewData(db: SupabaseClient, warehouseCode:
     .map(([zone, set]) => ({ zone, pieces: [...set].reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0), orders: set.size }))
     .sort((a, b) => b.pieces - a.pieces)
 
-  const activeOrders = orders.filter((o) => o.status !== 'cancelled')
-  const matchedOrders = activeOrders.filter((o) => o.consolidation_batch_id)
-  const unmatchedOrders = activeOrders.filter((o) => !o.consolidation_batch_id)
   const totalPieces = orders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
   const eligiblePieces = activeOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
   const matchedPieces = matchedOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)

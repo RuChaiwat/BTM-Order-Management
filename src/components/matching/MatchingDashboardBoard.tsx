@@ -164,7 +164,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
         <div className="card">
           <div className="card-title">Order Distribution by Zone</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            กระจายออเดอร์ตามโซน (ชิ้น) · lines from today's order pool · zones an order touches, don&apos;t sum across zones
+            กระจายออเดอร์ตามโซน (ชิ้น) · matched orders only · zones an order touches, don&apos;t sum across zones
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {data.zoneDistribution.map((z) => (

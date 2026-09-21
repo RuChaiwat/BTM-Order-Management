@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getActiveConfig } from './config'
 import { unwrap } from './unwrap'
+import { fetchScopedByOrderIds } from './scopedFetch'
 
 /**
  * §9-11 Matching Dashboard (Mockup 1 "Order Consolidation Dashboard") — a read-only, at-a-glance
@@ -27,10 +28,14 @@ export async function getMatchingOverviewData(db: SupabaseClient, warehouseCode:
   const batches = unwrap(batchesRes)
   const oversizedThreshold = Number(cfg.value('matching.p4_min_pieces') ?? 150)
 
+  // A plain `.in('order_id', orderIds)` puts every id in the request URL, which fails outright
+  // once one Order Date has hundreds/thousands of orders -- same root cause as the Run Matching
+  // bug (see migration 0024/0025's own comments), just for Zone Distribution instead. The RPC
+  // sends orderIds in the POST body instead.
   const orderIds = orders.map((o) => o.order_id)
-  const linesRes = orderIds.length ? await db.from('order_lines').select('order_id, zone_code').in('order_id', orderIds) : { data: [] as { order_id: string; zone_code: string | null }[] }
+  const lines = await fetchScopedByOrderIds<{ order_id: string; zone_code: string | null }>(db, 'get_order_line_zones_by_ids', 'order_id, zone_code', orderIds)
   const zoneOrderIds = new Map<string, Set<string>>()
-  for (const l of unwrap(linesRes)) {
+  for (const l of lines) {
     if (!l.zone_code) continue
     if (!zoneOrderIds.has(l.zone_code)) zoneOrderIds.set(l.zone_code, new Set())
     zoneOrderIds.get(l.zone_code)!.add(l.order_id)

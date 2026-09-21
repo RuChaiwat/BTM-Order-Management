@@ -51,29 +51,18 @@ export async function getMatchingOverviewData(db: SupabaseClient, warehouseCode:
   const unmatchedOrders = activeOrders.filter((o) => !o.consolidation_batch_id)
 
   // Scoped to MATCHED orders only -- Zone Distribution is meant to show where the consolidated
-  // demand actually is, not raw unfiltered demand for the date; including every order (matched or
-  // not) let a zone's total run higher than Matched Orders' own pieces total, which read as a
-  // contradiction between the two cards.
+  // demand actually is, not raw unfiltered demand for the date. Sums actual line-level qty per
+  // zone (not an order's total pieces repeated once for every zone it happens to touch, the
+  // Zone Status/Zone Overview convention elsewhere) -- an order split across 2 zones should only
+  // contribute the pieces that are really stored in each one, so the column's total lines up with
+  // Matched Orders' own pieces total instead of exceeding it.
   // A plain `.in('order_id', orderIds)` puts every id in the request URL, which fails outright
   // once one Order Date has hundreds/thousands of orders -- same root cause as the Run Matching
-  // bug (see migration 0024/0025's own comments), just for Zone Distribution instead. The RPC
-  // sends orderIds in the POST body instead.
+  // bug (see migration 0024's own comment), just for Zone Distribution instead. The RPC sends
+  // orderIds in the POST body instead, and aggregates the per-zone sum server-side.
   const matchedOrderIds = matchedOrders.map((o) => o.order_id)
-  const lines = await fetchScopedByOrderIds<{ order_id: string; zone_code: string | null }>(db, 'get_order_line_zones_by_ids', 'order_id, zone_code', matchedOrderIds)
-  const zoneOrderIds = new Map<string, Set<string>>()
-  for (const l of lines) {
-    if (!l.zone_code) continue
-    if (!zoneOrderIds.has(l.zone_code)) zoneOrderIds.set(l.zone_code, new Set())
-    zoneOrderIds.get(l.zone_code)!.add(l.order_id)
-  }
-  const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
-  // Pieces, not just order count -- same "Orders/Pieces Touching Zone, don't sum across zones"
-  // convention as Operations Dashboard's Zone Status / Control Tower's Zone Overview: an order
-  // touching 2 zones counts its full pieces toward both, so this column isn't meant to be summed
-  // down the list.
-  const zoneDistribution = [...zoneOrderIds.entries()]
-    .map(([zone, set]) => ({ zone, pieces: [...set].reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0), orders: set.size }))
-    .sort((a, b) => b.pieces - a.pieces)
+  const zonePieces = await fetchScopedByOrderIds<{ zone_code: string; pieces: number }>(db, 'get_order_line_zone_pieces_by_ids', 'zone_code, pieces', matchedOrderIds)
+  const zoneDistribution = zonePieces.map((z) => ({ zone: z.zone_code, pieces: z.pieces })).sort((a, b) => b.pieces - a.pieces)
 
   const totalPieces = orders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
   const eligiblePieces = activeOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)

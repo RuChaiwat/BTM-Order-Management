@@ -25,7 +25,7 @@ interface OverviewData {
   }
   priorityBreakdown: { priority: string; batches: number; orders: number; pieces: number }[]
   totalGroupedOrders: number
-  zoneDistribution: { zone: string; pieces: number; orders: number }[]
+  zoneDistribution: { zone: string; pieces: number }[]
   actionRequired: { lowMatchRateBatches: number; oversizedSingleOrders: number; awaitingApproval: number }
   topBatches: { consol_batch_id: string; batch_no: string; priority: string; match_pct: number | null; stores_count: number; orders_count: number; total_pieces: number; status: string }[]
 }

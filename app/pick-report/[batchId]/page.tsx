@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getBatchDetail, buildPickReportLines } from '@/lib/queries/consolidation'
 import { BatchReportDocument, PICK_REPORT_PRINT_CSS } from '@/components/consolidation/BatchReportDocument'
 import { PrintButton } from '@/components/PrintButton'
+import { BackButton } from '@/components/BackButton'
 import { batchStatusLabel, isBatchPrintable } from '@/lib/matching/batchStatus'
 import { formatDateTime } from '@/lib/formatDate'
 
@@ -28,7 +29,8 @@ export default async function PickReportPage({ params }: { params: { batchId: st
     <div>
       <style>{PICK_REPORT_PRINT_CSS}</style>
 
-      <div className="no-print" style={{ marginBottom: 16, maxWidth: 800, margin: '0 auto 16px' }}>
+      <div className="no-print" style={{ marginBottom: 16, maxWidth: 800, margin: '0 auto 16px', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <BackButton fallbackHref="/matching-analysis" />
         {printable ? (
           <PrintButton />
         ) : (

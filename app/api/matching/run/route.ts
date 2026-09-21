@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
 import { getActiveConfig, MATCHING_CONFIG_KEYS } from '@/lib/queries/config'
 import { runMatching, splitGroupIfNeeded, type MatchableOrder, type MatchingConfig } from '@/lib/matching/engine'
-import { fetchAllRows } from '@/lib/queries/fetchAllRows'
+import { fetchScopedByOrderIds } from '@/lib/queries/scopedFetch'
 
 /** §10 pre-screen + P1-P4 matching for one Order Date / Warehouse. Creates consolidation_batches
  * as 'candidate' — nothing is released to a pick report yet, that's a separate approve step. */
@@ -57,14 +57,13 @@ export async function POST(request: Request) {
   }
 
   const orderIds = orders.map((o) => o.order_id)
-  // Must page through with fetchAllRows, not a plain select -- a day with more than Supabase's
-  // project "Max Rows" cap worth of lines (order_lines is by far the largest table; ~10 lines per
-  // order on average) previously got silently truncated, so orders past the cut lost their lines
-  // entirely, read as uniqueSkuCount>0 but skus:[] below, and were dropped from `eligible` even
-  // though they were genuinely new/unassigned -- Run Matching looked like it did nothing.
-  const lines = await fetchAllRows<{ order_id: string; sku: string }>((from, to) =>
-    admin.from('order_lines').select('order_id, sku').in('order_id', orderIds).range(from, to),
-  )
+  // A plain `.in('order_id', orderIds)` puts every id in the request URL, which fails outright
+  // once a single Order Date's eligible orders run into the hundreds/thousands (see migration
+  // 0024) -- every order then silently reads as skus:[] and the engine's own eligible filter drops
+  // all of them, so Run Matching produced nothing with no visible error. The RPC sends orderIds in
+  // the POST body instead, and fetchScopedByOrderIds still pages through the result via
+  // fetchAllRows so it stays immune to the separate Max Rows cap regardless of line count.
+  const lines = await fetchScopedByOrderIds<{ order_id: string; sku: string }>(admin, 'get_order_lines_by_ids', 'order_id, sku', orderIds)
   const skusByOrder = new Map<string, string[]>()
   for (const l of lines) {
     if (!skusByOrder.has(l.order_id)) skusByOrder.set(l.order_id, [])

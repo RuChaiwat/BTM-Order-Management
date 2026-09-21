@@ -11,7 +11,12 @@ import { fetchAllRows } from './fetchAllRows'
  * through the RPC result exactly like any other query (immune to the separate Max Rows cap,
  * migration 0012), requesting only the given `columns` so each caller keeps its existing shape.
  */
-export async function fetchScopedByOrderIds<T>(db: SupabaseClient, rpcName: 'get_order_alerts_by_ids' | 'get_picker_completions_by_ids', columns: string, orderIds: string[]): Promise<T[]> {
+export async function fetchScopedByOrderIds<T>(
+  db: SupabaseClient,
+  rpcName: 'get_order_alerts_by_ids' | 'get_picker_completions_by_ids' | 'get_order_lines_by_ids',
+  columns: string,
+  orderIds: string[],
+): Promise<T[]> {
   if (orderIds.length === 0) return []
   // The client isn't given a generated Database type, so a custom RPC's row shape can't be
   // inferred (same reason every other .rpc() call in this codebase goes through `unwrap`/a loose

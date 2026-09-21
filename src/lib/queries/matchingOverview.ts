@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getActiveConfig } from './config'
-import { unwrap } from './unwrap'
 import { fetchScopedByOrderIds } from './scopedFetch'
+import { fetchAllRows } from './fetchAllRows'
 
 /**
  * §9-11 Matching Dashboard (Mockup 1 "Order Consolidation Dashboard") — a read-only, at-a-glance
@@ -16,16 +16,33 @@ import { fetchScopedByOrderIds } from './scopedFetch'
  * it if this distinction becomes operationally important.
  */
 export async function getMatchingOverviewData(db: SupabaseClient, warehouseCode: string, orderDate: string) {
-  const [ordersRes, batchesRes, cfg] = await Promise.all([
-    db.from('orders').select('order_id, status, planned_pieces, consolidation_batch_id').eq('warehouse_code', warehouseCode).eq('original_order_date', orderDate),
-    db
-      .from('consolidation_batches')
-      .select('consol_batch_id, batch_no, priority, match_pct, stores_count, orders_count, unique_sku_count, total_pieces, status')
-      .eq('order_date', orderDate),
+  // A plain `.select()` with no `.range()` is silently capped at Supabase/PostgREST's project
+  // "Max Rows" setting (see fetchAllRows's own comment) -- a busy Order Date's order count sat
+  // exactly at that cap (1000) here, undercounting Total/Eligible Orders and everything derived
+  // from them below once real volume passed it.
+  const [orders, batches, cfg] = await Promise.all([
+    fetchAllRows<{ order_id: string; status: string; planned_pieces: number | null; consolidation_batch_id: string | null }>((from, to) =>
+      db.from('orders').select('order_id, status, planned_pieces, consolidation_batch_id').eq('warehouse_code', warehouseCode).eq('original_order_date', orderDate).range(from, to),
+    ),
+    fetchAllRows<{
+      consol_batch_id: string
+      batch_no: string
+      priority: string
+      match_pct: number | null
+      stores_count: number
+      orders_count: number
+      unique_sku_count: number
+      total_pieces: number
+      status: string
+    }>((from, to) =>
+      db
+        .from('consolidation_batches')
+        .select('consol_batch_id, batch_no, priority, match_pct, stores_count, orders_count, unique_sku_count, total_pieces, status')
+        .eq('order_date', orderDate)
+        .range(from, to),
+    ),
     getActiveConfig(db, ['matching.p4_min_pieces']),
   ])
-  const orders = unwrap(ordersRes)
-  const batches = unwrap(batchesRes)
   const oversizedThreshold = Number(cfg.value('matching.p4_min_pieces') ?? 150)
 
   // A plain `.in('order_id', orderIds)` puts every id in the request URL, which fails outright

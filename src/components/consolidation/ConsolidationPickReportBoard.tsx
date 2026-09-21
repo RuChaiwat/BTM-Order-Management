@@ -45,7 +45,12 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
   }
 
   return (
-    <div className="card" style={{ minHeight: 0 }}>
+    // No minHeight:0 -- .app-shell is a fixed 100vh flex column, so a flex item allowed to shrink
+    // below its content gets squeezed by the flex algorithm once total page content exceeds the
+    // viewport, and .card has no overflow:hidden of its own, so the table's overflow rows would
+    // spill out past the card's bottom edge instead of the page just scrolling (same fix as Zone
+    // Dashboard/Control Tower).
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Active pick &amp; sort worklist</span>
         <span className="card-subtitle">sorted by release time, oldest first</span>

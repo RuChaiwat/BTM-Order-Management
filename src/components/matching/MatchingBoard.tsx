@@ -224,7 +224,12 @@ export function MatchingBoard({
         )}
       </div>
 
-      <div className="card" style={{ flex: 1, minHeight: 0 }}>
+      {/* No minHeight:0 -- .app-shell is a fixed 100vh flex column, so a flex item allowed to
+          shrink below its content gets squeezed by the flex algorithm once total page content
+          exceeds the viewport, and .card has no overflow:hidden of its own, so the table's
+          overflow rows would spill out past the card's bottom edge instead of the page just
+          scrolling (same fix as Zone Dashboard/Control Tower). */}
+      <div className="card" style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div className="card-title">Batch review — {formatDate(orderDate)}</div>

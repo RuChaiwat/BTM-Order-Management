@@ -96,8 +96,13 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 14, flex: 1, minHeight: 0 }}>
-        <div className="card" style={{ minHeight: 0 }}>
+      {/* No minHeight:0 anywhere below -- .app-shell is a fixed 100vh flex column, so a flex item
+          allowed to shrink below its content gets squeezed by the flex algorithm once total page
+          content exceeds the viewport, and .card has no overflow:hidden of its own, so a table's
+          overflow rows spill out past the card's bottom edge instead of the page just scrolling
+          (same fix as Zone Dashboard/Control Tower). */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 14, flex: 1 }}>
+        <div className="card">
           <div className="card-header" style={{ marginBottom: 10 }}>
             <span className="card-title">Top Batches</span>
             <span className="card-subtitle">ranked by pieces</span>
@@ -144,7 +149,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
           </table>
         </div>
 
-        <div className="card" style={{ minHeight: 0 }}>
+        <div className="card">
           <div className="card-header">
             <span className="card-title">Action Required</span>
             <span className="card-subtitle">รายการที่ต้องดำเนินการ</span>

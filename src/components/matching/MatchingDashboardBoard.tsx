@@ -40,8 +40,12 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
     <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: 'var(--color-text-secondary)' }}>
         Import Orders <span>→</span> Pre-screen <span>→</span> <strong style={{ color: 'var(--color-text)' }}>Matching</strong> <span>→</span> Batch Split <span>→</span> Pick Report
-        <Link href="/matching-analysis" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto', textDecoration: 'none' }}>
-          Open Matching Analysis &amp; Batch Review →
+        <Link
+          href="/matching-analysis"
+          className="btn btn-primary btn-sm"
+          style={{ marginLeft: 'auto', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          Review &amp; Approve →
         </Link>
       </div>
 
@@ -244,15 +248,6 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
             {data.actionRequired.lowMatchRateBatches > 0 && <ActionRow color="#DC2626" text={`${data.actionRequired.lowMatchRateBatches} batch(es) with match rate < 50%`} />}
             {data.actionRequired.oversizedSingleOrders > 0 && <ActionRow color="#EA580C" text={`${data.actionRequired.oversizedSingleOrders} single order(s) over the size threshold`} />}
             {!hasActions && <span style={{ color: 'var(--color-text-secondary)' }}>Nothing needs attention for {formatDate(data.orderDate)}.</span>}
-          </div>
-          <div style={{ marginTop: 'auto', paddingTop: 12 }}>
-            <Link
-              href="/matching-analysis"
-              className="btn btn-primary btn-sm"
-              style={{ width: '100%', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              Review &amp; act on batches
-            </Link>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getActiveConfig } from './config'
 import { fetchScopedByOrderIds } from './scopedFetch'
 import { fetchAllRows } from './fetchAllRows'
+import { PRINTABLE_BATCH_STATUSES } from '../matching/batchStatus'
 
 /**
  * §9-11 Matching Dashboard (Mockup 1 "Order Consolidation Dashboard") — a read-only, at-a-glance
@@ -57,32 +58,68 @@ export async function getMatchingOverviewData(db: SupabaseClient, warehouseCode:
     if (!zoneOrderIds.has(l.zone_code)) zoneOrderIds.set(l.zone_code, new Set())
     zoneOrderIds.get(l.zone_code)!.add(l.order_id)
   }
-  const zoneDistribution = [...zoneOrderIds.entries()].map(([zone, set]) => ({ zone, orders: set.size })).sort((a, b) => b.orders - a.orders)
+  const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
+  // Pieces, not just order count -- same "Orders/Pieces Touching Zone, don't sum across zones"
+  // convention as Operations Dashboard's Zone Status / Control Tower's Zone Overview: an order
+  // touching 2 zones counts its full pieces toward both, so this column isn't meant to be summed
+  // down the list.
+  const zoneDistribution = [...zoneOrderIds.entries()]
+    .map(([zone, set]) => ({ zone, pieces: [...set].reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0), orders: set.size }))
+    .sort((a, b) => b.pieces - a.pieces)
 
   const activeOrders = orders.filter((o) => o.status !== 'cancelled')
   const matchedOrders = activeOrders.filter((o) => o.consolidation_batch_id)
   const unmatchedOrders = activeOrders.filter((o) => !o.consolidation_batch_id)
   const totalPieces = orders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
-  const matchRate = activeOrders.length > 0 ? Math.round((matchedOrders.length / activeOrders.length) * 1000) / 10 : 0
+  const eligiblePieces = activeOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
+  const matchedPieces = matchedOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
+  // Two match rates on purpose: pieces is the number that actually matters for pick-floor
+  // workload, but a date with a few huge orders can make that look better or worse than the
+  // simpler "how many orders got matched" view, so both are shown rather than picking one.
+  const matchRatePieces = eligiblePieces > 0 ? Math.round((matchedPieces / eligiblePieces) * 1000) / 10 : 0
+  const matchRateOrders = activeOrders.length > 0 ? Math.round((matchedOrders.length / activeOrders.length) * 1000) / 10 : 0
 
   const priorityBreakdown = (['P1', 'P2', 'P3', 'P4'] as const).map((priority) => {
     const group = batches.filter((b) => b.priority === priority)
-    return { priority, batches: group.length, orders: group.reduce((s, b) => s + b.orders_count, 0) }
+    return { priority, batches: group.length, orders: group.reduce((s, b) => s + b.orders_count, 0), pieces: group.reduce((s, b) => s + b.total_pieces, 0) }
   })
   const totalGroupedOrders = priorityBreakdown.reduce((s, p) => s + p.orders, 0) + unmatchedOrders.length
 
   const topBatches = [...batches].sort((a, b) => b.total_pieces - a.total_pieces).slice(0, 5)
 
+  // Order Approved / Completed / Pending -- a batch's status only ever moves forward through the
+  // pipeline (candidate/review -> approved -> picking -> at_consolidation -> sorting -> completed),
+  // so "Approved" here means "has passed approval" (PRINTABLE_BATCH_STATUSES, the same set that
+  // already gates the Print button -- INCLUDES completed batches, they were approved too) and
+  // "Pending" is the difference: approved but not yet all the way to completed, i.e. still active
+  // in the pick/consolidate/sort pipeline. Mirrors the Total -> Assigned -> Completed funnel style
+  // already used on Operations Dashboard.
+  const approvedBatches = batches.filter((b) => PRINTABLE_BATCH_STATUSES.has(b.status))
+  const completedBatches = batches.filter((b) => b.status === 'completed')
+  const approvedOrders = approvedBatches.reduce((s, b) => s + b.orders_count, 0)
+  const approvedPieces = approvedBatches.reduce((s, b) => s + b.total_pieces, 0)
+  const completedOrders = completedBatches.reduce((s, b) => s + b.orders_count, 0)
+  const completedPieces = completedBatches.reduce((s, b) => s + b.total_pieces, 0)
+
   return {
     orderDate,
     kpis: {
       totalOrders: orders.length,
+      totalPieces,
       eligibleOrders: activeOrders.length,
+      eligiblePieces,
       matchedOrders: matchedOrders.length,
-      matchRate,
+      matchedPieces,
+      matchRatePieces,
+      matchRateOrders,
       batchesCreated: batches.length,
       singleOrders: unmatchedOrders.length,
-      totalPieces,
+      approvedOrders,
+      approvedPieces,
+      completedOrders,
+      completedPieces,
+      pendingOrders: approvedOrders - completedOrders,
+      pendingPieces: approvedPieces - completedPieces,
     },
     priorityBreakdown,
     totalGroupedOrders,

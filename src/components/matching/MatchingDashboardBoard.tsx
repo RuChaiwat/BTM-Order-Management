@@ -7,16 +7,25 @@ interface OverviewData {
   orderDate: string
   kpis: {
     totalOrders: number
+    totalPieces: number
     eligibleOrders: number
+    eligiblePieces: number
     matchedOrders: number
-    matchRate: number
+    matchedPieces: number
+    matchRatePieces: number
+    matchRateOrders: number
     batchesCreated: number
     singleOrders: number
-    totalPieces: number
+    approvedOrders: number
+    approvedPieces: number
+    completedOrders: number
+    completedPieces: number
+    pendingOrders: number
+    pendingPieces: number
   }
-  priorityBreakdown: { priority: string; batches: number; orders: number }[]
+  priorityBreakdown: { priority: string; batches: number; orders: number; pieces: number }[]
   totalGroupedOrders: number
-  zoneDistribution: { zone: string; orders: number }[]
+  zoneDistribution: { zone: string; pieces: number; orders: number }[]
   actionRequired: { lowMatchRateBatches: number; oversizedSingleOrders: number; awaitingApproval: number }
   topBatches: { consol_batch_id: string; batch_no: string; priority: string; match_pct: number | null; stores_count: number; orders_count: number; total_pieces: number; status: string }[]
 }
@@ -24,7 +33,7 @@ interface OverviewData {
 const PRIORITY_COLOR: Record<string, string> = { P1: '#16A34A', P2: '#2563EB', P3: '#F59E0B', P4: '#DC2626' }
 
 export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
-  const maxZoneOrders = Math.max(1, ...data.zoneDistribution.map((z) => z.orders))
+  const maxZonePieces = Math.max(1, ...data.zoneDistribution.map((z) => z.pieces))
   const hasActions = data.actionRequired.lowMatchRateBatches > 0 || data.actionRequired.oversizedSingleOrders > 0 || data.actionRequired.awaitingApproval > 0
 
   return (
@@ -36,14 +45,90 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
         </Link>
       </div>
 
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: 10 }}>
-        <KpiCard label="TOTAL ORDERS" value={data.kpis.totalOrders} compact style={{ padding: 12 }} />
-        <KpiCard label="ELIGIBLE ORDERS" value={data.kpis.eligibleOrders} valueColor="#16A34A" compact style={{ padding: 12 }} />
-        <KpiCard label="MATCHED ORDERS" value={data.kpis.matchedOrders} valueColor="#7C3AED" compact style={{ padding: 12 }} />
-        <KpiCard label="MATCH RATE" value={`${data.kpis.matchRate}%`} valueColor="#0891B2" compact style={{ padding: 12 }} />
-        <KpiCard label="BATCHES CREATED" value={data.kpis.batchesCreated} valueColor="#EA580C" compact style={{ padding: 12 }} />
-        <KpiCard label="SINGLE ORDERS" value={data.kpis.singleOrders} valueColor="#DC2626" compact style={{ padding: 12 }} />
-        <KpiCard label="TOTAL PIECES" value={data.kpis.totalPieces} compact style={{ padding: 12 }} />
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
+        <KpiCard
+          label="TOTAL ORDERS (PCS)"
+          labelTh="ออเดอร์ทั้งหมดที่ Import"
+          value={data.kpis.totalPieces.toLocaleString()}
+          sub={`${data.kpis.totalOrders.toLocaleString()} orders`}
+          compact
+          style={{ padding: 12 }}
+        />
+        <KpiCard
+          label="ELIGIBLE ORDERS (PCS)"
+          labelTh="ออเดอร์ที่พร้อมจับคู่"
+          value={data.kpis.eligiblePieces.toLocaleString()}
+          valueColor="#16A34A"
+          sub={`${data.kpis.eligibleOrders.toLocaleString()} orders`}
+          compact
+          style={{ padding: 12 }}
+        />
+        <KpiCard
+          label="MATCHED ORDERS (PCS)"
+          labelTh="ออเดอร์ที่จับคู่แล้ว"
+          value={data.kpis.matchedPieces.toLocaleString()}
+          valueColor="#7C3AED"
+          sub={`${data.kpis.matchedOrders.toLocaleString()} orders`}
+          compact
+          style={{ padding: 12 }}
+        />
+        <KpiCard
+          label="MATCH RATE"
+          labelTh="% การจับคู่สำเร็จ (ชิ้น)"
+          value={`${data.kpis.matchRatePieces}%`}
+          valueColor="#0891B2"
+          sub={`${data.kpis.matchRateOrders}% by order count`}
+          compact
+          style={{ padding: 12 }}
+        />
+        <KpiCard
+          label="BATCHES CREATED"
+          labelTh="แบตช์ที่สร้างแล้ว"
+          value={data.kpis.batchesCreated.toLocaleString()}
+          valueColor="#EA580C"
+          sub="batches"
+          compact
+          style={{ padding: 12 }}
+        />
+        <KpiCard
+          label="SINGLE ORDERS"
+          labelTh="ออเดอร์เดี่ยว (ไม่จับคู่)"
+          value={data.kpis.singleOrders.toLocaleString()}
+          valueColor="#DC2626"
+          sub="orders"
+          compact
+          style={{ padding: 12 }}
+        />
+      </div>
+
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        <KpiCard
+          label="ORDERS APPROVED (PCS)"
+          labelTh="ออเดอร์ที่อนุมัติแล้ว"
+          value={data.kpis.approvedPieces.toLocaleString()}
+          valueColor="#2563EB"
+          sub={`${data.kpis.approvedOrders.toLocaleString()} orders`}
+          compact
+          style={{ padding: 12 }}
+        />
+        <KpiCard
+          label="ORDERS COMPLETED (PCS)"
+          labelTh="ออเดอร์ที่เสร็จสิ้นแล้ว"
+          value={data.kpis.completedPieces.toLocaleString()}
+          valueColor="#16A34A"
+          sub={`${data.kpis.completedOrders.toLocaleString()} orders`}
+          compact
+          style={{ padding: 12 }}
+        />
+        <KpiCard
+          label="ORDERS PENDING (PCS)"
+          labelTh="ออเดอร์ที่รอดำเนินการ"
+          value={data.kpis.pendingPieces.toLocaleString()}
+          valueColor={data.kpis.pendingPieces > 0 ? '#F59E0B' : undefined}
+          sub={`${data.kpis.pendingOrders.toLocaleString()} orders`}
+          compact
+          style={{ padding: 12 }}
+        />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -60,7 +145,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, color: PRIORITY_COLOR[p.priority] }}>{p.priority}</span>
                     <span>
-                      {p.orders} orders · {p.batches} batch(es) ({pct}%)
+                      {p.orders} orders · {p.pieces.toLocaleString()} pcs · {p.batches} batch(es) ({pct}%)
                     </span>
                   </div>
                   <div style={{ height: 8, borderRadius: 4, background: '#F3F4F6', overflow: 'hidden' }}>
@@ -79,16 +164,16 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
         <div className="card">
           <div className="card-title">Order Distribution by Zone</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            กระจายออเดอร์ตามโซน · lines from today's order pool
+            กระจายออเดอร์ตามโซน (ชิ้น) · lines from today's order pool · zones an order touches, don&apos;t sum across zones
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {data.zoneDistribution.map((z) => (
               <div key={z.zone} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                 <span style={{ width: 56, fontWeight: 700 }}>Zone {z.zone}</span>
                 <div style={{ flex: 1, height: 16, borderRadius: 4, background: '#F3F4F6', overflow: 'hidden' }}>
-                  <span style={{ display: 'block', height: '100%', width: `${(z.orders / maxZoneOrders) * 100}%`, background: '#2563EB' }} />
+                  <span style={{ display: 'block', height: '100%', width: `${(z.pieces / maxZonePieces) * 100}%`, background: '#2563EB' }} />
                 </div>
-                <span style={{ width: 36, textAlign: 'right' }}>{z.orders}</span>
+                <span style={{ width: 70, textAlign: 'right' }}>{z.pieces.toLocaleString()} pcs</span>
               </div>
             ))}
             {data.zoneDistribution.length === 0 && <span style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>No order lines for this date yet.</span>}
@@ -161,7 +246,11 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
             {!hasActions && <span style={{ color: 'var(--color-text-secondary)' }}>Nothing needs attention for {formatDate(data.orderDate)}.</span>}
           </div>
           <div style={{ marginTop: 'auto', paddingTop: 12 }}>
-            <Link href="/matching-analysis" className="btn btn-secondary btn-sm" style={{ width: '100%', textAlign: 'center', textDecoration: 'none', display: 'block' }}>
+            <Link
+              href="/matching-analysis"
+              className="btn btn-primary btn-sm"
+              style={{ width: '100%', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
               Review &amp; act on batches
             </Link>
           </div>

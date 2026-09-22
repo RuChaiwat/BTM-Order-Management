@@ -5,6 +5,7 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getMatchingDashboardData } from '@/lib/queries/consolidation'
 import { getMostRecentOrderDate } from '@/lib/queries/orderDates'
+import { getActivePickers } from '@/lib/queries/pickers'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -24,12 +25,12 @@ export default async function MatchingAnalysisPage({ searchParams }: { searchPar
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
   const orderDate = searchParams.date ?? (await getMostRecentOrderDate(admin, warehouseCode)) ?? yesterday()
-  const { batches, unmatchedPendingCount } = await getMatchingDashboardData(admin, warehouseCode, orderDate)
+  const [{ batches, unmatchedPendingCount }, pickers] = await Promise.all([getMatchingDashboardData(admin, warehouseCode, orderDate), getActivePickers(admin, warehouseCode)])
 
   return (
     <>
       <TopBar title="Matching Analysis & Batch Review" subtitle={`วิเคราะห์การจับคู่ / ตรวจแบตช์ · ${warehouseCode}`} />
-      <MatchingBoard batches={batches} warehouseCode={warehouseCode} unmatchedPendingCount={unmatchedPendingCount} orderDate={orderDate} />
+      <MatchingBoard batches={batches} warehouseCode={warehouseCode} unmatchedPendingCount={unmatchedPendingCount} orderDate={orderDate} pickers={pickers} />
     </>
   )
 }

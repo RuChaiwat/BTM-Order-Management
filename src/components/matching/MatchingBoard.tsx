@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
 import { formatDate } from '@/lib/formatDate'
 import { DateInput } from '@/components/DateInput'
+import { Modal, ModalFooter } from '@/components/Modal'
+import type { PickerRow } from '@/lib/queries/pickers'
 
 interface Batch {
   consol_batch_id: string
@@ -35,11 +37,13 @@ export function MatchingBoard({
   warehouseCode,
   unmatchedPendingCount,
   orderDate,
+  pickers,
 }: {
   batches: Batch[]
   warehouseCode: string
   unmatchedPendingCount: number
   orderDate: string
+  pickers: PickerRow[]
 }) {
   const router = useRouter()
   const [dateInput, setDateInput] = useState(orderDate)
@@ -52,6 +56,14 @@ export function MatchingBoard({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'batch_no', dir: 'asc' })
   const [page, setPage] = useState(1)
+
+  // Approve now requires assigning a picker in the same step -- see migration 0027's own comment:
+  // without this, orders that only went through Order Consolidation sat at status='new' forever,
+  // invisible to Pick Completion / Admin Verification / every dashboard that tracks active work.
+  const [approveTarget, setApproveTarget] = useState<string[] | null>(null)
+  const [pickerScanValue, setPickerScanValue] = useState('')
+  const [pickerScanError, setPickerScanError] = useState<string | null>(null)
+  const [scannedPicker, setScannedPicker] = useState<PickerRow | null>(null)
 
   useEffect(() => {
     setDateInput(orderDate)
@@ -103,9 +115,10 @@ export function MatchingBoard({
 
   /** Approve collapses the old two-step Approve-then-Release flow into one action, and the
    * system prints the batch's pick report immediately once it's approved — for one batch (row
-   * action) or several at once (bulk). The print tab is opened synchronously, inside the click
-   * handler, so browsers don't treat it as an unrequested popup once the approve call resolves. */
-  async function approveAndPrint(batchIds: string[]) {
+   * action) or several at once (bulk, all assigned to the same picker). The print tab is opened
+   * synchronously, inside the click handler, so browsers don't treat it as an unrequested popup
+   * once the approve call resolves. */
+  async function approveAndPrint(batchIds: string[], pickerId: string) {
     if (batchIds.length === 0) return
     const printWindow = window.open('', '_blank')
     setBulkBusy(true)
@@ -117,7 +130,7 @@ export function MatchingBoard({
         const res = await fetch(`/api/consolidation-batches/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'approve' }),
+          body: JSON.stringify({ action: 'approve', picker_id: pickerId }),
         })
         const body = await res.json()
         if (!res.ok) throw new Error(body.error ?? 'Approve failed')
@@ -135,6 +148,42 @@ export function MatchingBoard({
       printWindow?.close()
     }
     router.refresh()
+  }
+
+  function openApproveModal(batchIds: string[]) {
+    setApproveTarget(batchIds)
+    setPickerScanValue('')
+    setPickerScanError(null)
+    setScannedPicker(null)
+  }
+
+  function closeApproveModal() {
+    setApproveTarget(null)
+    setPickerScanValue('')
+    setPickerScanError(null)
+    setScannedPicker(null)
+  }
+
+  function handlePickerScan() {
+    const value = pickerScanValue.trim()
+    if (!value) return
+    setPickerScanError(null)
+    const match = pickers.find((p) => p.picker_id === value.toUpperCase())
+    if (!match) {
+      setPickerScanError(`No active picker with ID '${value}'`)
+      return
+    }
+    setScannedPicker(match)
+    setPickerScanValue('')
+  }
+
+  // Deliberately keeps the modal open (bulkBusy disables its Confirm button) through the whole
+  // approve+print call, only closing once it settles -- closing immediately on click would leave
+  // no visible feedback while the request (and, on success, opening the print tab) is in flight.
+  async function confirmApprove() {
+    if (!approveTarget || !scannedPicker) return
+    await approveAndPrint(approveTarget, scannedPicker.picker_id)
+    closeApproveModal()
   }
 
   function toggleSort(key: SortKey) {
@@ -239,7 +288,7 @@ export function MatchingBoard({
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {selected.size > 0 && (
-              <button className="btn btn-primary btn-sm" disabled={bulkBusy} onClick={() => approveAndPrint([...selected])}>
+              <button className="btn btn-primary btn-sm" disabled={bulkBusy} onClick={() => openApproveModal([...selected])}>
                 {bulkBusy ? 'Approving…' : `Approve selected (${selected.size})`}
               </button>
             )}
@@ -284,7 +333,7 @@ export function MatchingBoard({
                 <td>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {b.status === 'candidate' && (
-                      <button className="btn btn-primary btn-sm" style={{ height: 28, padding: '0 10px' }} disabled={bulkBusy} onClick={() => approveAndPrint([b.consol_batch_id])}>
+                      <button className="btn btn-primary btn-sm" style={{ height: 28, padding: '0 10px' }} disabled={bulkBusy} onClick={() => openApproveModal([b.consol_batch_id])}>
                         Approve
                       </button>
                     )}
@@ -320,6 +369,59 @@ export function MatchingBoard({
           </div>
         )}
       </div>
+
+      {approveTarget && (
+        <Modal
+          title={approveTarget.length === 1 ? 'Approve batch' : `Approve ${approveTarget.length} batches`}
+          subtitle="สแกนรหัส Picker เพื่อมอบหมายงานหยิบก่อนอนุมัติ · orders in this batch will be assigned to the scanned picker"
+        >
+          <div className="modal-body">
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 8 }}>
+              Assign to picker <span style={{ color: '#DC2626' }}>*</span>
+            </div>
+            {scannedPicker ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '10px 12px' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{scannedPicker.name_en}</div>
+                  <div style={{ fontSize: 11, color: '#6B7280' }}>{scannedPicker.picker_id}</div>
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={() => setScannedPicker(null)}>
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  className="control"
+                  placeholder="Scan picker ID…"
+                  value={pickerScanValue}
+                  onChange={(e) => setPickerScanValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handlePickerScan()}
+                  style={{ flex: 1, minWidth: 0 }}
+                  autoFocus
+                />
+                <button className="btn btn-secondary btn-sm" onClick={handlePickerScan}>
+                  Scan
+                </button>
+              </div>
+            )}
+            {pickerScanError && <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--color-danger)' }}>{pickerScanError}</div>}
+            <div style={{ marginTop: 14, fontSize: 12, color: '#6B7280' }}>
+              {approveTarget.length === 1
+                ? "This batch's orders will be assigned to the picker above and immediately available on their Pick Completion screen."
+                : `All ${approveTarget.length} selected batches will be assigned to the same picker above.`}
+            </div>
+          </div>
+          <ModalFooter>
+            <button className="modal-footer-btn btn-secondary" disabled={bulkBusy} onClick={closeApproveModal}>
+              Cancel
+            </button>
+            <button className="modal-footer-btn btn-primary" style={{ minWidth: 190, border: 0 }} disabled={!scannedPicker || bulkBusy} onClick={confirmApprove}>
+              {bulkBusy ? 'Approving…' : 'Confirm & Approve'}
+            </button>
+          </ModalFooter>
+        </Modal>
+      )}
     </div>
   )
 }

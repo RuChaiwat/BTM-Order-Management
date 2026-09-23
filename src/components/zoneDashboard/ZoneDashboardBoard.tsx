@@ -54,15 +54,6 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
-interface MultiZoneWork {
-  activeOrders: ZoneActiveOrderRow[]
-  activePickers: number
-  activePickerTotalPieces: number
-  activePickerTotalOrders: number
-  criticalCount: number
-  overdueCount: number
-}
-
 const RISK_COLOR: Record<ZoneDetail['riskLevel'], string> = { red: '#DC2626', yellow: '#F59E0B', green: '#16A34A' }
 const PAGE_SIZE = 15
 
@@ -130,19 +121,11 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
   )
 }
 
-export function ZoneDashboardBoard({ zoneDetail, multiZone, initialZone }: { zoneDetail: ZoneDetail[]; multiZone: MultiZoneWork; initialZone?: string }) {
+export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: ZoneDetail[]; initialZone?: string }) {
   const [activeZone, setActiveZone] = useState(() => (initialZone && zoneDetail.some((z) => z.zone === initialZone) ? initialZone : (zoneDetail[0]?.zone ?? '')))
   const selected = zoneDetail.find((z) => z.zone === activeZone) ?? zoneDetail[0]
 
   const orderTable = useSortedPage<ZoneActiveOrderRow, OrderSortColumn>(selected?.activeOrders ?? [], 'elapsedMinutes', {
-    orderNo: (o) => o.orderNo,
-    pickerName: (o) => o.pickerName,
-    status: (o) => o.status,
-    elapsedMinutes: (o) => o.elapsedMinutes,
-    timeAlert: (o) => o.timeAlert ?? '',
-  })
-
-  const multiZoneOrderTable = useSortedPage<ZoneActiveOrderRow, OrderSortColumn>(multiZone.activeOrders, 'elapsedMinutes', {
     orderNo: (o) => o.orderNo,
     pickerName: (o) => o.pickerName,
     status: (o) => o.status,
@@ -197,50 +180,6 @@ export function ZoneDashboardBoard({ zoneDetail, multiZone, initialZone }: { zon
         ))}
         {zoneDetail.length === 0 && <div className="card">No zones found — import Location Master data first.</div>}
       </div>
-
-      {/* Orders from a Consolidation Batch are assigned to a picker across multiple zones at once
-          (migration 0027), so they can't belong to any single zone card above -- surfaced here
-          separately instead of silently vanishing from this page. */}
-      {(multiZone.activeOrders.length > 0 || multiZone.activePickers > 0) && (
-        <div className="card">
-          <div className="card-header" style={{ marginBottom: 10 }}>
-            <span className="card-title">Consolidation Batches — Multi-Zone Picking</span>
-            <span className="card-subtitle">
-              ออเดอร์จาก Consolidation Batch ที่มอบหมายแล้ว (ข้ามหลายโซน) · {multiZone.activePickers} picker(s) · {multiZone.activePickerTotalPieces.toLocaleString()} pcs /{' '}
-              {multiZone.activePickerTotalOrders} orders in hand · click a column to sort
-            </span>
-          </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <SortHeader label="ORDER NO." column="orderNo" active={multiZoneOrderTable.sortColumn} dir={multiZoneOrderTable.sortDir} onSort={multiZoneOrderTable.changeSort} />
-                <SortHeader label="PICKER" column="pickerName" active={multiZoneOrderTable.sortColumn} dir={multiZoneOrderTable.sortDir} onSort={multiZoneOrderTable.changeSort} />
-                <SortHeader label="STATUS" column="status" active={multiZoneOrderTable.sortColumn} dir={multiZoneOrderTable.sortDir} onSort={multiZoneOrderTable.changeSort} />
-                <SortHeader label="ELAPSED" column="elapsedMinutes" active={multiZoneOrderTable.sortColumn} dir={multiZoneOrderTable.sortDir} onSort={multiZoneOrderTable.changeSort} />
-                <SortHeader label="ALERT" column="timeAlert" active={multiZoneOrderTable.sortColumn} dir={multiZoneOrderTable.sortDir} onSort={multiZoneOrderTable.changeSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {multiZoneOrderTable.pageRows.map((o) => (
-                <tr key={o.orderId}>
-                  <td className="link">{o.orderNo}</td>
-                  <td>{o.pickerName}</td>
-                  <td>{STATUS_LABEL[o.status] ?? o.status}</td>
-                  <td>{o.elapsedMinutes} min</td>
-                  <td>
-                    {o.timeAlert ? (
-                      <span className={`badge badge-${o.timeAlert === 'critical' ? 'danger' : o.timeAlert === 'overdue' ? 'warning' : 'info'}`}>{o.timeAlert}</span>
-                    ) : (
-                      <span style={{ color: '#9CA3AF' }}>—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <Pagination page={multiZoneOrderTable.page} totalPages={multiZoneOrderTable.totalPages} onChange={multiZoneOrderTable.setPage} />
-        </div>
-      )}
 
       {selected && (
         <>

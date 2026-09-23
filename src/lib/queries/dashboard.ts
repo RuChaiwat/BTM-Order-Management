@@ -143,14 +143,23 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   // touch". Using the broader line-based set here previously flagged a zone red/yellow for an
   // order that was actually late in a DIFFERENT zone, just because one of its SKUs also happened to
   // be stored there -- a real disagreement with Zone Dashboard's own risk badges for the same data.
+  //
+  // A consolidation-linked batch (zone_code='MULTI', migration 0027) is the one deliberate
+  // exception: it spans multiple zones by design (its orders were clustered by SKU/store overlap,
+  // not confined to one zone), so it's attributed to every real zone its orders' lines actually
+  // touch instead of a single zone_code it was never confined to -- same as the "touching"
+  // pieces/backlog totals below, and the same convention Zone Dashboard itself uses.
   const zoneOfBatch = new Map(assignmentBatches.filter((b) => b.zone_code).map((b) => [b.assignment_batch_id, b.zone_code as string]))
   const activeOrderIdsByZone = new Map<string, string[]>()
   for (const o of orders) {
     if (!o.assignment_batch_id || !ACTIVE_ORDER_STATUSES.has(o.status)) continue
     const zone = zoneOfBatch.get(o.assignment_batch_id)
     if (!zone) continue
-    if (!activeOrderIdsByZone.has(zone)) activeOrderIdsByZone.set(zone, [])
-    activeOrderIdsByZone.get(zone)!.push(o.order_id)
+    const targetZones = zone === 'MULTI' ? [...zoneOrders.keys()].filter((z) => zoneOrders.get(z)!.has(o.order_id)) : [zone]
+    for (const z of targetZones) {
+      if (!activeOrderIdsByZone.has(z)) activeOrderIdsByZone.set(z, [])
+      activeOrderIdsByZone.get(z)!.push(o.order_id)
+    }
   }
   const zoneStatus = zones.map((zone) => {
     const touching = [...(zoneOrders.get(zone) ?? new Set())]

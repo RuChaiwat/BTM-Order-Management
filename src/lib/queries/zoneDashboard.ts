@@ -126,32 +126,42 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   // an Assigned status show up in a zone's order list while never counting toward that same zone's
   // Active Pickers, because the two used different definitions of "this zone" for the same order --
   // a real, confusing inconsistency. Both are now derived from this one map, so they can't disagree.
+  //
+  // A consolidation-linked batch (zone_code='MULTI', migration 0027) is the one deliberate
+  // exception: it spans multiple zones by design (its orders were clustered by SKU/store overlap
+  // across the warehouse, not confined to one zone), so its orders genuinely ARE being worked in
+  // every zone their own lines touch -- attributed there directly (same zoneOrderIds map "touching"
+  // already uses below) instead of a single zone_code the batch was never confined to. A picker
+  // working one of these batches can correctly show as active in more than one zone at once.
   const zoneOfBatch = new Map(batches.filter((b) => b.zone_code).map((b) => [b.assignment_batch_id, b.zone_code as string]))
   const activeOrdersByZone = new Map<string, ZoneActiveOrderRow[]>()
   const zonePickerWork = new Map<string, Map<string, { orders: number; pieces: number }>>()
   for (const o of orders) {
     if (!o.assignment_batch_id || !ACTIVE_ORDER_STATUSES.has(o.status)) continue
-    const zone = zoneOfBatch.get(o.assignment_batch_id)
+    const batchZone = zoneOfBatch.get(o.assignment_batch_id)
     const pickerId = pickerIdByBatch.get(o.assignment_batch_id)
-    if (!zone || !pickerId) continue
-
-    if (!zonePickerWork.has(zone)) zonePickerWork.set(zone, new Map())
-    const perPicker = zonePickerWork.get(zone)!
-    const entry = perPicker.get(pickerId) ?? { orders: 0, pieces: 0 }
-    entry.orders += 1
-    entry.pieces += o.planned_pieces ?? 0
-    perPicker.set(pickerId, entry)
+    if (!batchZone || !pickerId) continue
+    const targetZones = batchZone === 'MULTI' ? [...zoneOrderIds.keys()].filter((z) => zoneOrderIds.get(z)!.has(o.order_id)) : [batchZone]
 
     const alert = alertByOrder.get(o.order_id)
-    if (!activeOrdersByZone.has(zone)) activeOrdersByZone.set(zone, [])
-    activeOrdersByZone.get(zone)!.push({
-      orderId: o.order_id,
-      orderNo: o.order_no,
-      status: o.status,
-      pickerName: nameByPicker.get(pickerId) ?? pickerId,
-      elapsedMinutes: Math.round(alert?.elapsed_minutes ?? 0),
-      timeAlert: alert?.time_alert ?? null,
-    })
+    for (const zone of targetZones) {
+      if (!zonePickerWork.has(zone)) zonePickerWork.set(zone, new Map())
+      const perPicker = zonePickerWork.get(zone)!
+      const entry = perPicker.get(pickerId) ?? { orders: 0, pieces: 0 }
+      entry.orders += 1
+      entry.pieces += o.planned_pieces ?? 0
+      perPicker.set(pickerId, entry)
+
+      if (!activeOrdersByZone.has(zone)) activeOrdersByZone.set(zone, [])
+      activeOrdersByZone.get(zone)!.push({
+        orderId: o.order_id,
+        orderNo: o.order_no,
+        status: o.status,
+        pickerName: nameByPicker.get(pickerId) ?? pickerId,
+        elapsedMinutes: Math.round(alert?.elapsed_minutes ?? 0),
+        timeAlert: alert?.time_alert ?? null,
+      })
+    }
   }
 
   const zoneDetail = zones.map((zone) => {
@@ -202,21 +212,5 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
     }
   })
 
-  // Consolidation-linked assignment batches get zone_code='MULTI' (migration 0027) since their
-  // orders span multiple zones by design (FR-030's single-zone rule doesn't apply to them) --
-  // 'MULTI' never matches a real zone, so `zones.map()` above naturally excludes their active
-  // orders/pickers from every per-zone breakdown. Surfaced here separately instead, so this work
-  // doesn't just silently vanish from Zone Dashboard.
-  const multiZoneActiveOrders = (activeOrdersByZone.get('MULTI') ?? []).sort((a, b) => b.elapsedMinutes - a.elapsedMinutes)
-  const multiZonePickerWork = zonePickerWork.get('MULTI')
-  const multiZone = {
-    activeOrders: multiZoneActiveOrders,
-    activePickers: multiZonePickerWork?.size ?? 0,
-    activePickerTotalPieces: multiZonePickerWork ? [...multiZonePickerWork.values()].reduce((s, w) => s + w.pieces, 0) : 0,
-    activePickerTotalOrders: multiZonePickerWork ? [...multiZonePickerWork.values()].reduce((s, w) => s + w.orders, 0) : 0,
-    criticalCount: multiZoneActiveOrders.filter((o) => o.timeAlert === 'critical').length,
-    overdueCount: multiZoneActiveOrders.filter((o) => o.timeAlert === 'overdue').length,
-  }
-
-  return { zoneDetail, multiZone }
+  return { zoneDetail }
 }

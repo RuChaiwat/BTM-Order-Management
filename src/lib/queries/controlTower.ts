@@ -63,15 +63,20 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
   // definition Zone Dashboard uses (the order's assignment batch's own zone_code), not "any zone
   // this order's lines touch" -- otherwise this row can flag a zone red/yellow for an order that's
   // actually late in a DIFFERENT zone, disagreeing with what Zone Dashboard itself would show for
-  // that same zone (see the identical fix in dashboard.ts).
+  // that same zone (see the identical fix in dashboard.ts). A consolidation-linked batch
+  // (zone_code='MULTI', migration 0027) is the one exception: it spans multiple zones by design,
+  // so it's attributed to every real zone its orders' lines actually touch instead.
   const zoneOfBatch = new Map(assignmentBatches.filter((b) => b.zone_code).map((b) => [b.assignment_batch_id, b.zone_code as string]))
   const activeOrderIdsByZone = new Map<string, string[]>()
   for (const o of orders) {
     if (!o.assignment_batch_id || !ACTIVE_ORDER_STATUSES.has(o.status)) continue
     const zone = zoneOfBatch.get(o.assignment_batch_id)
     if (!zone) continue
-    if (!activeOrderIdsByZone.has(zone)) activeOrderIdsByZone.set(zone, [])
-    activeOrderIdsByZone.get(zone)!.push(o.order_id)
+    const targetZones = zone === 'MULTI' ? [...zoneOrders.keys()].filter((z) => zoneOrders.get(z)!.has(o.order_id)) : [zone]
+    for (const z of targetZones) {
+      if (!activeOrderIdsByZone.has(z)) activeOrderIdsByZone.set(z, [])
+      activeOrderIdsByZone.get(z)!.push(o.order_id)
+    }
   }
 
   const zoneOverview = zones.map((zone) => {

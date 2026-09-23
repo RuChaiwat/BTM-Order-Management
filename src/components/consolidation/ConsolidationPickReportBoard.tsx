@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
 import { formatDate, formatDateTime } from '@/lib/formatDate'
+import { Modal, ModalFooter } from '@/components/Modal'
+import { Spinner } from '@/components/Spinner'
 
 interface Batch {
   consol_batch_id: string
@@ -37,17 +39,26 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'released_at', dir: 'asc' })
   const [page, setPage] = useState(1)
 
-  async function markCompleted(batchId: string) {
+  // Marking a batch Completed here has the same real effect as the picker confirming through Pick
+  // Completion -- it used to only flip consolidation_batches.status, leaving every order inside it
+  // stuck at Assigned/In Progress forever (invisible to Admin Verification). 100% vs Short applies
+  // to every order in the batch at once, same as Pick Completion's own "Completed All" -- a
+  // genuinely mixed batch (some 100%, some short) still needs those confirmed individually from
+  // Pick Completion instead.
+  const [completeTarget, setCompleteTarget] = useState<string | null>(null)
+
+  async function markCompleted(batchId: string, result: '100_percent' | 'short') {
     setBusyBatch(batchId)
     setError(null)
     const res = await fetch(`/api/consolidation-batches/${batchId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'complete' }),
+      body: JSON.stringify({ action: 'complete', result }),
     })
+    const body = await res.json()
     setBusyBatch(null)
+    setCompleteTarget(null)
     if (!res.ok) {
-      const body = await res.json()
       setError(body.error)
       return
     }
@@ -82,13 +93,16 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
     )
   }
 
+  const completeBatch = batches.find((b) => b.consol_batch_id === completeTarget) ?? null
+
   return (
-    // No minHeight:0 -- .app-shell is a fixed 100vh flex column, so a flex item allowed to shrink
-    // below its content gets squeezed by the flex algorithm once total page content exceeds the
-    // viewport, and .card has no overflow:hidden of its own, so the table's overflow rows would
-    // spill out past the card's bottom edge instead of the page just scrolling (same fix as Zone
-    // Dashboard/Control Tower).
-    <div className="card">
+    <>
+      {/* No minHeight:0 -- .app-shell is a fixed 100vh flex column, so a flex item allowed to
+          shrink below its content gets squeezed by the flex algorithm once total page content
+          exceeds the viewport, and .card has no overflow:hidden of its own, so the table's
+          overflow rows would spill out past the card's bottom edge instead of the page just
+          scrolling (same fix as Zone Dashboard/Control Tower). */}
+      <div className="card">
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Active pick &amp; sort worklist</span>
         <span className="card-subtitle">click a column to sort</span>
@@ -142,7 +156,7 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
                     className="btn btn-success btn-sm"
                     style={{ height: 28, padding: '0 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                     disabled={busyBatch === b.consol_batch_id}
-                    onClick={() => markCompleted(b.consol_batch_id)}
+                    onClick={() => setCompleteTarget(b.consol_batch_id)}
                   >
                     Mark completed
                   </button>
@@ -172,6 +186,39 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
           </button>
         </div>
       )}
-    </div>
+      </div>
+
+      {completeBatch && (
+        <Modal title={`Mark ${completeBatch.batch_no} completed`} subtitle="ยืนยันผลการหยิบของทั้ง Batch · หยุดเวลาของทุกออเดอร์ในกลุ่มนี้">
+          <div className="modal-body">
+            All {completeBatch.orders_count} order(s) in this batch will be marked picked and sent to Admin Verification. Choose 100% only if every order in the batch was fully picked --
+            otherwise use Completed with Short (Admin will record the actual short quantity/reason per order during verification).
+          </div>
+          <ModalFooter>
+            <button className="modal-footer-btn btn-secondary" disabled={busyBatch === completeTarget} onClick={() => setCompleteTarget(null)}>
+              Cancel
+            </button>
+            <button
+              className="modal-footer-btn btn-warning"
+              style={{ border: 0 }}
+              disabled={busyBatch === completeTarget}
+              onClick={() => completeBatch && markCompleted(completeBatch.consol_batch_id, 'short')}
+            >
+              {busyBatch === completeTarget && <Spinner />}
+              Completed with Short
+            </button>
+            <button
+              className="modal-footer-btn btn-success"
+              style={{ minWidth: 160, border: 0 }}
+              disabled={busyBatch === completeTarget}
+              onClick={() => completeBatch && markCompleted(completeBatch.consol_batch_id, '100_percent')}
+            >
+              {busyBatch === completeTarget && <Spinner />}
+              Completed (100%)
+            </button>
+          </ModalFooter>
+        </Modal>
+      )}
+    </>
   )
 }

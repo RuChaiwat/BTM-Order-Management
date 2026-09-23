@@ -13,10 +13,7 @@ import { writeAudit, writeStatusHistory } from '@/lib/audit'
 // orders (migration 0027) -- otherwise those orders sat at status='new' forever, invisible to Pick
 // Completion, Admin Verification, and every dashboard that tracks active picking work. See that
 // migration's own comment for the full reasoning.
-const SIMPLE_TRANSITIONS: Record<string, string> = {
-  cancel: 'cancelled',
-  complete: 'completed',
-}
+const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in_progress'])
 
 /** §9-11 consolidation batch lifecycle: candidate -> report_released ("Approved") -> ... -> completed (or cancelled). */
 export async function PATCH(request: Request, { params }: { params: { batchId: string } }) {
@@ -27,9 +24,9 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
 
-  const { action, picker_id: pickerId } = await request.json()
-  if (action !== 'approve' && !SIMPLE_TRANSITIONS[action]) {
-    return NextResponse.json({ error: "action must be 'approve', 'cancel' or 'complete'" }, { status: 400 })
+  const { action, picker_id: pickerId, result } = await request.json()
+  if (!['approve', 'complete', 'cancel'].includes(action)) {
+    return NextResponse.json({ error: "action must be 'approve', 'complete' or 'cancel'" }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -78,16 +75,52 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
     return NextResponse.json({ batch: updated, assignment_batch: assignmentBatch })
   }
 
-  const newStatus = SIMPLE_TRANSITIONS[action]
-  const { data: updated, error } = await admin.from('consolidation_batches').update({ status: newStatus }).eq('consol_batch_id', params.batchId).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (action === 'complete') {
+    if (!['100_percent', 'short'].includes(result ?? '')) {
+      return NextResponse.json({ error: "result must be '100_percent' or 'short'" }, { status: 400 })
+    }
 
-  if (action === 'cancel') {
-    await admin.from('orders').update({ consolidation_batch_id: null }).eq('consolidation_batch_id', params.batchId)
+    // Mirrors POST /api/picker-completions: marking a batch "Completed" previously only ever
+    // touched consolidation_batches.status, leaving every order inside it stuck at
+    // assigned/in_progress forever -- invisible to Admin Verification and every dashboard that
+    // tracks active picking work, exactly the same gap migration 0027 closed for Approve. Orders
+    // already past picking (picker_completed_*, final_closed_*, cancelled) are left alone.
+    const { data: batchOrders } = await admin.from('orders').select('order_id, status, planned_pieces').eq('consolidation_batch_id', params.batchId)
+    const activeOrders = (batchOrders ?? []).filter((o) => ACTIVE_ORDER_STATUSES.has(o.status))
+
+    const nowIso = new Date().toISOString()
+    const newOrderStatus = result === '100_percent' ? 'picker_completed_100' : 'picker_completed_short'
+    for (const o of activeOrders) {
+      const actualPieces = result === '100_percent' ? o.planned_pieces : null
+      await admin.from('picker_completions').upsert({ order_id: o.order_id, picker_completed_time: nowIso, actual_pieces: actualPieces, result }, { onConflict: 'order_id' })
+      await admin.from('orders').update({ status: newOrderStatus, picker_completed_time: nowIso }).eq('order_id', o.order_id)
+      await writeStatusHistory(admin, { entityType: 'orders', entityId: o.order_id, oldStatus: o.status, newStatus: newOrderStatus, changedBy: caller.user_id })
+    }
+
+    const { data: updated, error } = await admin.from('consolidation_batches').update({ status: 'completed' }).eq('consol_batch_id', params.batchId).select().single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    await writeStatusHistory(admin, { entityType: 'consolidation_batches', entityId: params.batchId, oldStatus: batch.status, newStatus: 'completed', changedBy: caller.user_id })
+    await writeAudit(admin, {
+      userId: caller.user_id,
+      action: 'consolidation_batch.complete',
+      entityType: 'consolidation_batches',
+      entityId: params.batchId,
+      before: batch,
+      after: { ...updated, result, orders_completed: activeOrders.length },
+    })
+
+    return NextResponse.json({ batch: updated, orders_completed: activeOrders.length })
   }
 
-  await writeStatusHistory(admin, { entityType: 'consolidation_batches', entityId: params.batchId, oldStatus: batch.status, newStatus, changedBy: caller.user_id })
-  await writeAudit(admin, { userId: caller.user_id, action: `consolidation_batch.${action}`, entityType: 'consolidation_batches', entityId: params.batchId, before: batch, after: updated })
+  // action === 'cancel'
+  const { data: updated, error } = await admin.from('consolidation_batches').update({ status: 'cancelled' }).eq('consol_batch_id', params.batchId).select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  await admin.from('orders').update({ consolidation_batch_id: null }).eq('consolidation_batch_id', params.batchId)
+
+  await writeStatusHistory(admin, { entityType: 'consolidation_batches', entityId: params.batchId, oldStatus: batch.status, newStatus: 'cancelled', changedBy: caller.user_id })
+  await writeAudit(admin, { userId: caller.user_id, action: 'consolidation_batch.cancel', entityType: 'consolidation_batches', entityId: params.batchId, before: batch, after: updated })
 
   return NextResponse.json({ batch: updated })
 }

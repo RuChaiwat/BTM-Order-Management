@@ -192,7 +192,8 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
         <Modal title={`Mark ${completeBatch.batch_no} completed`} subtitle="ยืนยันผลการหยิบของทั้ง Batch · หยุดเวลาของทุกออเดอร์ในกลุ่มนี้">
           <div className="modal-body">
             All {completeBatch.orders_count} order(s) in this batch will be marked picked and sent to Admin Verification. Choose 100% only if every order in the batch was fully picked --
-            otherwise use Completed with Short (Admin will record the actual short quantity/reason per order during verification).
+            otherwise use Completed with Short (Admin will record the actual short quantity/reason per order during verification). If the batch is genuinely mixed, you can instead confirm each
+            order individually from Pick Completion — this batch closes itself automatically once every order in it has been confirmed there.
           </div>
           <ModalFooter>
             <button className="modal-footer-btn btn-secondary" disabled={busyBatch === completeTarget} onClick={() => setCompleteTarget(null)}>

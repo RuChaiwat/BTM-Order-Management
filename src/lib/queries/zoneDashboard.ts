@@ -202,5 +202,21 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
     }
   })
 
-  return { zoneDetail }
+  // Consolidation-linked assignment batches get zone_code='MULTI' (migration 0027) since their
+  // orders span multiple zones by design (FR-030's single-zone rule doesn't apply to them) --
+  // 'MULTI' never matches a real zone, so `zones.map()` above naturally excludes their active
+  // orders/pickers from every per-zone breakdown. Surfaced here separately instead, so this work
+  // doesn't just silently vanish from Zone Dashboard.
+  const multiZoneActiveOrders = (activeOrdersByZone.get('MULTI') ?? []).sort((a, b) => b.elapsedMinutes - a.elapsedMinutes)
+  const multiZonePickerWork = zonePickerWork.get('MULTI')
+  const multiZone = {
+    activeOrders: multiZoneActiveOrders,
+    activePickers: multiZonePickerWork?.size ?? 0,
+    activePickerTotalPieces: multiZonePickerWork ? [...multiZonePickerWork.values()].reduce((s, w) => s + w.pieces, 0) : 0,
+    activePickerTotalOrders: multiZonePickerWork ? [...multiZonePickerWork.values()].reduce((s, w) => s + w.orders, 0) : 0,
+    criticalCount: multiZoneActiveOrders.filter((o) => o.timeAlert === 'critical').length,
+    overdueCount: multiZoneActiveOrders.filter((o) => o.timeAlert === 'overdue').length,
+  }
+
+  return { zoneDetail, multiZone }
 }

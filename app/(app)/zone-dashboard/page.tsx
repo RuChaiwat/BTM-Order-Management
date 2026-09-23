@@ -21,7 +21,7 @@ export default async function ZoneDashboardPage({ searchParams }: { searchParams
   return (
     <>
       <TopBar title="Zone Dashboard" subtitle={`แดชบอร์ดโซน · ${data.zoneDetail.length} zones · ${warehouseCode}`} />
-      <ZoneDashboardBoard zoneDetail={data.zoneDetail} initialZone={searchParams.zone} />
+      <ZoneDashboardBoard zoneDetail={data.zoneDetail} multiZone={data.multiZone} initialZone={searchParams.zone} />
     </>
   )
 }

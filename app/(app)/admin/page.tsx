@@ -6,7 +6,6 @@ import { ConfigHistoryPanel } from '@/components/admin/ConfigHistoryPanel'
 import { HousekeepingPanel } from '@/components/admin/HousekeepingPanel'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/auth'
-import { formatDateTime } from '@/lib/formatDate'
 import { CONFIG_FIELDS } from '@/lib/configCatalog'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
@@ -26,7 +25,6 @@ export default async function AdminPage() {
     { data: reasons, error: reasonsError },
     { data: configs, error: configsError },
     { data: configVersions, error: configVersionsError },
-    { data: auditLogs, error: auditError },
     { data: exportJobs, error: exportError },
     { data: purgeLog, error: purgeError },
   ] = await Promise.all([
@@ -36,7 +34,6 @@ export default async function AdminPage() {
     // ordering by version desc here lets it just take the first two per key in JS instead of a
     // second round trip.
     admin.from('configuration').select('key, value, version, changed_by, changed_at, change_reason').in('key', knownConfigKeys).order('key').order('version', { ascending: false }),
-    admin.from('audit_logs').select('id, user_id, action, entity_type, entity_id, created_at').order('created_at', { ascending: false }).limit(30),
     admin.from('export_jobs').select('id, status, period_start, period_end, row_count, target_ref, finished_at, error_detail').order('created_at', { ascending: false }).limit(10),
     admin.from('purge_log').select('id, covered_period_start, table_name, rows_purged, result, created_at').order('created_at', { ascending: false }).limit(20),
   ])
@@ -44,7 +41,6 @@ export default async function AdminPage() {
     ['reason_master', reasonsError],
     ['configuration', configsError],
     ['configuration_versions', configVersionsError],
-    ['audit_logs', auditError],
     ['export_jobs', exportError],
     ['purge_log', purgeError],
   ] as const) {
@@ -53,49 +49,12 @@ export default async function AdminPage() {
 
   return (
     <>
-      <TopBar title="Configuration / Audit" subtitle="ตั้งค่า / ตรวจสอบ · Reason Master, thresholds, audit trail" />
+      <TopBar title="Configuration" subtitle="ตั้งค่าระบบ · Reason Master, thresholds — see Audit Trail (sidebar) for the change log" />
       <div className="page-body">
         <ReasonMasterManager reasons={reasons ?? []} />
         <ConfigEditor configs={configs ?? []} />
         <ConfigHistoryPanel versions={configVersions ?? []} />
         <HousekeepingPanel exportJobs={exportJobs ?? []} purgeLog={purgeLog ?? []} />
-
-        <div className="card" style={{ flex: 1, minHeight: 0 }}>
-          <div className="card-title">Audit Trail</div>
-          <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            Last 30 recorded actions (§23) — immutable, System Admin / Warehouse Manager only
-          </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>TIME</th>
-                <th>USER</th>
-                <th>ACTION</th>
-                <th>ENTITY</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(auditLogs ?? []).map((a) => (
-                <tr key={a.id}>
-                  <td>{formatDateTime(a.created_at)}</td>
-                  <td>{a.user_id ?? 'system'}</td>
-                  <td>{a.action}</td>
-                  <td>
-                    {a.entity_type}
-                    {a.entity_id ? ` · ${a.entity_id}` : ''}
-                  </td>
-                </tr>
-              ))}
-              {(!auditLogs || auditLogs.length === 0) && (
-                <tr>
-                  <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
-                    No audit records yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
       </div>
     </>
   )

@@ -2,37 +2,37 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds } from './scopedFetch'
+import { getActiveConfig } from './config'
+import { bangkokDateKey } from '../formatDate'
 
-const WINDOW_DAYS = 7
 /** Cycle time (Assigned → Picker Completed) at or under this is "on time" for the SLA KPI here.
  * Matches Control Tower's "overdue" threshold (§13); a dedicated configuration key is a
  * reasonable follow-up, not built here (same judgment call as order_alerts' thresholds). */
 const SLA_THRESHOLD_MINUTES = 120
+const LEADERBOARD_SIZE = 10
 
-/** §12.2/§13 Productivity / SLA / Short Pick analytics — 7-day picker productivity, cycle-time
- * SLA compliance, and a short-pick reason breakdown (which reasons/zones cost the most pieces).
- *
- * Windowed and driven entirely by the PICKER's own confirm date (picker_completions.
- * picker_completed_time) — deliberately independent of Admin Verification, so a picker's
- * throughput this week shows up immediately, without waiting on Admin to get around to Final
- * Close. This means the top KPIs can legitimately disagree with Operations Dashboard/Control
- * Tower's "Completed" (which only counts admin-verified final_closed_* orders): those measure
- * work Admin has signed off on; this measures work the picker actually did.
+/** §12.2/§13 Productivity / SLA / Short Pick analytics for a single (Bangkok-calendar) day, driven
+ * entirely by the PICKER's own confirm date (picker_completions.picker_completed_time) --
+ * deliberately independent of Admin Verification, so a picker's work today shows up immediately
+ * without waiting on Admin to get around to Final Close. A rolling multi-day average would hide
+ * exactly the thing this page exists to show: how today's shift is doing right now.
  *
  * One consequence of that independence: reason-level Short Pick detail (picker_completion_lines)
  * is only ever written at Admin Verification's Final Close step (app/api/admin-verifications/
- * route.ts) — the picker's own submission is coarse, by design (§12.2 redesign). So the Short
- * Pick Reasons table can only show reasons for orders in this window that HAVE been verified so
+ * route.ts) -- the picker's own submission is coarse, by design (§12.2 redesign). So the Short
+ * Pick Reasons table can only show reasons for orders on this date that HAVE been verified so
  * far; an order the picker just completed but Admin hasn't touched yet still counts toward Orders
  * Completed/Total Pieces/SLA/Short Pick Rate (all picker-reported), just not yet toward the
  * reason breakdown. */
-export async function getProductivityData(db: SupabaseClient, warehouseCode: string) {
-  const sinceIso = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
-
-  const [orders, pickers] = await Promise.all([
+export async function getProductivityData(db: SupabaseClient, warehouseCode: string, date: string) {
+  const [orders, pickers, cfg] = await Promise.all([
     fetchAllRows((from, to) => db.from('orders').select('order_id, assigned_time, assignment_batch_id').eq('warehouse_code', warehouseCode).range(from, to)),
     db.from('pickers').select('picker_id, name_en').eq('warehouse_code', warehouseCode).eq('active', true).then(unwrap),
+    // Same target used by the weekly Picker Productivity rating (migration 0020) -- configurable
+    // rather than a second hardcoded number baked into this page.
+    getActiveConfig(db, ['picker_productivity.target_pcs_per_hour']),
   ])
+  const targetPcsPerHour = Number(cfg.value('picker_productivity.target_pcs_per_hour') ?? 4500)
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
   const orderIds = orders.map((o) => o.order_id)
 
@@ -48,7 +48,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
   )
 
   const completedRows = completions
-    .filter((c) => c.picker_completed_time >= sinceIso)
+    .filter((c) => bangkokDateKey(c.picker_completed_time) === date)
     .map((completion) => ({ order: orderById.get(completion.order_id), completion }))
     .filter((r): r is { order: NonNullable<typeof r.order>; completion: typeof r.completion } => !!r.order)
 
@@ -97,6 +97,15 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     }
   })
 
+  // Leaderboards only make sense for pickers who actually worked this date -- a picker who didn't
+  // work isn't "below target," they're simply absent from the day's productivity entirely.
+  const workedPickers = pickerRows.filter((p) => p.completed > 0 && p.pcsPerHour !== null) as (typeof pickerRows[number] & { pcsPerHour: number })[]
+  const topAboveTarget = [...workedPickers]
+    .filter((p) => p.pcsPerHour > targetPcsPerHour)
+    .sort((a, b) => b.pcsPerHour - a.pcsPerHour)
+    .slice(0, LEADERBOARD_SIZE)
+  const bottomPerformers = [...workedPickers].sort((a, b) => a.pcsPerHour - b.pcsPerHour).slice(0, LEADERBOARD_SIZE)
+
   // Reason-level detail only exists once Admin has Final Closed the order (see the function-level
   // note above) -- this naturally shows fewer rows than completedRows until Admin catches up, but
   // never blocks the KPIs above, which are picker-reported and available immediately.
@@ -128,9 +137,12 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     .sort((a, b) => b.shortPieces - a.shortPieces)
 
   return {
-    windowDays: WINDOW_DAYS,
+    date,
+    targetPcsPerHour,
     pickerRows,
     reasonBreakdown,
+    topAboveTarget,
+    bottomPerformers,
     kpis: {
       completedOrders: completedRows.length,
       totalPieces,

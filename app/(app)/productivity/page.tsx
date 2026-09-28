@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
 import { KpiCard } from '@/components/KpiCard'
+import { ProductivityDateFilter } from '@/components/productivity/ProductivityDateFilter'
 import { ProductivityBoard } from '@/components/productivity/ProductivityBoard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getProductivityData } from '@/lib/queries/productivity'
+import { bangkokDateKey, formatDate } from '@/lib/formatDate'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -12,16 +14,19 @@ import { getProductivityData } from '@/lib/queries/productivity'
 // this route (and its data) to always be fresh.
 export const dynamic = 'force-dynamic'
 
-export default async function ProductivityPage() {
+export default async function ProductivityPage({ searchParams }: { searchParams: { date?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
-  const data = await getProductivityData(admin, warehouseCode)
+  const date = searchParams.date || bangkokDateKey(new Date()) || new Date().toISOString().slice(0, 10)
+  const data = await getProductivityData(admin, warehouseCode, date)
 
   return (
     <>
-      <TopBar title="Productivity / SLA / Short Pick" subtitle={`ผลิตภาพ / SLA / หยิบขาด · ${data.windowDays}-day window · ${warehouseCode}`} />
+      <TopBar title="Productivity / SLA / Short Pick" subtitle={`ผลิตภาพ / SLA / หยิบขาด · ${formatDate(date)} · ${warehouseCode}`}>
+        <ProductivityDateFilter date={date} />
+      </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <KpiCard
@@ -37,7 +42,7 @@ export default async function ProductivityPage() {
             label="AVG PCS / HOUR"
             labelTh="อัตราหยิบเฉลี่ย (ชิ้น/ชม.)"
             value={data.kpis.avgPcsPerHour ?? '—'}
-            sub={`${data.windowDays}-day window`}
+            sub={`target ${data.targetPcsPerHour.toLocaleString()} pcs/hr`}
             compact
             style={{ padding: 14 }}
           />
@@ -61,7 +66,15 @@ export default async function ProductivityPage() {
           />
         </div>
 
-        <ProductivityBoard pickerRows={data.pickerRows} reasonBreakdown={data.reasonBreakdown} windowDays={data.windowDays} warehouseCode={warehouseCode} />
+        <ProductivityBoard
+          pickerRows={data.pickerRows}
+          reasonBreakdown={data.reasonBreakdown}
+          topAboveTarget={data.topAboveTarget}
+          bottomPerformers={data.bottomPerformers}
+          targetPcsPerHour={data.targetPcsPerHour}
+          date={date}
+          warehouseCode={warehouseCode}
+        />
       </div>
     </>
   )

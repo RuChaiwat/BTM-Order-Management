@@ -9,8 +9,9 @@ import { getSessionUser } from '@/lib/auth'
  *
  * Deliberately conservative and NOT exhaustive of everything §20.2 lists as purgeable
  * ("matching candidates/history... derived dashboard aggregates") — this build purges only
- * orders/order_lines (+ their direct per-order children) and fully-orphaned old
- * consolidation_batches, which can be deleted with a clear, auditable blast radius per row.
+ * orders/order_lines (+ their direct per-order children), fully-orphaned old
+ * consolidation_batches, and old audit_logs rows, which can be deleted with a clear, auditable
+ * blast radius per row.
  * import_batches/import_errors are deliberately left alone here: orders.import_id has no
  * cascade, and nulling it out first to make that chain safe is a follow-up, not guessed at
  * blind — see the code comment below. This is the single least-tested piece of the whole build
@@ -100,6 +101,16 @@ export async function GET(request: Request) {
     }
   }
   purgeCounts.consolidation_batches = consolidationBatchesPurged
+
+  // audit_logs is the one table this job previously left alone entirely -- every other
+  // transactional table here gets cleaned up as a side effect of purging the specific orders/
+  // batches that own its rows, but an audit_logs row isn't owned by any single order (a
+  // configuration.update entry, for instance, has no order_id at all), so it needs its own
+  // straightforward time-based sweep instead of an order-scoped one. Immutability (§23) means
+  // never editing a row, not keeping every row forever -- same cutoff and safety gate as
+  // everything else purged here.
+  const { count: auditLogsPurged } = await admin.from('audit_logs').delete({ count: 'exact' }).lt('created_at', cutoff.toISOString())
+  purgeCounts.audit_logs = auditLogsPurged ?? 0
 
   for (const [table, rows] of Object.entries(purgeCounts)) {
     await admin.from('purge_log').insert({

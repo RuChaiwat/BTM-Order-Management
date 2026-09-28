@@ -22,11 +22,13 @@ export const ROLE_LABELS: Record<string, string> = {
 
 // id 8 = Pick Completion (kept as an office/supervisor-operated screen for completing on a
 // picker's behalf, now that pickers themselves never log in); id 16 = Admin Verification
-// (office-only confirm/reject); id 17 = Picker Management (Admin-only picker CRUD).
+// (office-only confirm/reject); id 17 = Picker Management (Admin-only picker CRUD); id 18 =
+// Audit Trail (split out of Configuration, id 15 -- same roles as 15 kept access to it, since it
+// was simply a card on that same page before).
 export const ROLE_MENU_ACCESS: Record<string, number[]> = {
-  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
-  warehouse_manager: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17],
-  supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17],
+  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+  warehouse_manager: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18],
+  supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 18],
   planner_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16],
   zone_controller: [1, 3, 8, 9, 10, 11, 12],
   viewer: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 16],

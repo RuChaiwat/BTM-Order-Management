@@ -18,12 +18,13 @@ export async function PATCH(request: Request) {
   }
 
   const { key, value, scope, change_reason } = await request.json()
-  if (!key || value === undefined || !change_reason) {
-    return NextResponse.json({ error: 'key, value and change_reason are required' }, { status: 400 })
+  if (!key || value === undefined) {
+    return NextResponse.json({ error: 'key and value are required' }, { status: 400 })
   }
 
   const admin = createAdminClient()
   const effectiveScope = scope ?? 'global'
+  const reason = change_reason || 'Updated from Configuration settings'
 
   const { data: current } = await admin
     .from('configuration')
@@ -37,7 +38,7 @@ export async function PATCH(request: Request) {
 
   const { data: created, error: insertError } = await admin
     .from('configuration')
-    .insert({ key, value, scope: effectiveScope, version: nextVersion, active: true, changed_by: caller.user_id, change_reason })
+    .insert({ key, value, scope: effectiveScope, version: nextVersion, active: true, changed_by: caller.user_id, change_reason: reason })
     .select()
     .single()
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 400 })

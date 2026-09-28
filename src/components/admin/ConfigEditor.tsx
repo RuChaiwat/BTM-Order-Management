@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { CONFIG_CATEGORIES, CONFIG_FIELDS, CONFIG_FIELD_BY_KEY, toDisplayValue, fromDisplayValue } from '@/lib/configCatalog'
 
 interface ConfigRow {
   key: string
@@ -11,85 +12,132 @@ interface ConfigRow {
 
 export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
   const router = useRouter()
-  const [key, setKey] = useState(configs[0]?.key ?? '')
-  const [value, setValue] = useState('')
-  const [reason, setReason] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const configByKey = new Map(configs.map((c) => [c.key, c]))
+  // Only edits actually in flight live here -- everything else reads straight from `configs`
+  // (the server's own current value), so a save elsewhere (or router.refresh()) never leaves a
+  // stale draft behind.
+  const [edits, setEdits] = useState<Record<string, string>>({})
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  async function save() {
-    setBusy(true)
-    setError(null)
-    let parsedValue: unknown
-    try {
-      parsedValue = JSON.parse(value)
-    } catch {
-      setBusy(false)
-      setError('Value must be valid JSON (e.g. 300, "text", true, ["a","b"])')
+  function displayFor(key: string): string {
+    if (key in edits) return edits[key]
+    const field = CONFIG_FIELD_BY_KEY.get(key)!
+    return toDisplayValue(field.kind, configByKey.get(key)?.value)
+  }
+
+  function isDirty(key: string): boolean {
+    if (!(key in edits)) return false
+    const field = CONFIG_FIELD_BY_KEY.get(key)!
+    return edits[key] !== toDisplayValue(field.kind, configByKey.get(key)?.value)
+  }
+
+  function setEdit(key: string, display: string) {
+    setEdits((e) => ({ ...e, [key]: display }))
+    setErrors((e) => (key in e ? { ...e, [key]: '' } : e))
+  }
+
+  function cancelEdit(key: string) {
+    setEdits((e) => {
+      const next = { ...e }
+      delete next[key]
+      return next
+    })
+    setErrors((e) => {
+      const next = { ...e }
+      delete next[key]
+      return next
+    })
+  }
+
+  async function save(key: string) {
+    const field = CONFIG_FIELD_BY_KEY.get(key)!
+    const parsed = fromDisplayValue(field.kind, edits[key] ?? '')
+    if (!parsed.ok) {
+      setErrors((e) => ({ ...e, [key]: 'Enter a valid number · กรอกตัวเลขให้ถูกต้อง' }))
       return
     }
+    setBusyKey(key)
     const res = await fetch('/api/configuration', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, value: parsedValue, change_reason: reason }),
+      body: JSON.stringify({ key, value: parsed.value }),
     })
     const body = await res.json()
-    setBusy(false)
-    if (!res.ok) return setError(body.error)
-    setValue('')
-    setReason('')
+    setBusyKey(null)
+    if (!res.ok) {
+      setErrors((e) => ({ ...e, [key]: body.error }))
+      return
+    }
+    cancelEdit(key)
     router.refresh()
   }
 
   return (
     <div className="card">
-      <div className="card-title">Configuration</div>
-      <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        Effective-dated — a change creates a new version, in-progress batches keep the version they started with (§17)
+      <div className="card-title">Settings</div>
+      <div className="card-subtitle" style={{ marginBottom: 4 }}>
+        ตั้งค่าระบบ · แก้ไขค่าแล้วกด Save เพื่อบันทึกทันที
       </div>
-      <table className="table" style={{ marginBottom: 16 }}>
-        <thead>
-          <tr>
-            <th>KEY</th>
-            <th>VALUE</th>
-            <th>VERSION</th>
-          </tr>
-        </thead>
-        <tbody>
-          {configs.map((c) => (
-            <tr key={c.key}>
-              <td style={{ fontWeight: 700 }}>{c.key}</td>
-              <td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5 }}>{JSON.stringify(c.value)}</td>
-              <td>{c.version}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
 
-      <div style={{ paddingTop: 14, borderTop: '1px dashed var(--color-border)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-        <div className="field">
-          <label className="field-label">Key</label>
-          <select className="field-input" value={key} onChange={(e) => setKey(e.target.value)} style={{ border: '1px solid var(--color-border)' }}>
-            {configs.map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.key}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label className="field-label">New value (JSON)</label>
-          <input className="field-input" value={value} onChange={(e) => setValue(e.target.value)} placeholder="e.g. 300" style={{ border: '1px solid var(--color-border)' }} />
-        </div>
-        <div className="field">
-          <label className="field-label">Change reason</label>
-          <input className="field-input" value={reason} onChange={(e) => setReason(e.target.value)} style={{ border: '1px solid var(--color-border)' }} />
-        </div>
-        <button className="btn btn-primary btn-sm" disabled={!value || !reason || busy} onClick={save}>
-          Save new version
-        </button>
-      </div>
-      {error && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
+      {CONFIG_CATEGORIES.map((cat) => {
+        const fields = CONFIG_FIELDS.filter((f) => f.category === cat.id)
+        return (
+          <div key={cat.id} style={{ marginTop: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{cat.labelEn}</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 8 }}>{cat.labelTh}</div>
+            <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+              {fields.map((field, i) => {
+                const dirty = isDirty(field.key)
+                const busy = busyKey === field.key
+                const error = errors[field.key]
+                return (
+                  <div
+                    key={field.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                      padding: '12px 14px',
+                      borderTop: i === 0 ? 'none' : '1px solid var(--color-border)',
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{field.labelEn}</div>
+                      <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>{field.labelTh}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 4, maxWidth: 560 }}>{field.descriptionEn}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', maxWidth: 560 }}>{field.descriptionTh}</div>
+                      {error && <div style={{ fontSize: 11.5, color: 'var(--color-danger)', marginTop: 4 }}>{error}</div>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
+                      <input
+                        className="field-input"
+                        style={{ border: '1px solid var(--color-border)', width: 90, textAlign: 'right' }}
+                        value={displayFor(field.key)}
+                        placeholder={field.kind === 'nullable_integer' ? 'no limit' : undefined}
+                        onChange={(e) => setEdit(field.key, e.target.value)}
+                        disabled={busy}
+                      />
+                      <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', width: 52 }}>{field.unit}</span>
+                      {dirty && (
+                        <>
+                          <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => cancelEdit(field.key)}>
+                            Cancel
+                          </button>
+                          <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => save(field.key)}>
+                            {busy ? 'Saving…' : 'Save'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

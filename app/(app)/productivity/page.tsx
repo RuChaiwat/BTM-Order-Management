@@ -26,7 +26,7 @@ export default async function ProductivityPage() {
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <KpiCard
             label="ORDERS COMPLETED (PCS)"
-            labelTh="ปิดงานแล้ว (Admin Verified)"
+            labelTh="Picker ยืนยันเสร็จแล้ว"
             value={data.kpis.totalPieces.toLocaleString()}
             valueColor="#16A34A"
             sub={`${data.kpis.completedOrders.toLocaleString()} orders`}

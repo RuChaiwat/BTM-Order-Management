@@ -12,14 +12,20 @@ const SLA_THRESHOLD_MINUTES = 120
 /** §12.2/§13 Productivity / SLA / Short Pick analytics — 7-day picker productivity, cycle-time
  * SLA compliance, and a short-pick reason breakdown (which reasons/zones cost the most pieces).
  *
- * "Completed" here means the same thing it means everywhere else in this app (Operations
- * Dashboard, Control Tower): a decision='final_close' admin_verifications row, not the picker's
- * own coarse self-report -- picker_completion_lines (and therefore any short-pick reason detail)
- * is only ever written at that step (app/api/admin-verifications/route.ts), and
- * picker_completions.actual_pieces/result get corrected to the real verified numbers there too.
- * Windowed to the last WINDOW_DAYS by verified_time, so this reads as "throughput this week"
- * rather than the dashboards' all-time cumulative count -- the two are related but not meant to
- * be identical. */
+ * Windowed and driven entirely by the PICKER's own confirm date (picker_completions.
+ * picker_completed_time) — deliberately independent of Admin Verification, so a picker's
+ * throughput this week shows up immediately, without waiting on Admin to get around to Final
+ * Close. This means the top KPIs can legitimately disagree with Operations Dashboard/Control
+ * Tower's "Completed" (which only counts admin-verified final_closed_* orders): those measure
+ * work Admin has signed off on; this measures work the picker actually did.
+ *
+ * One consequence of that independence: reason-level Short Pick detail (picker_completion_lines)
+ * is only ever written at Admin Verification's Final Close step (app/api/admin-verifications/
+ * route.ts) — the picker's own submission is coarse, by design (§12.2 redesign). So the Short
+ * Pick Reasons table can only show reasons for orders in this window that HAVE been verified so
+ * far; an order the picker just completed but Admin hasn't touched yet still counts toward Orders
+ * Completed/Total Pieces/SLA/Short Pick Rate (all picker-reported), just not yet toward the
+ * reason breakdown. */
 export async function getProductivityData(db: SupabaseClient, warehouseCode: string) {
   const sinceIso = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
@@ -30,24 +36,21 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
   const orderIds = orders.map((o) => o.order_id)
 
-  // admin_verifications/picker_completions have no warehouse_code column, so both are fetched via
-  // an RPC scoped to exactly this warehouse's order_ids (same pattern as dashboard.ts/backlog.ts),
-  // then windowed by verified_time/picker_completed_time in JS.
-  const [verifications, completions] = await Promise.all([
-    fetchScopedByOrderIds<{ order_id: string; decision: string; verified_time: string }>(db, 'get_admin_verifications_by_ids', 'order_id, decision, verified_time', orderIds),
-    fetchScopedByOrderIds<{ completion_id: string; order_id: string; actual_pieces: number | null; result: string; picker_completed_time: string }>(
-      db,
-      'get_picker_completions_by_ids',
-      'completion_id, order_id, actual_pieces, result, picker_completed_time',
-      orderIds,
-    ),
-  ])
-  const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
+  // picker_completions has no warehouse_code column, so it's fetched via an RPC scoped to exactly
+  // this warehouse's order_ids (same pattern as dashboard.ts/backlog.ts) instead of a plain
+  // .gte() filter across every warehouse with no .range() paging -- past Supabase's default row
+  // cap that used to risk silently dropping this warehouse's own rows behind another warehouse's.
+  const completions = await fetchScopedByOrderIds<{ completion_id: string; order_id: string; actual_pieces: number | null; result: string; picker_completed_time: string }>(
+    db,
+    'get_picker_completions_by_ids',
+    'completion_id, order_id, actual_pieces, result, picker_completed_time',
+    orderIds,
+  )
 
-  const completedOrderIds = new Set(verifications.filter((v) => v.decision === 'final_close' && v.verified_time >= sinceIso).map((v) => v.order_id))
-  const completedRows = [...completedOrderIds]
-    .map((orderId) => ({ order: orderById.get(orderId), completion: completionByOrderId.get(orderId) }))
-    .filter((r): r is { order: NonNullable<typeof r.order>; completion: NonNullable<typeof r.completion> } => !!r.order && !!r.completion)
+  const completedRows = completions
+    .filter((c) => c.picker_completed_time >= sinceIso)
+    .map((completion) => ({ order: orderById.get(completion.order_id), completion }))
+    .filter((r): r is { order: NonNullable<typeof r.order>; completion: typeof r.completion } => !!r.order)
 
   const batchIds = [...new Set(completedRows.map((r) => r.order.assignment_batch_id).filter(Boolean))] as string[]
   const batchesRes = batchIds.length
@@ -94,6 +97,9 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     }
   })
 
+  // Reason-level detail only exists once Admin has Final Closed the order (see the function-level
+  // note above) -- this naturally shows fewer rows than completedRows until Admin catches up, but
+  // never blocks the KPIs above, which are picker-reported and available immediately.
   const completionIds = completedRows.map((r) => r.completion.completion_id)
   const shortLinesRes = completionIds.length
     ? await db.from('picker_completion_lines').select('line_id, short_reason_code, ordered_qty, picked_qty').in('completion_id', completionIds).eq('is_short', true)

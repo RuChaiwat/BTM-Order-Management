@@ -29,7 +29,7 @@ export function ConfigHistoryPanel({ versions }: { versions: ConfigVersionRow[] 
   })).filter((c) => c.fields.length > 0)
 
   return (
-    <div className="card" style={{ flex: 1, minHeight: 0 }}>
+    <div className="card">
       <div className="card-title">Configuration History</div>
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
         ประวัติการแก้ไขค่าตั้งค่า · แสดงเฉพาะค่าก่อนหน้าล่าสุด 1 ครั้ง

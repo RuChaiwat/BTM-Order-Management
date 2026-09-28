@@ -57,13 +57,23 @@ export async function getBacklogData(db: SupabaseClient, warehouseCode: string) 
     })
     .sort((a, b) => (b.alert?.elapsed_minutes ?? 0) - (a.alert?.elapsed_minutes ?? 0))
 
+  const pickingRows = rows.filter((r) => r.alert?.is_picking_backlog)
+  const verificationRows = rows.filter((r) => r.alert?.is_verification_backlog)
+  const overdueRows = rows.filter((r) => r.alert?.time_alert === 'overdue')
+  const criticalRows = rows.filter((r) => r.alert?.time_alert === 'critical')
+  const sumPieces = (list: typeof rows) => list.reduce((s, r) => s + (r.planned_pieces ?? 0), 0)
+
   return {
     rows,
     summary: {
-      pickingBacklog: rows.filter((r) => r.alert?.is_picking_backlog).length,
-      verificationBacklog: rows.filter((r) => r.alert?.is_verification_backlog).length,
-      critical: rows.filter((r) => r.alert?.time_alert === 'critical').length,
-      overdue: rows.filter((r) => r.alert?.time_alert === 'overdue').length,
+      pickingBacklogOrders: pickingRows.length,
+      pickingBacklogPieces: sumPieces(pickingRows),
+      verificationBacklogOrders: verificationRows.length,
+      verificationBacklogPieces: sumPieces(verificationRows),
+      overdueOrders: overdueRows.length,
+      overduePieces: sumPieces(overdueRows),
+      criticalOrders: criticalRows.length,
+      criticalPieces: sumPieces(criticalRows),
     },
   }
 }

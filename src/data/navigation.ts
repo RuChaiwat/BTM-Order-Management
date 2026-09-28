@@ -38,7 +38,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 16, en: 'Admin Verification', th: 'ตรวจสอบยืนยันโดยแอดมิน', path: '/verification' },
       { id: 9, en: 'Zone Dashboard', th: 'แดชบอร์ดโซน', path: '/zone-dashboard' },
       { id: 10, en: 'Control Tower', th: 'ศูนย์ควบคุม', path: '/control-tower' },
-      { id: 11, en: 'Backlog Monitor', th: 'งานคงค้าง', path: '/backlog' },
+      { id: 11, en: 'Pending Actions Monitor', th: 'รายการที่ต้องดำเนินการ', path: '/backlog' },
     ],
   },
   {

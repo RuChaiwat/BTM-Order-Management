@@ -21,13 +21,45 @@ export default async function BacklogPage() {
 
   return (
     <>
-      <TopBar title="Backlog Monitor" subtitle={`งานคงค้าง · ${data.rows.length} orders backlogged`} />
+      <TopBar title="Pending Actions Monitor" subtitle={`รายการที่ต้องดำเนินการ · ${data.rows.length} orders pending action`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          <KpiCard label="PICKING BACKLOG" value={data.summary.pickingBacklog} valueColor="#F59E0B" compact style={{ padding: 14 }} />
-          <KpiCard label="VERIFICATION BACKLOG" value={data.summary.verificationBacklog} valueColor="#2563EB" compact style={{ padding: 14 }} />
-          <KpiCard label="OVERDUE (45-120m)" value={data.summary.overdue} valueColor="#EA580C" compact style={{ padding: 14 }} />
-          <KpiCard label="CRITICAL (120m+)" value={data.summary.critical} valueColor="#DC2626" compact style={{ padding: 14 }} />
+          <KpiCard
+            label="PICKING PENDING (PCS)"
+            labelTh="รอ Picker ดำเนินการ (ชิ้น)"
+            value={data.summary.pickingBacklogPieces.toLocaleString()}
+            sub={`${data.summary.pickingBacklogOrders.toLocaleString()} orders`}
+            valueColor="#F59E0B"
+            compact
+            style={{ padding: 14 }}
+          />
+          <KpiCard
+            label="VERIFICATION PENDING (PCS)"
+            labelTh="รอ Admin ตรวจสอบ (ชิ้น)"
+            value={data.summary.verificationBacklogPieces.toLocaleString()}
+            sub={`${data.summary.verificationBacklogOrders.toLocaleString()} orders`}
+            valueColor="#2563EB"
+            compact
+            style={{ padding: 14 }}
+          />
+          <KpiCard
+            label="OVERDUE 45-120M (PCS)"
+            labelTh="เกินกำหนด 45-120 นาที (ชิ้น)"
+            value={data.summary.overduePieces.toLocaleString()}
+            sub={`${data.summary.overdueOrders.toLocaleString()} orders`}
+            valueColor="#EA580C"
+            compact
+            style={{ padding: 14 }}
+          />
+          <KpiCard
+            label="CRITICAL 120M+ (PCS)"
+            labelTh="วิกฤต เกิน 120 นาที (ชิ้น)"
+            value={data.summary.criticalPieces.toLocaleString()}
+            sub={`${data.summary.criticalOrders.toLocaleString()} orders`}
+            valueColor="#DC2626"
+            compact
+            style={{ padding: 14 }}
+          />
         </div>
         <BacklogBoard rows={data.rows} />
       </div>

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { writeAudit, writeStatusHistory } from '@/lib/audit'
 import { getPickerActiveOrders } from '@/lib/queries/pickCompletion'
+import { submitPickerCompletion } from '@/lib/pickerCompletionActions'
 
 /** GET ?picker_id=XXX -- the office-operated Pick Completion screen scans/types a Picker ID and
  * pulls up that picker's own active order list (pickers never log in themselves, see migration
@@ -49,65 +49,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient()
-  const { data: order } = await admin.from('orders').select('order_id, status, planned_pieces, assignment_batch_id, consolidation_batch_id').eq('order_id', order_id).single()
-  if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-  if (!['assigned', 'in_progress', 'correction_in_progress'].includes(order.status)) {
-    return NextResponse.json({ error: `Order status is '${order.status}' — must be Assigned, In Progress, or returned for correction to complete` }, { status: 409 })
-  }
-
-  const { data: batch } = await admin.from('assignment_batches').select('picker_id').eq('assignment_batch_id', order.assignment_batch_id ?? '').maybeSingle()
-  if (!batch || batch.picker_id !== picker_id) {
-    return NextResponse.json({ error: 'This order is not assigned to that picker' }, { status: 409 })
-  }
-
-  // actual_pieces is only really known for a full pick -- for a short completion, the real count
-  // isn't known until Admin checks the WMS and enters it during verification (nullable since
-  // migration 0021).
-  const actualPieces = result === '100_percent' ? order.planned_pieces : null
-  const nowIso = new Date().toISOString()
-  const { error: completionError } = await admin
-    .from('picker_completions')
-    .upsert({ order_id, picker_completed_time: nowIso, actual_pieces: actualPieces, result }, { onConflict: 'order_id' })
-  if (completionError) return NextResponse.json({ error: completionError.message }, { status: 400 })
-
-  const newStatus = result === '100_percent' ? 'picker_completed_100' : 'picker_completed_short'
-  await admin.from('orders').update({ status: newStatus, picker_completed_time: nowIso }).eq('order_id', order_id)
-  await writeStatusHistory(admin, { entityType: 'orders', entityId: order_id, oldStatus: order.status, newStatus, changedBy: caller.user_id })
-  await writeAudit(admin, { userId: caller.user_id, action: 'picker_completion.create', entityType: 'orders', entityId: order_id, after: { result, picker_id } })
-
-  // This order may have come from a Consolidation Batch (migration 0027's Approve, or a mixed
-  // batch closed out per-order here instead of via Consolidation Pick Report's own "Mark
-  // completed" -- see that page's own note about mixed 100%/short batches). If it was the LAST
-  // order in that batch still being actively picked, auto-close the batch too -- otherwise it
-  // would sit in Consolidation Pick Report's active worklist forever even though every order
-  // inside it is actually done, with no one reminded to close it out themselves.
-  if (order.consolidation_batch_id) {
-    const { count: stillActive } = await admin
-      .from('orders')
-      .select('order_id', { count: 'exact', head: true })
-      .eq('consolidation_batch_id', order.consolidation_batch_id)
-      .in('status', ['assigned', 'in_progress', 'correction_in_progress'])
-    if ((stillActive ?? 0) === 0) {
-      const { data: consolBatch } = await admin.from('consolidation_batches').select('status').eq('consol_batch_id', order.consolidation_batch_id).maybeSingle()
-      if (consolBatch && !['completed', 'cancelled'].includes(consolBatch.status)) {
-        await admin.from('consolidation_batches').update({ status: 'completed' }).eq('consol_batch_id', order.consolidation_batch_id)
-        await writeStatusHistory(admin, {
-          entityType: 'consolidation_batches',
-          entityId: order.consolidation_batch_id,
-          oldStatus: consolBatch.status,
-          newStatus: 'completed',
-          changedBy: caller.user_id,
-        })
-        await writeAudit(admin, {
-          userId: caller.user_id,
-          action: 'consolidation_batch.auto_complete',
-          entityType: 'consolidation_batches',
-          entityId: order.consolidation_batch_id,
-          after: { triggered_by_order_id: order_id },
-        })
-      }
-    }
-  }
-
-  return NextResponse.json({ status: newStatus }, { status: 201 })
+  const result_ = await submitPickerCompletion(admin, { orderId: order_id, pickerId: picker_id, result: result!, changedBy: caller.user_id })
+  if (!result_.ok) return NextResponse.json({ error: result_.error }, { status: result_.httpStatus })
+  return NextResponse.json({ status: result_.status }, { status: 201 })
 }

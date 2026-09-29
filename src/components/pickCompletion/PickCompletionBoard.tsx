@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Spinner } from '../Spinner'
 import { apiFetch } from '../../lib/apiFetch'
@@ -29,24 +29,20 @@ const STATUS_LABEL: Record<string, string> = {
 
 /**
  * §12.2 Pick Completion redesign — pickers use a Handheld to do the actual picking and never log
- * into this app themselves (see migration 0015: Pickers and system Users are separate tables
- * entirely, so there is no Picker role to gate on). This same page serves two real audiences on
- * the same authenticated browser session, told apart only by which URL was opened, not by role:
- * office staff scanning a Picker ID on someone else's behalf (any PC), and a Picker's own Handheld,
- * closing their own work, which is set up ONCE to always open this page with `?handheld=1` in its
- * URL/bookmark (the same "configure the device once" pattern as Work Assignment's Chrome
- * --kiosk-printing shortcut). Reprint isn't something a Picker should be doing themselves, so it's
- * hidden whenever that flag is present -- Completed / Completed with Short stay available either
- * way, since that's the actual job this screen exists for.
+ * into this app themselves (migration 0015: Pickers and system Users are separate tables
+ * entirely, so there is no Picker role to gate on). This same component now backs two separate
+ * pages: the office-authenticated /pick-completion (default props: hits /api/picker-completions,
+ * shows Reprint) and the deliberately public, unauthenticated /handheld/pick-completion for a
+ * Picker's own Handheld device (apiBase="/api/handheld/picker-completions", showReprint={false} --
+ * Reprint isn't something a Picker should be doing themselves). Completed / Completed with Short
+ * stay available either way, since that's the actual job this screen exists for.
  *
- * Built as one responsive layout rather than a separate Handheld app: order rows are flex "cards"
- * with large tap targets that wrap to a single column on a narrow screen and lay out as a wider
- * row on a PC monitor, so the same page serves both without a second codebase to maintain.
+ * Built as one responsive layout rather than two separate ones: order rows are flex "cards" with
+ * large tap targets that wrap to a single column on a narrow Handheld screen and lay out as a
+ * wider row on a PC monitor, so one component serves both without a second copy to maintain.
  */
-export function PickCompletionBoard() {
+export function PickCompletionBoard({ apiBase = '/api/picker-completions', showReprint = true }: { apiBase?: string; showReprint?: boolean }) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const isHandheld = searchParams.get('handheld') === '1'
   const [scanValue, setScanValue] = useState('')
   const [scanError, setScanError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -62,7 +58,7 @@ export function PickCompletionBoard() {
     if (!value) return
     setLoading(true)
     setScanError(null)
-    const res = await apiFetch(`/api/picker-completions?picker_id=${encodeURIComponent(value)}`)
+    const res = await apiFetch(`${apiBase}?picker_id=${encodeURIComponent(value)}`)
     const body = await res.json()
     setLoading(false)
     if (!res.ok) {
@@ -87,7 +83,7 @@ export function PickCompletionBoard() {
 
   async function refreshOrders() {
     if (!picker) return
-    const res = await apiFetch(`/api/picker-completions?picker_id=${encodeURIComponent(picker.picker_id)}`)
+    const res = await apiFetch(`${apiBase}?picker_id=${encodeURIComponent(picker.picker_id)}`)
     const body = await res.json()
     if (res.ok) setOrders(body.orders)
   }
@@ -100,7 +96,7 @@ export function PickCompletionBoard() {
     if (!picker) return
     setSubmitting(true)
     setSubmitError(null)
-    const res = await apiFetch('/api/picker-completions', {
+    const res = await apiFetch(apiBase, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order_id: orderId, picker_id: picker.picker_id, result }),
@@ -124,7 +120,7 @@ export function PickCompletionBoard() {
     setSubmitError(null)
     const failures: string[] = []
     for (const o of orders) {
-      const res = await apiFetch('/api/picker-completions', {
+      const res = await apiFetch(apiBase, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order_id: o.order_id, picker_id: picker.picker_id, result: '100_percent' }),
@@ -182,7 +178,7 @@ export function PickCompletionBoard() {
               {picker.name_th && <div style={{ fontSize: 12, color: '#6B7280' }}>{picker.name_th}</div>}
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {!isHandheld && (
+              {showReprint && (
                 <button
                   className="btn btn-secondary btn-sm"
                   disabled={orders.length === 0}
@@ -230,7 +226,7 @@ export function PickCompletionBoard() {
                 <span className={`badge badge-${o.status === 'correction_in_progress' ? 'warning' : 'info'}`}>{STATUS_LABEL[o.status] ?? o.status}</span>
               </div>
               <div style={{ flex: '1 1 260px', display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                {!isHandheld && (
+                {showReprint && (
                   <button
                     className="btn btn-secondary"
                     style={{ padding: '12px 18px', fontSize: 14, flex: '0 0 auto' }}

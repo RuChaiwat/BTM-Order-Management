@@ -27,7 +27,14 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isPublicPath = request.nextUrl.pathname === '/login' || request.nextUrl.pathname.startsWith('/auth')
+  // /handheld and its API are deliberately public -- a Picker's own Handheld has no login of its
+  // own (migration 0015: pickers and system Users are entirely separate tables), so this is the
+  // one page/route pair in the app that intentionally bypasses this global auth gate.
+  const isPublicPath =
+    request.nextUrl.pathname === '/login' ||
+    request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/handheld') ||
+    request.nextUrl.pathname.startsWith('/api/handheld')
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()

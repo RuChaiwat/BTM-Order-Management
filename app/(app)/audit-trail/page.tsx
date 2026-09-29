@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
 import { AuditTrailDateFilter } from '@/components/admin/AuditTrailDateFilter'
+import { AuditTrailBoard } from '@/components/admin/AuditTrailBoard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuditTrail } from '@/lib/queries/auditTrail'
-import { bangkokDateKey, formatDate, formatDateTime } from '@/lib/formatDate'
+import { bangkokDateKey, formatDate } from '@/lib/formatDate'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -34,36 +35,7 @@ export default async function AuditTrailPage({ searchParams }: { searchParams: {
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
             Immutable — System Admin / Warehouse Manager only. Purged after the configured retention window (Configuration page), same as other transactional data.
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>TIME</th>
-                <th>USER</th>
-                <th>ACTION</th>
-                <th>ENTITY</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((a) => (
-                <tr key={a.id}>
-                  <td>{formatDateTime(a.created_at)}</td>
-                  <td>{a.user_id ?? 'system'}</td>
-                  <td>{a.action}</td>
-                  <td>
-                    {a.entity_type}
-                    {a.entity_id ? ` · ${a.entity_id}` : ''}
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
-                    No audit records for this date — either nothing happened, or it's past the retention window.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <AuditTrailBoard rows={rows} />
         </div>
       </div>
     </>

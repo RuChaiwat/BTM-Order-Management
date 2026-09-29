@@ -39,8 +39,8 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
     <div className="card">
       <div className="card-title">Housekeeping</div>
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        §20.1/§20.2 weekly Google Sheets export + 7-day retention purge — normally run by Vercel Cron (vercel.json); manual trigger here for
-        System Admin
+        §20.1/§20.2 weekly Excel (.xlsx) export + 7-day retention purge — normally run by Vercel Cron (vercel.json); manual trigger here for System
+        Admin
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <button className="btn btn-secondary btn-sm" disabled={busy !== null} onClick={() => trigger('export')}>

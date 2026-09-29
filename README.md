@@ -63,8 +63,8 @@ Supabase CLI is linked to your project, or by pasting each file into the Supabas
 
 Import this repo on [vercel.com](https://vercel.com), set the environment variables listed in
 `.env.local.example` under Project Settings → Environment Variables, and deploy. The two cron
-jobs in `vercel.json` need `CRON_SECRET` set, and the weekly export additionally needs
-`GOOGLE_SERVICE_ACCOUNT_JSON` + `GOOGLE_DRIVE_FOLDER_ID`.
+jobs in `vercel.json` need `CRON_SECRET` set; the weekly export needs no separate credentials
+beyond that (writes to the `exports` Supabase Storage bucket via `SUPABASE_SERVICE_ROLE_KEY`).
 
 ## First-time setup
 

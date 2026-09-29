@@ -1,15 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createWeeklySpreadsheet, writeSheetValues } from '@/lib/google/sheetsExport'
+import { buildXlsxBuffer } from '@/lib/xlsxExport'
 import { getSessionUser } from '@/lib/auth'
 
 /**
  * §20.1 weekly productivity export — one row per Order productivity result, into a new
- * BTM_Productivity_YYYY-Www spreadsheet. Triggered by Vercel Cron (vercel.json) on the schedule
+ * BTM_Productivity_YYYY-Www.xlsx file. Triggered by Vercel Cron (vercel.json) on the schedule
  * that should mirror the `export.weekly_day_time_tz` configuration value — Vercel Cron schedules
  * are static at deploy time, not readable from the DB at runtime, so keep vercel.json's cron
  * expression in sync by hand if that config value changes (a platform constraint, not an
  * oversight).
+ *
+ * Was a Google Sheets export (service-account JSON + a shared Drive folder) -- dropped in favor of
+ * a plain .xlsx file in Supabase Storage (see migration 0029) because the Google Cloud setup this
+ * needed looked like it would incur billing to the business, for a feature that's really just a
+ * periodic snapshot file, not a live collaborative sheet. Same `xlsx` package already used to
+ * parse uploaded order/location spreadsheets on import, just its write side.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
@@ -98,15 +104,25 @@ export async function GET(request: Request) {
       shortPickOrders: rows.filter((r) => r[11] === 'short').length,
     }
 
-    const { spreadsheetId, url } = await createWeeklySpreadsheet(title, process.env.GOOGLE_DRIVE_FOLDER_ID!)
-    await writeSheetValues(spreadsheetId, 'Sheet1!A1', [header, ...rows])
+    const storagePath = `weekly/${title}.xlsx`
+    const buffer = buildXlsxBuffer('Sheet1', [header, ...rows])
+    const { error: uploadError } = await admin.storage
+      .from('exports')
+      .upload(storagePath, buffer, { contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', upsert: true })
+    if (uploadError) throw new Error(`Supabase Storage upload failed: ${uploadError.message}`)
 
     await admin
       .from('export_jobs')
-      .update({ status: 'success', row_count: controlTotals.rowCount, control_totals: controlTotals, target_ref: url, finished_at: new Date().toISOString() })
+      .update({
+        status: 'success',
+        row_count: controlTotals.rowCount,
+        control_totals: { ...controlTotals, storagePath },
+        target_ref: `/api/exports/${job.id}/download`,
+        finished_at: new Date().toISOString(),
+      })
       .eq('id', job.id)
 
-    return NextResponse.json({ status: 'success', spreadsheet: url, ...controlTotals })
+    return NextResponse.json({ status: 'success', download: `/api/exports/${job.id}/download`, ...controlTotals })
   } catch (e) {
     await admin.from('export_jobs').update({ status: 'failed', error_detail: (e as Error).message, finished_at: new Date().toISOString() }).eq('id', job.id)
     return NextResponse.json({ status: 'failed', error: (e as Error).message }, { status: 500 })

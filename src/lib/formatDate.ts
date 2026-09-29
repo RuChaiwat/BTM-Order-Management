@@ -4,6 +4,7 @@
  * `<input type="date">` — those need the raw ISO yyyy-mm-dd string. */
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric' })
+const WEEKDAY_FORMATTER = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', weekday: 'short' })
 const DATETIME_FORMATTER = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Bangkok',
   day: '2-digit',
@@ -23,6 +24,15 @@ export function formatDate(value: string | Date | null | undefined): string {
   const d = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(d.getTime())) return String(value)
   return DATE_FORMATTER.format(d)
+}
+
+/** Bare calendar date -> "DD/MM/YYYY (Ddd)" -- Pick Slip's own format (§ Work Assignment print),
+ * so the picker can sanity-check the order date against today without doing the weekday math. */
+export function formatDateWithWeekday(value: string | Date | null | undefined): string {
+  if (!value) return '—'
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  return `${DATE_FORMATTER.format(d)} (${WEEKDAY_FORMATTER.format(d)})`
 }
 
 /** Timestamp -> "DD/MM/YYYY HH:mm" in Thailand time. */

@@ -286,6 +286,11 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
 
   async function confirmAssignment() {
     if (!effectiveZone || !scannedPicker) return
+    // Opened synchronously, inside the click handler, before the first await -- same reasoning as
+    // Matching Analysis & Batch Review's own approveAndPrint: browsers only allow window.open
+    // without it being treated as an unrequested popup while still inside the user gesture that
+    // triggered it, not after an async call resolves.
+    const printWindow = window.open('', '_blank')
     setSubmitting(true)
     setSubmitError(null)
     const res = await apiFetch('/api/assignments', {
@@ -301,10 +306,12 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     })
     const body = await res.json()
     if (!res.ok) {
+      printWindow?.close()
       setSubmitting(false)
       setSubmitError(body.error)
       return
     }
+    if (printWindow) printWindow.location.href = `/pick-slip/print?assignment_batch_id=${body.assignment_batch.assignment_batch_id}`
     // Refresh the pool for the SAME Criteria selection (rather than resetting it) -- assigning one
     // picker's batch is usually the first of several against the same date/zone, so the admin can
     // keep going against an accurate remaining list without re-clicking through Criteria again.

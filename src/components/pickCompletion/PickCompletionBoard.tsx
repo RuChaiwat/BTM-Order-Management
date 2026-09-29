@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Spinner } from '../Spinner'
 import { apiFetch } from '../../lib/apiFetch'
@@ -29,11 +29,15 @@ const STATUS_LABEL: Record<string, string> = {
 
 /**
  * §12.2 Pick Completion redesign — pickers use a Handheld to do the actual picking and never log
- * into this app themselves (see migration 0015), so this screen is operated by office staff on
- * their behalf: scan/type the Picker ID, see that picker's assigned orders, and mark each one
- * Completed or Completed with Short. No per-line quantity/reason entry here anymore -- that moves
- * to Admin Verification, checked against the real WMS confirmation. Confirming stops the order's
- * clock and forwards it to Admin Verification.
+ * into this app themselves (see migration 0015: Pickers and system Users are separate tables
+ * entirely, so there is no Picker role to gate on). This same page serves two real audiences on
+ * the same authenticated browser session, told apart only by which URL was opened, not by role:
+ * office staff scanning a Picker ID on someone else's behalf (any PC), and a Picker's own Handheld,
+ * closing their own work, which is set up ONCE to always open this page with `?handheld=1` in its
+ * URL/bookmark (the same "configure the device once" pattern as Work Assignment's Chrome
+ * --kiosk-printing shortcut). Reprint isn't something a Picker should be doing themselves, so it's
+ * hidden whenever that flag is present -- Completed / Completed with Short stay available either
+ * way, since that's the actual job this screen exists for.
  *
  * Built as one responsive layout rather than a separate Handheld app: order rows are flex "cards"
  * with large tap targets that wrap to a single column on a narrow screen and lay out as a wider
@@ -41,6 +45,8 @@ const STATUS_LABEL: Record<string, string> = {
  */
 export function PickCompletionBoard() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isHandheld = searchParams.get('handheld') === '1'
   const [scanValue, setScanValue] = useState('')
   const [scanError, setScanError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -176,14 +182,16 @@ export function PickCompletionBoard() {
               {picker.name_th && <div style={{ fontSize: 12, color: '#6B7280' }}>{picker.name_th}</div>}
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                disabled={orders.length === 0}
-                onClick={() => reprintSlip(orders.map((o) => o.order_id))}
-                title="Reprint every currently-assigned order's Pick Slip -- paper jam, empty roll, or the picker lost it"
-              >
-                Reprint All
-              </button>
+              {!isHandheld && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={orders.length === 0}
+                  onClick={() => reprintSlip(orders.map((o) => o.order_id))}
+                  title="Reprint every currently-assigned order's Pick Slip -- paper jam, empty roll, or the picker lost it"
+                >
+                  Reprint All
+                </button>
+              )}
               <button className="btn btn-success btn-sm" disabled={orders.length === 0 || submitting} onClick={() => setShowCompletedAll(true)}>
                 Completed All ({orders.length})
               </button>
@@ -222,14 +230,16 @@ export function PickCompletionBoard() {
                 <span className={`badge badge-${o.status === 'correction_in_progress' ? 'warning' : 'info'}`}>{STATUS_LABEL[o.status] ?? o.status}</span>
               </div>
               <div style={{ flex: '1 1 260px', display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                <button
-                  className="btn btn-secondary"
-                  style={{ padding: '12px 18px', fontSize: 14, flex: '0 0 auto' }}
-                  onClick={() => reprintSlip([o.order_id])}
-                  title="Reprint this order's Pick Slip"
-                >
-                  Reprint
-                </button>
+                {!isHandheld && (
+                  <button
+                    className="btn btn-secondary"
+                    style={{ padding: '12px 18px', fontSize: 14, flex: '0 0 auto' }}
+                    onClick={() => reprintSlip([o.order_id])}
+                    title="Reprint this order's Pick Slip"
+                  >
+                    Reprint
+                  </button>
+                )}
                 <button
                   className="btn btn-success"
                   style={{ padding: '12px 18px', fontSize: 14, flex: '1 1 auto', minWidth: 130 }}

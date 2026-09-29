@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildXlsxBuffer } from '@/lib/xlsxExport'
 import { getSessionUser } from '@/lib/auth'
+import { bangkokDateKey, formatDate } from '@/lib/formatDate'
 
 /**
  * §20.1 weekly productivity export — one row per Order productivity result, into a new
@@ -68,44 +69,88 @@ export async function GET(request: Request) {
       zonesByOrder.get(l.order_id)!.add(l.zone_code)
     }
 
-    const header = [
-      'Order No', 'Original Order Date', 'Store', 'Warehouse Code', 'Picker',
-      'Assigned Time', 'Picker Completed Time', 'Planned Pieces', 'Actual Pieces',
-      'Cycle Minutes', 'Pieces/Hour', 'Completion Result', 'Short Pick Reason', 'Zone Contribution',
-    ]
-    const rows = (completions ?? []).map((c) => {
+    // Computed once per completion (assigned_time -> picker_completed_time, same basis as
+    // Productivity's own per-day view) and reused for both the Order Detail rows and the Picker
+    // Daily Summary sheet below, so the two can't ever disagree with each other.
+    const enriched = (completions ?? []).map((c) => {
       const order = orderById.get(c.order_id)
       const pickerId = order?.assignment_batch_id ? pickerByBatch.get(order.assignment_batch_id) : null
       const cycleMinutes = order?.assigned_time ? (new Date(c.picker_completed_time).getTime() - new Date(order.assigned_time).getTime()) / 60000 : 0
       const pcsPerHour = cycleMinutes > 0 ? Math.round((c.actual_pieces / cycleMinutes) * 60) : 0
-      return [
-        order?.order_no ?? c.order_id,
-        order?.original_order_date ?? '',
-        order?.store_code ?? '',
-        order?.warehouse_code ?? '',
-        pickerId ?? '',
-        order?.assigned_time ?? '',
-        c.picker_completed_time,
-        order?.planned_pieces ?? 0,
-        c.actual_pieces,
-        Math.round(cycleMinutes),
-        pcsPerHour,
-        c.result,
-        c.short_reason_code ?? '',
-        [...(zonesByOrder.get(c.order_id) ?? [])].join(', '),
-      ]
+      return { c, order, pickerId, cycleMinutes, pcsPerHour }
     })
 
+    const detailHeader = [
+      'Order No', 'Original Order Date', 'Store', 'Warehouse Code', 'Picker',
+      'Assigned Time', 'Picker Completed Time', 'Planned Pieces', 'Actual Pieces',
+      'Cycle Minutes', 'Pieces/Hour', 'Completion Result', 'Short Pick Reason', 'Zone Contribution',
+    ]
+    const detailRows = enriched.map(({ c, order, pickerId, cycleMinutes, pcsPerHour }) => [
+      order?.order_no ?? c.order_id,
+      order?.original_order_date ?? '',
+      order?.store_code ?? '',
+      order?.warehouse_code ?? '',
+      pickerId ?? '',
+      order?.assigned_time ?? '',
+      c.picker_completed_time,
+      order?.planned_pieces ?? 0,
+      c.actual_pieces,
+      Math.round(cycleMinutes),
+      pcsPerHour,
+      c.result,
+      c.short_reason_code ?? '',
+      [...(zonesByOrder.get(c.order_id) ?? [])].join(', '),
+    ])
+
     const controlTotals = {
-      rowCount: rows.length,
-      totalPlannedPieces: rows.reduce((s, r) => s + Number(r[7]), 0),
-      totalActualPieces: rows.reduce((s, r) => s + Number(r[8]), 0),
-      completedOrders: rows.length,
-      shortPickOrders: rows.filter((r) => r[11] === 'short').length,
+      rowCount: detailRows.length,
+      totalPlannedPieces: detailRows.reduce((s, r) => s + Number(r[7]), 0),
+      totalActualPieces: detailRows.reduce((s, r) => s + Number(r[8]), 0),
+      completedOrders: detailRows.length,
+      shortPickOrders: detailRows.filter((r) => r[11] === 'short').length,
     }
 
+    // Picker Daily Summary -- grouped by (picker, Bangkok-calendar day). Avg Cycle Minutes is a
+    // plain per-order mean (typical order duration); Avg Pieces/Hour is total pieces over total
+    // minutes for the group (throughput), not a mean of each order's own rate -- same convention
+    // Productivity's own per-day view uses, so one short order can't skew it disproportionately.
+    const summaryByKey = new Map<string, { pickerId: string; day: string; orders: number; totalPieces: number; totalMinutes: number }>()
+    for (const { c, order, pickerId, cycleMinutes } of enriched) {
+      if (!pickerId || !order?.assigned_time) continue
+      const day = bangkokDateKey(c.picker_completed_time)
+      if (!day) continue
+      const key = `${pickerId}__${day}`
+      const entry = summaryByKey.get(key) ?? { pickerId, day, orders: 0, totalPieces: 0, totalMinutes: 0 }
+      entry.orders += 1
+      entry.totalPieces += c.actual_pieces ?? 0
+      entry.totalMinutes += cycleMinutes
+      summaryByKey.set(key, entry)
+    }
+
+    const pickerIdsForSummary = [...new Set([...summaryByKey.values()].map((s) => s.pickerId))]
+    const { data: summaryPickers } = pickerIdsForSummary.length
+      ? await admin.from('pickers').select('picker_id, name_en').in('picker_id', pickerIdsForSummary)
+      : { data: [] as { picker_id: string; name_en: string }[] }
+    const nameByPicker = new Map((summaryPickers ?? []).map((p) => [p.picker_id, p.name_en]))
+
+    const summaryHeader = ['Picker ID', 'Picker Name', 'Date', 'Orders Completed', 'Total Pieces', 'Avg Cycle Minutes', 'Avg Pieces/Hour']
+    const summaryRows = [...summaryByKey.values()]
+      .sort((a, b) => a.day.localeCompare(b.day) || a.pickerId.localeCompare(b.pickerId))
+      .map((s) => [
+        s.pickerId,
+        nameByPicker.get(s.pickerId) ?? s.pickerId,
+        formatDate(s.day),
+        s.orders,
+        s.totalPieces,
+        Math.round(s.totalMinutes / s.orders),
+        s.totalMinutes > 0 ? Math.round((s.totalPieces / s.totalMinutes) * 60) : 0,
+      ])
+
     const storagePath = `weekly/${title}.xlsx`
-    const buffer = buildXlsxBuffer('Sheet1', [header, ...rows])
+    const buffer = buildXlsxBuffer([
+      { name: 'Order Detail', rows: [detailHeader, ...detailRows] },
+      { name: 'Picker Daily Summary', rows: [summaryHeader, ...summaryRows] },
+    ])
     const { error: uploadError } = await admin.storage
       .from('exports')
       .upload(storagePath, buffer, { contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', upsert: true })

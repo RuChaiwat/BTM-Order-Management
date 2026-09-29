@@ -2,7 +2,7 @@ import { Barcode } from '@/components/Barcode'
 import { formatDateWithWeekday } from '@/lib/formatDate'
 import type { PickSlipRow } from '@/lib/queries/pickSlip'
 
-/** 80mm thermal slip, one per order in the batch (design approved separately). "auto" page height
+/** 80mm thermal slip, one per requested order (design approved separately). "auto" page height
  * lets the printer's continuous roll size each slip to its own content instead of a fixed sheet;
  * `break-after: page` on every slip but the last is what turns that into one physical cut per
  * order on a printer configured for auto-cut-per-page (the printer driver's own "Roll Paper / Auto
@@ -26,7 +26,7 @@ export const PICK_SLIP_PRINT_CSS = `
   }
 `
 
-export function PickSlipDocument({ slips, warehouseCode, pickerName }: { slips: PickSlipRow[]; warehouseCode: string; pickerName: string }) {
+export function PickSlipDocument({ slips }: { slips: PickSlipRow[] }) {
   return (
     <div className="pick-slip-doc">
       {slips.length === 0 && <div className="no-print">No orders found for this assignment.</div>}
@@ -43,7 +43,7 @@ export function PickSlipDocument({ slips, warehouseCode, pickerName }: { slips: 
 
           <div className="pick-slip-row">
             <span className="pick-slip-label">Transfer From&nbsp;:</span>
-            <span className="pick-slip-value">{warehouseCode}</span>
+            <span className="pick-slip-value">{s.warehouseCode}</span>
           </div>
           <div className="pick-slip-row">
             <span className="pick-slip-label">To Store&nbsp;:</span>
@@ -63,7 +63,7 @@ export function PickSlipDocument({ slips, warehouseCode, pickerName }: { slips: 
           </div>
           <div className="pick-slip-row">
             <span className="pick-slip-label">Picker&nbsp;:</span>
-            <span className="pick-slip-value">{pickerName}</span>
+            <span className="pick-slip-value">{s.pickerName}</span>
           </div>
 
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>

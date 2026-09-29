@@ -68,6 +68,11 @@ export function PickCompletionBoard() {
     setScanValue('')
   }
 
+  function reprintSlip(orderIds: string[]) {
+    if (orderIds.length === 0) return
+    window.open(`/pick-slip/print?order_ids=${orderIds.join(',')}`, '_blank')
+  }
+
   function switchPicker() {
     setPicker(null)
     setOrders([])
@@ -171,6 +176,14 @@ export function PickCompletionBoard() {
               {picker.name_th && <div style={{ fontSize: 12, color: '#6B7280' }}>{picker.name_th}</div>}
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={orders.length === 0}
+                onClick={() => reprintSlip(orders.map((o) => o.order_id))}
+                title="Reprint every currently-assigned order's Pick Slip -- paper jam, empty roll, or the picker lost it"
+              >
+                Reprint All
+              </button>
               <button className="btn btn-success btn-sm" disabled={orders.length === 0 || submitting} onClick={() => setShowCompletedAll(true)}>
                 Completed All ({orders.length})
               </button>
@@ -209,6 +222,14 @@ export function PickCompletionBoard() {
                 <span className={`badge badge-${o.status === 'correction_in_progress' ? 'warning' : 'info'}`}>{STATUS_LABEL[o.status] ?? o.status}</span>
               </div>
               <div style={{ flex: '1 1 260px', display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '12px 18px', fontSize: 14, flex: '0 0 auto' }}
+                  onClick={() => reprintSlip([o.order_id])}
+                  title="Reprint this order's Pick Slip"
+                >
+                  Reprint
+                </button>
                 <button
                   className="btn btn-success"
                   style={{ padding: '12px 18px', fontSize: 14, flex: '1 1 auto', minWidth: 130 }}

@@ -311,7 +311,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       setSubmitError(body.error)
       return
     }
-    if (printWindow) printWindow.location.href = `/pick-slip/print?assignment_batch_id=${body.assignment_batch.assignment_batch_id}`
+    if (printWindow) printWindow.location.href = `/pick-slip/print?order_ids=${[...selected].join(',')}`
     // Refresh the pool for the SAME Criteria selection (rather than resetting it) -- assigning one
     // picker's batch is usually the first of several against the same date/zone, so the admin can
     // keep going against an accurate remaining list without re-clicking through Criteria again.

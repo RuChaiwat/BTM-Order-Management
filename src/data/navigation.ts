@@ -45,7 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Analytics',
     items: [
       { id: 12, en: 'Productivity / SLA / Short Pick', th: 'ผลิตภาพ / SLA / หยิบขาด', path: '/productivity' },
-      { id: 19, en: 'Short / Damage / Expired Monitor', th: 'ตรวจสอบสินค้าหยิบขาด / เสียหาย / หมดอายุ', path: '/short-pick-monitor' },
+      { id: 19, en: 'Product Issue List', th: 'รายการสินค้ามีปัญหา', path: '/short-pick-monitor' },
     ],
   },
   {

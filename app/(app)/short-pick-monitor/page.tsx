@@ -20,7 +20,7 @@ export default async function ShortPickMonitorPage({ searchParams }: { searchPar
 
   return (
     <>
-      <TopBar title="Short / Damage / Expired Monitor" subtitle={`ตรวจสอบสินค้าหยิบขาด / เสียหาย / หมดอายุ · ${formatDate(date)} · ${warehouseCode}`}>
+      <TopBar title="Product Issue List" subtitle={`รายการสินค้ามีปัญหา · ${formatDate(date)} · ${warehouseCode}`}>
         <ShortPickMonitorDateFilter date={date} />
       </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
@@ -30,9 +30,9 @@ export default async function ShortPickMonitorPage({ searchParams }: { searchPar
               key={r.code}
               label={r.labelEn.toUpperCase()}
               labelTh={r.labelTh}
-              value={r.count.toLocaleString()}
-              valueColor={r.count > 0 ? '#F59E0B' : undefined}
-              sub={`${r.shortQty.toLocaleString()} pcs short`}
+              value={r.shortQty.toLocaleString()}
+              valueColor={r.shortQty > 0 ? '#F59E0B' : undefined}
+              sub={`${r.count.toLocaleString()} order(s)`}
               compact
               style={{ padding: 14 }}
             />

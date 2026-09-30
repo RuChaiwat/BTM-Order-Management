@@ -3,6 +3,7 @@ import { TopBar } from '@/components/TopBar'
 import { OrderImportForm } from '@/components/orderPool/OrderImportForm'
 import { ImportErrorsViewer } from '@/components/ImportErrorsViewer'
 import { OrderPoolOverview } from '@/components/orderPool/OrderPoolOverview'
+import { CancelOrderPanel } from '@/components/orderPool/CancelOrderPanel'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getOrderPoolOverview } from '@/lib/queries/orderPool'
 import { getSessionUser } from '@/lib/auth'
@@ -18,9 +19,10 @@ export default async function OrderPoolPage() {
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
 
-  const [{ data: importBatches, error: importsError }, overview] = await Promise.all([
+  const [{ data: importBatches, error: importsError }, overview, { data: cancelReasons }] = await Promise.all([
     admin.from('import_batches').select('import_id, file_name, uploaded_at, status, total_rows, success_rows, error_rows').order('uploaded_at', { ascending: false }).limit(10),
     getOrderPoolOverview(admin, warehouseCode),
+    admin.from('reason_master').select('reason_code, label_en').eq('reason_type', 'cancel').eq('active', true).order('label_en'),
   ])
   if (importsError) console.error('[orders] import_batches error', importsError.message)
 
@@ -76,6 +78,8 @@ export default async function OrderPoolPage() {
         </div>
 
         <OrderPoolOverview totalOrders={overview.totalOrders} zoneDensity={overview.zoneDensity} bands={overview.bands} thresholds={overview.thresholds} />
+
+        <CancelOrderPanel reasons={cancelReasons ?? []} />
       </div>
     </>
   )

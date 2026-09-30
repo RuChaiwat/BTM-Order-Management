@@ -9,6 +9,10 @@
  * order_alerts' own view comment says as much for the SLA ones). Showing those here as editable
  * would silently do nothing when changed, which is worse than not showing them.
  *
+ * retention.transaction_days WAS wrongly left out of that dead-key list in an earlier pass -- it's
+ * read directly (not via getActiveConfig()) by both app/api/cron/purge and its own safety gate, so
+ * it's very much live; added back here once that was caught.
+ *
  * Percent fields are stored as a 0-1 decimal (matching.p2_match_pct = 0.8) but shown/edited as a
  * whole percent (80) -- toDisplay/fromDisplay below do that conversion so nothing downstream of
  * getActiveConfig() has to change.
@@ -41,6 +45,7 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
   { id: 'consolidation', labelEn: 'Order Consolidation', labelTh: 'การรวมออเดอร์' },
   { id: 'order_complexity', labelEn: 'Order Complexity', labelTh: 'ความซับซ้อนของออเดอร์' },
   { id: 'picker_productivity', labelEn: 'Picker Productivity', labelTh: 'ผลิตภาพพนักงานหยิบสินค้า' },
+  { id: 'housekeeping', labelEn: 'Data Retention', labelTh: 'ระยะเวลาเก็บข้อมูล' },
 ]
 
 export const CONFIG_FIELDS: ConfigFieldMeta[] = [
@@ -212,6 +217,18 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     unit: 'pcs/hr',
     min: 0,
     step: 50,
+  },
+  {
+    key: 'retention.transaction_days',
+    category: 'housekeeping',
+    labelEn: 'Data retention window',
+    labelTh: 'ระยะเวลาเก็บข้อมูล',
+    descriptionEn:
+      'Closed/cancelled orders older than this many days (and everything recorded against them) can be permanently purged — only after a weekly export has already covered that period (Housekeeping, below).',
+    descriptionTh: 'ออเดอร์ที่ปิดงาน/ยกเลิกแล้ว ซึ่งเก่ากว่าจำนวนวันนี้ (และข้อมูลที่บันทึกไว้กับออเดอร์นั้น) จะถูกลบถาวรได้ — ก็ต่อเมื่อมี Weekly Export ที่ครอบคลุมช่วงเวลานั้นแล้วเท่านั้น (ดู Housekeeping ด้านล่าง)',
+    kind: 'integer',
+    unit: 'days',
+    min: 1,
   },
 ]
 

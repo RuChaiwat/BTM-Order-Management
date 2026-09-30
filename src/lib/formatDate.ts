@@ -51,3 +51,13 @@ export function bangkokDateKey(value: string | Date | null | undefined): string 
   if (Number.isNaN(d.getTime())) return null
   return BANGKOK_DATE_KEY_FORMATTER.format(d)
 }
+
+/** UTC instant range [since, until) covering one Thailand-calendar day ("YYYY-MM-DD", as
+ * bangkokDateKey produces) -- for a query-level `.gte()/.lt()` date filter, the counterpart to
+ * bucketing already-fetched rows with bangkokDateKey. Thailand has no DST, so the +07:00 offset
+ * is always correct. */
+export function bangkokDayRange(dateKey: string): { sinceIso: string; untilIso: string } {
+  const since = new Date(`${dateKey}T00:00:00+07:00`)
+  const until = new Date(since.getTime() + 24 * 60 * 60 * 1000)
+  return { sinceIso: since.toISOString(), untilIso: until.toISOString() }
+}

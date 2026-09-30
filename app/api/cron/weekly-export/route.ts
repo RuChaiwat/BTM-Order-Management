@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildXlsxBuffer } from '@/lib/xlsxExport'
 import { getSessionUser } from '@/lib/auth'
-import { bangkokDateKey, formatDate } from '@/lib/formatDate'
+import { bangkokDateKey, formatDate, formatDateTime } from '@/lib/formatDate'
+import { getShortPickDetailRows } from '@/lib/queries/shortPickMonitor'
 
 /**
  * §20.1 weekly productivity export — one row per Order productivity result, into a new
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
   try {
     const { data: completions } = await admin
       .from('picker_completions')
-      .select('order_id, actual_pieces, result, picker_completed_time, short_reason_code')
+      .select('completion_id, order_id, actual_pieces, result, picker_completed_time, short_reason_code')
       .gte('picker_completed_time', periodStart.toISOString())
       .lt('picker_completed_time', periodEnd.toISOString())
 
@@ -146,10 +147,34 @@ export async function GET(request: Request) {
         s.totalMinutes > 0 ? Math.round((s.totalPieces / s.totalMinutes) * 60) : 0,
       ])
 
+    // Short / Damage / Expired sheet (Purge review follow-up, item 2) -- item-level detail, same
+    // source and warehouse-agnostic scope as the rest of this export. Reason detail only exists
+    // once Admin has Final Closed the order (see getShortPickDetailRows), so this naturally lists
+    // fewer rows than "Order Detail"'s short-result orders until Admin catches up on verification.
+    const shortDetailRows = await getShortPickDetailRows(admin, undefined, completions ?? [])
+    const shortDetailHeader = ['Order No', 'Store', 'Warehouse Code', 'Zone', 'SKU', 'Item Description', 'Bin', 'Reason (EN)', 'Reason (TH)', 'Ordered Qty', 'Picked Qty', 'Short Qty', 'Remark', 'Recorded At']
+    const shortDetailSheetRows = shortDetailRows.map((r) => [
+      r.orderNo,
+      r.storeCode,
+      r.warehouseCode,
+      r.zoneCode,
+      r.sku,
+      r.itemDescription ?? '',
+      r.binCode,
+      r.reasonLabelEn,
+      r.reasonLabelTh,
+      r.orderedQty,
+      r.pickedQty,
+      r.shortQty,
+      r.remark ?? '',
+      formatDateTime(r.recordedAt),
+    ])
+
     const storagePath = `weekly/${title}.xlsx`
     const buffer = buildXlsxBuffer([
       { name: 'Order Detail', rows: [detailHeader, ...detailRows] },
       { name: 'Picker Daily Summary', rows: [summaryHeader, ...summaryRows] },
+      { name: 'Short-Damage-Expired', rows: [shortDetailHeader, ...shortDetailSheetRows] },
     ])
     const { error: uploadError } = await admin.storage
       .from('exports')

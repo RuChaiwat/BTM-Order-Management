@@ -286,7 +286,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     // A picker must clear every order still open from their last round (Pick Completion) before
     // taking on a new one -- otherwise they'd end up holding two rounds' worth of orders at once.
     if (body.activeOrderCount > 0) {
-      setPickerScanError(`${match.name_en} still has ${body.activeOrderCount} order(s) open from a previous round — complete them at Pick Completion first`)
+      setPickerScanError(`${match.name_en} ยังเบิกงานก่อนหน้าไม่เสร็จ กรุณาจบงานในระบบก่อน`)
       return
     }
     setScannedPicker(match)
@@ -580,8 +580,10 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
                     )
                   })()}
                 </div>
-                {pickerTodayRounds !== null && <div style={{ fontSize: 11.5, color: '#166534', fontWeight: 600 }}>{pickerTodayRounds} รอบ (today)</div>}
-                <div style={{ fontSize: 11, color: '#6B7280' }}>{scannedPicker.picker_id}</div>
+                <div style={{ fontSize: 11, color: '#6B7280', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <span>{scannedPicker.picker_id}</span>
+                  {pickerTodayRounds !== null && <span style={{ color: '#166534', fontWeight: 600 }}>{pickerTodayRounds} รอบ</span>}
+                </div>
               </div>
               <button
                 className="btn btn-secondary btn-sm"

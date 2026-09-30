@@ -47,7 +47,19 @@ export async function POST(request: Request, { params }: { params: { orderId: st
   if (order.assignment_batch_id) {
     await admin.from('assignment_orders').delete().eq('assignment_batch_id', order.assignment_batch_id).eq('order_id', params.orderId)
   }
-  await admin.from('orders').update({ status: 'new', assignment_batch_id: null, assigned_time: null }).eq('order_id', params.orderId)
+  // Guarded on the exact status just read (compare-and-swap): if a Picker's own Pick Completion
+  // submission landed on this same order between that read and here, this update matches zero
+  // rows instead of silently reverting an order that's actually already been completed.
+  const { data: updatedOrder } = await admin
+    .from('orders')
+    .update({ status: 'new', assignment_batch_id: null, assigned_time: null })
+    .eq('order_id', params.orderId)
+    .eq('status', order.status)
+    .select('order_id')
+    .maybeSingle()
+  if (!updatedOrder) {
+    return NextResponse.json({ error: 'This order was just updated elsewhere (e.g. the picker just completed it) — refresh and try again' }, { status: 409 })
+  }
   await writeStatusHistory(admin, { entityType: 'orders', entityId: params.orderId, oldStatus: order.status, newStatus: 'new', changedBy: caller.user_id, reason: 'Unassigned by admin from Pick Completion' })
   await writeAudit(admin, { userId: caller.user_id, action: 'order.unassign', entityType: 'orders', entityId: params.orderId, before: { status: order.status, assignment_batch_id: order.assignment_batch_id } })
 

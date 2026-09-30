@@ -32,18 +32,33 @@ export async function submitPickerCompletion(
     return { ok: false, httpStatus: 409, error: 'This order is not assigned to that picker' }
   }
 
+  const nowIso = new Date().toISOString()
+  const newStatus = result === '100_percent' ? 'picker_completed_100' : 'picker_completed_short'
+  // Guarded on the exact status just read (compare-and-swap), and done FIRST -- before writing
+  // picker_completions -- so that if an Admin's Unassign lands on this same order between that
+  // read and here, this update matches zero rows and nothing else gets written at all, instead of
+  // silently completing (and leaving a dangling picker_completions row for) an order that's
+  // actually just been sent back to the pool.
+  const { data: updatedOrder } = await admin
+    .from('orders')
+    .update({ status: newStatus, picker_completed_time: nowIso })
+    .eq('order_id', orderId)
+    .eq('status', order.status)
+    .select('order_id')
+    .maybeSingle()
+  if (!updatedOrder) {
+    return { ok: false, httpStatus: 409, error: 'This order was just updated elsewhere (e.g. an admin just Unassigned it) — refresh and try again' }
+  }
+
   // actual_pieces is only really known for a full pick -- for a short completion, the real count
   // isn't known until Admin checks the WMS and enters it during verification (nullable since
   // migration 0021).
   const actualPieces = result === '100_percent' ? order.planned_pieces : null
-  const nowIso = new Date().toISOString()
   const { error: completionError } = await admin
     .from('picker_completions')
     .upsert({ order_id: orderId, picker_completed_time: nowIso, actual_pieces: actualPieces, result }, { onConflict: 'order_id' })
   if (completionError) return { ok: false, httpStatus: 400, error: completionError.message }
 
-  const newStatus = result === '100_percent' ? 'picker_completed_100' : 'picker_completed_short'
-  await admin.from('orders').update({ status: newStatus, picker_completed_time: nowIso }).eq('order_id', orderId)
   await writeStatusHistory(admin, { entityType: 'orders', entityId: orderId, oldStatus: order.status, newStatus, changedBy })
   await writeAudit(admin, { userId: changedBy, action: 'picker_completion.create', entityType: 'orders', entityId: orderId, after: { result, picker_id: pickerId } })
 

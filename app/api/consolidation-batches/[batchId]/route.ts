@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
+import { PENDING_BATCH_STATUSES, cancelPendingConsolidationBatch } from '@/lib/consolidationCleanup'
 
 // The lifecycle used to require two clicks (Approve, then Release) before a batch's pick report
 // could be printed. Collapsed into a single "Approve" action that does both at once: it moves the
@@ -113,14 +114,17 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
     return NextResponse.json({ batch: updated, orders_completed: activeOrders.length })
   }
 
-  // action === 'cancel'
-  const { data: updated, error } = await admin.from('consolidation_batches').update({ status: 'cancelled' }).eq('consol_batch_id', params.batchId).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  // action === 'cancel' -- only meaningful while the batch is still a matching candidate/review
+  // that's never actually been approved as a group; an already-approved/picking batch has real
+  // assignment_batches/picker work behind it and needs Consolidation Pick Report's own flow.
+  if (!PENDING_BATCH_STATUSES.includes(batch.status)) {
+    return NextResponse.json({ error: `Batch status is '${batch.status}' — can only cancel a batch still Pending Approval` }, { status: 409 })
+  }
+  const cancelled = await cancelPendingConsolidationBatch(admin, params.batchId, batch.status, caller.user_id, 'consolidation_batch.cancel', 'Cancelled by admin')
+  if (!cancelled) {
+    return NextResponse.json({ error: 'This batch was already changed by someone else — refresh and try again' }, { status: 409 })
+  }
 
-  await admin.from('orders').update({ consolidation_batch_id: null }).eq('consolidation_batch_id', params.batchId)
-
-  await writeStatusHistory(admin, { entityType: 'consolidation_batches', entityId: params.batchId, oldStatus: batch.status, newStatus: 'cancelled', changedBy: caller.user_id })
-  await writeAudit(admin, { userId: caller.user_id, action: 'consolidation_batch.cancel', entityType: 'consolidation_batches', entityId: params.batchId, before: batch, after: updated })
-
+  const { data: updated } = await admin.from('consolidation_batches').select('*').eq('consol_batch_id', params.batchId).single()
   return NextResponse.json({ batch: updated })
 }

@@ -48,18 +48,23 @@ export async function POST(request: Request) {
   }
 
   let newStatus: string
+  let completionId: string | null = null
+  let completionLines: { line_id: string; ordered_qty: number; picked_qty: number; is_short: boolean; short_reason_code: string | null; remark: string | null }[] = []
+  let actualPieces = 0
+  let result: '100_percent' | 'short' = '100_percent'
+
   if (decision === 'final_close') {
     if (!Array.isArray(lines) || lines.length === 0) {
       return NextResponse.json({ error: 'lines[] itemizing every order line is required to Final Close' }, { status: 400 })
     }
     const { data: completion } = await admin.from('picker_completions').select('completion_id').eq('order_id', order_id).maybeSingle()
     if (!completion) return NextResponse.json({ error: 'No picker completion found for this order' }, { status: 409 })
+    completionId = completion.completion_id
 
     const { data: orderLines } = await admin.from('order_lines').select('line_id, qty').eq('order_id', order_id)
     const orderedQtyByLine = new Map((orderLines ?? []).map((l) => [l.line_id, Number(l.qty)]))
     if (orderedQtyByLine.size === 0) return NextResponse.json({ error: 'Order has no lines to verify' }, { status: 409 })
 
-    const completionLines: { line_id: string; ordered_qty: number; picked_qty: number; is_short: boolean; short_reason_code: string | null; remark: string | null }[] = []
     for (const line of lines) {
       const orderedQty = orderedQtyByLine.get(line.line_id)
       if (orderedQty === undefined) return NextResponse.json({ error: `Line ${line.line_id} does not belong to this order` }, { status: 400 })
@@ -77,18 +82,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'All order lines must be itemized to Final Close' }, { status: 400 })
     }
 
-    const actualPieces = completionLines.reduce((s, l) => s + l.picked_qty, 0)
-    const result = completionLines.every((l) => !l.is_short) ? '100_percent' : 'short'
-
-    await admin.from('picker_completion_lines').delete().eq('completion_id', completion.completion_id)
-    const { error: linesError } = await admin.from('picker_completion_lines').insert(completionLines.map((l) => ({ completion_id: completion.completion_id, ...l })))
-    if (linesError) return NextResponse.json({ error: linesError.message }, { status: 400 })
-
-    await admin.from('picker_completions').update({ actual_pieces: actualPieces, result }).eq('completion_id', completion.completion_id)
-
+    actualPieces = completionLines.reduce((s, l) => s + l.picked_qty, 0)
+    result = completionLines.every((l) => !l.is_short) ? '100_percent' : 'short'
     newStatus = result === '100_percent' ? 'final_closed_100' : 'final_closed_short'
   } else {
     newStatus = 'correction_in_progress'
+  }
+
+  // Guarded on the exact status just read (compare-and-swap), and done BEFORE any of the writes
+  // below -- so two Admins racing to verify the same order can't both proceed: whichever request
+  // gets here first "locks" the order by flipping its status, and the second one matches zero rows
+  // and stops immediately, instead of both writing (and clobbering each other's) picker_completion_
+  // lines rows.
+  const { data: updatedOrder } = await admin.from('orders').update({ status: newStatus }).eq('order_id', order_id).eq('status', order.status).select('order_id').maybeSingle()
+  if (!updatedOrder) {
+    return NextResponse.json({ error: 'This order was just verified elsewhere — refresh and try again' }, { status: 409 })
+  }
+
+  if (decision === 'final_close' && completionId) {
+    await admin.from('picker_completion_lines').delete().eq('completion_id', completionId)
+    const { error: linesError } = await admin.from('picker_completion_lines').insert(completionLines.map((l) => ({ completion_id: completionId, ...l })))
+    if (linesError) return NextResponse.json({ error: linesError.message }, { status: 400 })
+
+    await admin.from('picker_completions').update({ actual_pieces: actualPieces, result }).eq('completion_id', completionId)
   }
 
   const { error: verificationError } = await admin.from('admin_verifications').insert({
@@ -99,7 +115,6 @@ export async function POST(request: Request) {
   })
   if (verificationError) return NextResponse.json({ error: verificationError.message }, { status: 400 })
 
-  await admin.from('orders').update({ status: newStatus }).eq('order_id', order_id)
   await writeStatusHistory(admin, { entityType: 'orders', entityId: order_id, oldStatus: order.status, newStatus, changedBy: caller.user_id, reason: reject_reason })
   await writeAudit(admin, { userId: caller.user_id, action: `admin_verification.${decision}`, entityType: 'orders', entityId: order_id, after: { newStatus, reject_reason } })
 

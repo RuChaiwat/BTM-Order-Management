@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { KpiCard } from '@/components/KpiCard'
 import { ShortPickMonitorDateFilter } from '@/components/shortPickMonitor/ShortPickMonitorDateFilter'
 import { ShortPickMonitorBoard } from '@/components/shortPickMonitor/ShortPickMonitorBoard'
@@ -20,6 +21,7 @@ export default async function ShortPickMonitorPage({ searchParams }: { searchPar
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Product Issue List" subtitle={`รายการสินค้ามีปัญหา · ${formatDate(date)} · ${warehouseCode}`}>
         <ShortPickMonitorDateFilter date={date} />
       </TopBar>

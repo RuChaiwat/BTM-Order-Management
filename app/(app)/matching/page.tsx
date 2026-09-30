@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { MatchingDateFilter } from '@/components/matching/MatchingDateFilter'
 import { MatchingDashboardBoard } from '@/components/matching/MatchingDashboardBoard'
 import { getSessionUser } from '@/lib/auth'
@@ -29,6 +30,7 @@ export default async function MatchingDashboardPage({ searchParams }: { searchPa
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Matching Dashboard" subtitle={`แดชบอร์ดการจับคู่ · ${warehouseCode}`}>
         <MatchingDateFilter orderDate={orderDate} />
       </TopBar>

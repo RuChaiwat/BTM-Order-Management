@@ -1,4 +1,5 @@
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { OperationsDashboardBoard } from '@/components/dashboard/OperationsDashboardBoard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -19,6 +20,7 @@ export default async function OperationsDashboardPage() {
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Operations Dashboard" subtitle={`ภาพรวมการดำเนินงาน · ${user.warehouse_code ?? ''}`}>
         <div className="control">
           <span style={{ fontWeight: 500 }}>{user.warehouse_code ?? '—'}</span>

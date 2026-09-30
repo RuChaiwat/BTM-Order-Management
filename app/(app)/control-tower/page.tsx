@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { KpiCard } from '@/components/KpiCard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -26,6 +27,7 @@ export default async function ControlTowerPage() {
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Control Tower" subtitle={`ศูนย์ควบคุม · ${user.warehouse_code ?? ''}`} />
 
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>

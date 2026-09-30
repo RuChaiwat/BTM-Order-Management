@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { KpiCard } from '@/components/KpiCard'
 import { BacklogBoard } from '@/components/backlog/BacklogBoard'
 import { getSessionUser } from '@/lib/auth'
@@ -21,6 +22,7 @@ export default async function BacklogPage() {
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Pending Actions Monitor" subtitle={`รายการที่ต้องดำเนินการ · ${data.rows.length} orders pending action`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>

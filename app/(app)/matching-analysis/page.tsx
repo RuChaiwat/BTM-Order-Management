@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { MatchingBoard } from '@/components/matching/MatchingBoard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -29,6 +30,7 @@ export default async function MatchingAnalysisPage({ searchParams }: { searchPar
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Matching Analysis & Batch Review" subtitle={`วิเคราะห์การจับคู่ / ตรวจแบตช์ · ${warehouseCode}`} />
       <MatchingBoard batches={batches} warehouseCode={warehouseCode} unmatchedPendingCount={unmatchedPendingCount} orderDate={orderDate} pickers={pickers} />
     </>

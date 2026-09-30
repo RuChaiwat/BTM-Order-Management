@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { ZoneDashboardBoard } from '@/components/zoneDashboard/ZoneDashboardBoard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -20,6 +21,7 @@ export default async function ZoneDashboardPage({ searchParams }: { searchParams
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Zone Dashboard" subtitle={`แดชบอร์ดโซน · ${data.zoneDetail.length} zones · ${warehouseCode}`} />
       <ZoneDashboardBoard zoneDetail={data.zoneDetail} initialZone={searchParams.zone} />
     </>

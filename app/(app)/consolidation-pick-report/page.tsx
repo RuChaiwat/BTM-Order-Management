@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { KpiCard } from '@/components/KpiCard'
 import { ConsolidationPickReportBoard } from '@/components/consolidation/ConsolidationPickReportBoard'
 import { getSessionUser } from '@/lib/auth'
@@ -20,6 +21,7 @@ export default async function ConsolidationPickReportPage() {
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Consolidation Pick Report" subtitle={`รายงานหยิบรวม · ${batches.length} batch(es) active at consolidation`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>

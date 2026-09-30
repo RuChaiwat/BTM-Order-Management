@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { KpiCard } from '@/components/KpiCard'
 import { ProductivityDateFilter } from '@/components/productivity/ProductivityDateFilter'
 import { ProductivityBoard } from '@/components/productivity/ProductivityBoard'
@@ -24,6 +25,7 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Productivity / SLA / Short Pick" subtitle={`ผลิตภาพ / SLA / หยิบขาด · ${formatDate(date)} · ${warehouseCode}`}>
         <ProductivityDateFilter date={date} />
       </TopBar>

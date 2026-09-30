@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { TopBar } from '@/components/TopBar'
+import { AutoRefresh } from '@/components/AutoRefresh'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
@@ -27,6 +28,7 @@ export default async function ConsolidationHistoryPage() {
 
   return (
     <>
+      <AutoRefresh />
       <TopBar title="Consolidation History" subtitle="ประวัติการรวมออเดอร์ · released, completed and cancelled batches" />
       <div className="page-body">
         <div className="card" style={{ flex: 1, minHeight: 0 }}>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
@@ -61,9 +61,19 @@ export function MatchingBoard({
   // without this, orders that only went through Order Consolidation sat at status='new' forever,
   // invisible to Pick Completion / Admin Verification / every dashboard that tracks active work.
   const [approveTarget, setApproveTarget] = useState<string[] | null>(null)
+  const pickerScanInputRef = useRef<HTMLInputElement>(null)
   const [pickerScanValue, setPickerScanValue] = useState('')
   const [pickerScanError, setPickerScanError] = useState<string | null>(null)
   const [scannedPicker, setScannedPicker] = useState<PickerRow | null>(null)
+
+  // Any scan error puts the cursor straight back in the box with its (unchanged) value selected,
+  // ready to scan straight over -- no mouse or manual clear needed.
+  useEffect(() => {
+    if (pickerScanError) {
+      pickerScanInputRef.current?.focus()
+      pickerScanInputRef.current?.select()
+    }
+  }, [pickerScanError])
 
   useEffect(() => {
     setDateInput(orderDate)
@@ -393,6 +403,7 @@ export function MatchingBoard({
             ) : (
               <div style={{ display: 'flex', gap: 6 }}>
                 <input
+                  ref={pickerScanInputRef}
                   className="control"
                   placeholder="Scan picker ID…"
                   value={pickerScanValue}

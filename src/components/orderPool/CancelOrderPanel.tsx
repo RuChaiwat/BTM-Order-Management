@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Spinner } from '../Spinner'
@@ -33,6 +33,15 @@ export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
   const [reasonCode, setReasonCode] = useState(reasons[0]?.reason_code ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Any lookup error puts the cursor straight back in the box with its (unchanged) value selected,
+  // ready to scan straight over -- no mouse or manual clear needed.
+  useEffect(() => {
+    if (scanError) {
+      scanInputRef.current?.focus()
+      scanInputRef.current?.select()
+    }
+  }, [scanError])
 
   async function lookup() {
     const value = scanValue.trim()

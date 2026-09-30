@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Spinner } from '../Spinner'
@@ -56,6 +56,7 @@ function formatElapsed(assignedTime: string | null, now: number): string {
  */
 export function PickCompletionBoard({ apiBase = '/api/picker-completions', showReprint = true }: { apiBase?: string; showReprint?: boolean }) {
   const router = useRouter()
+  const scanInputRef = useRef<HTMLInputElement>(null)
   const [scanValue, setScanValue] = useState('')
   const [scanError, setScanError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -74,6 +75,15 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
     const id = setInterval(() => setNow(Date.now()), 60_000)
     return () => clearInterval(id)
   }, [picker])
+
+  // Any scan error puts the cursor straight back in the box with its (unchanged) value selected,
+  // ready to scan straight over -- no mouse or manual clear needed.
+  useEffect(() => {
+    if (scanError) {
+      scanInputRef.current?.focus()
+      scanInputRef.current?.select()
+    }
+  }, [scanError])
 
   async function lookupPicker() {
     const value = scanValue.trim().toUpperCase()
@@ -169,6 +179,7 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
+              ref={scanInputRef}
               className="control"
               placeholder="Scan or type Picker ID…"
               value={scanValue}

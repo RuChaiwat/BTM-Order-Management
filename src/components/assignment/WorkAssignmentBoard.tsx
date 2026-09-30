@@ -115,6 +115,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
   const [selectedDetails, setSelectedDetails] = useState<Map<string, SelectedOrder>>(new Map())
   const [poolSelectError, setPoolSelectError] = useState<string | null>(null)
 
+  const orderScanInputRef = useRef<HTMLInputElement>(null)
   const [orderScanValue, setOrderScanValue] = useState('')
   const [orderScanError, setOrderScanError] = useState<string | null>(null)
   const [orderScanUsed, setOrderScanUsed] = useState(false)
@@ -140,6 +141,12 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       pickerScanInputRef.current?.select()
     }
   }, [pickerScanError])
+  useEffect(() => {
+    if (orderScanError) {
+      orderScanInputRef.current?.focus()
+      orderScanInputRef.current?.select()
+    }
+  }, [orderScanError])
 
   async function fetchPool(date: string, zone: string, page: number, band: Band | null, sort: SortColumn, dir: 'asc' | 'desc') {
     setLoadingPool(true)
@@ -469,6 +476,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
           <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', marginBottom: 6 }}>4. OR SCAN ORDER BARCODE</div>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
+              ref={orderScanInputRef}
               className="control"
               placeholder="Scan order barcode…"
               value={orderScanValue}

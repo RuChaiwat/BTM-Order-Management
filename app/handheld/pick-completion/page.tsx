@@ -18,7 +18,7 @@ export default function HandheldPickCompletionPage() {
     <div className="app-shell">
       <div className="app-main">
         <TopBar title="Pick Completion" subtitle="ปิดงานหยิบของฉัน · สแกนรหัส Picker ของตัวเอง" />
-        <PickCompletionBoard apiBase="/api/handheld/picker-completions" showReprint={false} />
+        <PickCompletionBoard apiBase="/api/handheld/picker-completions" showReprint={false} showUnassign={false} />
       </div>
     </div>
   )

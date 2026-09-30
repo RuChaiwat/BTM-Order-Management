@@ -54,7 +54,15 @@ function formatElapsed(assignedTime: string | null, now: number): string {
  * large tap targets that wrap to a single column on a narrow Handheld screen and lay out as a
  * wider row on a PC monitor, so one component serves both without a second copy to maintain.
  */
-export function PickCompletionBoard({ apiBase = '/api/picker-completions', showReprint = true }: { apiBase?: string; showReprint?: boolean }) {
+export function PickCompletionBoard({
+  apiBase = '/api/picker-completions',
+  showReprint = true,
+  showUnassign = true,
+}: {
+  apiBase?: string
+  showReprint?: boolean
+  showUnassign?: boolean
+}) {
   const router = useRouter()
   const scanInputRef = useRef<HTMLInputElement>(null)
   const [scanValue, setScanValue] = useState('')
@@ -64,6 +72,9 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
   const [orders, setOrders] = useState<PickerOrder[]>([])
   const [pending, setPending] = useState<{ orderId: string; result: '100_percent' | 'short' } | null>(null)
   const [showCompletedAll, setShowCompletedAll] = useState(false)
+  const [unassignTarget, setUnassignTarget] = useState<string | null>(null)
+  const [unassigning, setUnassigning] = useState(false)
+  const [unassignError, setUnassignError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -118,6 +129,26 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
     const res = await apiFetch(`${apiBase}?picker_id=${encodeURIComponent(picker.picker_id)}`)
     const body = await res.json()
     if (res.ok) setOrders(body.orders)
+  }
+
+  // Admin-only recall (never reachable on Handheld -- see showUnassign): stops the order's clock
+  // and sends it back to the Assignment Pool for a different picker, for the shift-end case where
+  // this picker just can't finish it.
+  async function confirmUnassign() {
+    if (!unassignTarget) return
+    setUnassigning(true)
+    setUnassignError(null)
+    const res = await apiFetch(`/api/orders/${unassignTarget}/unassign`, { method: 'POST' })
+    const body = await res.json()
+    if (!res.ok) {
+      setUnassigning(false)
+      setUnassignError(body.error)
+      return
+    }
+    await refreshOrders()
+    setUnassigning(false)
+    setUnassignTarget(null)
+    router.refresh()
   }
 
   // Deliberately keeps `submitting` true (buttons stay disabled, modal stays open) through the
@@ -273,6 +304,17 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
                     Reprint
                   </button>
                 )}
+                {showUnassign && (
+                  <button
+                    className="btn btn-danger-outline"
+                    style={{ padding: '12px 18px', fontSize: 14, flex: '0 0 auto' }}
+                    disabled={submitting}
+                    onClick={() => setUnassignTarget(o.order_id)}
+                    title="Send this order back to the pool for a different picker"
+                  >
+                    Unassign
+                  </button>
+                )}
                 <button
                   className="btn btn-success"
                   style={{ padding: '12px 18px', fontSize: 14, flex: '1 1 auto', minWidth: 130 }}
@@ -341,6 +383,25 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
             <button type="submit" className="modal-footer-btn btn-success" style={{ minWidth: 190, border: 0 }} disabled={submitting} autoFocus>
               {submitting && <Spinner />}
               {submitting ? 'Submitting…' : `Complete all ${orders.length}`}
+            </button>
+          </ModalFooter>
+        </Modal>
+      )}
+
+      {unassignTarget && (
+        <Modal title="Unassign this order?" subtitle="ยกเลิกการมอบหมายงาน" onSubmit={confirmUnassign}>
+          <div className="modal-body">
+            <div>Stops the timer and sends {orders.find((o) => o.order_id === unassignTarget)?.order_no} back to the pool for another picker. This cannot be undone.</div>
+            <div style={{ marginTop: 6, color: '#6B7280' }}>หยุดจับเวลาและส่ง Order นี้กลับเข้า Pool เพื่อมอบหมายให้ Picker คนอื่น ไม่สามารถย้อนกลับได้</div>
+          </div>
+          {unassignError && <div style={{ margin: '0 24px', fontSize: 12, color: 'var(--color-danger)' }}>{unassignError}</div>}
+          <ModalFooter>
+            <button type="button" className="modal-footer-btn btn-secondary" disabled={unassigning} onClick={() => setUnassignTarget(null)}>
+              Cancel
+            </button>
+            <button type="submit" className="modal-footer-btn btn-danger" style={{ minWidth: 170, border: 0 }} disabled={unassigning}>
+              {unassigning && <Spinner />}
+              {unassigning ? 'Unassigning…' : 'Confirm unassign'}
             </button>
           </ModalFooter>
         </Modal>

@@ -11,6 +11,14 @@ import { bangkokDateKey } from '../formatDate'
 const SLA_THRESHOLD_MINUTES = 120
 const LEADERBOARD_SIZE = 10
 
+/** Floor for the cycle-time minutes an order contributes to a Pcs/Hour calculation -- a real pick
+ * confirmed in under this looks the same as one confirmed within seconds of being assigned (test
+ * data, or a picker confirming in a rush), and either way divides pieces by an unrealistically tiny
+ * number of minutes and produces a rate in the thousands/hour that isn't a meaningful throughput
+ * figure. Only the RATE math is floored -- the real elapsed time still drives the SLA/on-time
+ * check above, and the picker's own confirm action is never blocked or delayed by this. */
+export const MIN_CYCLE_MINUTES_FOR_RATE = 5
+
 /** §12.2/§13 Productivity / SLA / Short Pick analytics for a single (Bangkok-calendar) day, driven
  * entirely by the PICKER's own confirm date (picker_completions.picker_completed_time) --
  * deliberately independent of Admin Verification, so a picker's work today shows up immediately
@@ -70,15 +78,16 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     totalPieces += completion.actual_pieces ?? 0
     if (completion.result === 'short') shortCount += 1
     if (!order.assigned_time) continue
-    const minutes = Math.max(1, (new Date(completion.picker_completed_time).getTime() - new Date(order.assigned_time).getTime()) / 60000)
-    totalMinutes += minutes
+    const rawMinutes = Math.max(1, (new Date(completion.picker_completed_time).getTime() - new Date(order.assigned_time).getTime()) / 60000)
+    const rateMinutes = Math.max(MIN_CYCLE_MINUTES_FOR_RATE, rawMinutes)
+    totalMinutes += rateMinutes
     cycleTimedCount += 1
-    const onTime = minutes <= SLA_THRESHOLD_MINUTES
+    const onTime = rawMinutes <= SLA_THRESHOLD_MINUTES
     if (onTime) onTimeCount += 1
     if (!pickerId) continue
     const entry = productivityByPicker.get(pickerId) ?? { pieces: 0, minutes: 0, completed: 0, short: 0, onTime: 0 }
     entry.pieces += completion.actual_pieces ?? 0
-    entry.minutes += minutes
+    entry.minutes += rateMinutes
     entry.completed += 1
     if (completion.result === 'short') entry.short += 1
     if (onTime) entry.onTime += 1

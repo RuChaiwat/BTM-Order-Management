@@ -4,6 +4,7 @@ import { buildXlsxBuffer } from '@/lib/xlsxExport'
 import { getSessionUser } from '@/lib/auth'
 import { bangkokDateKey, formatDate, formatDateTime } from '@/lib/formatDate'
 import { getShortPickDetailRows } from '@/lib/queries/shortPickMonitor'
+import { MIN_CYCLE_MINUTES_FOR_RATE } from '@/lib/queries/productivity'
 
 /**
  * §20.1 weekly productivity export — one row per Order productivity result, into a new
@@ -72,13 +73,19 @@ export async function GET(request: Request) {
 
     // Computed once per completion (assigned_time -> picker_completed_time, same basis as
     // Productivity's own per-day view) and reused for both the Order Detail rows and the Picker
-    // Daily Summary sheet below, so the two can't ever disagree with each other.
+    // Daily Summary sheet below, so the two can't ever disagree with each other. cycleMinutes is
+    // the real elapsed time (shown as-is in Order Detail); rateMinutes floors it at
+    // MIN_CYCLE_MINUTES_FOR_RATE before it feeds any Pieces/Hour figure, so an order confirmed
+    // within seconds of being assigned (test data, or a rushed confirm) can't produce a
+    // thousands-per-hour rate that isn't a meaningful throughput number -- same fix as
+    // Productivity's own page, kept consistent so the two never disagree.
     const enriched = (completions ?? []).map((c) => {
       const order = orderById.get(c.order_id)
       const pickerId = order?.assignment_batch_id ? pickerByBatch.get(order.assignment_batch_id) : null
       const cycleMinutes = order?.assigned_time ? (new Date(c.picker_completed_time).getTime() - new Date(order.assigned_time).getTime()) / 60000 : 0
-      const pcsPerHour = cycleMinutes > 0 ? Math.round((c.actual_pieces / cycleMinutes) * 60) : 0
-      return { c, order, pickerId, cycleMinutes, pcsPerHour }
+      const rateMinutes = Math.max(MIN_CYCLE_MINUTES_FOR_RATE, cycleMinutes)
+      const pcsPerHour = cycleMinutes > 0 ? Math.round((c.actual_pieces / rateMinutes) * 60) : 0
+      return { c, order, pickerId, cycleMinutes, rateMinutes, pcsPerHour }
     })
 
     const detailHeader = [
@@ -112,19 +119,21 @@ export async function GET(request: Request) {
     }
 
     // Picker Daily Summary -- grouped by (picker, Bangkok-calendar day). Avg Cycle Minutes is a
-    // plain per-order mean (typical order duration); Avg Pieces/Hour is total pieces over total
-    // minutes for the group (throughput), not a mean of each order's own rate -- same convention
-    // Productivity's own per-day view uses, so one short order can't skew it disproportionately.
-    const summaryByKey = new Map<string, { pickerId: string; day: string; orders: number; totalPieces: number; totalMinutes: number }>()
-    for (const { c, order, pickerId, cycleMinutes } of enriched) {
+    // plain per-order mean of the REAL elapsed time (typical order duration); Avg Pieces/Hour is
+    // total pieces over total RATE minutes (floored, see above) for the group (throughput), not a
+    // mean of each order's own rate -- same convention Productivity's own per-day view uses, so one
+    // short order can't skew it disproportionately.
+    const summaryByKey = new Map<string, { pickerId: string; day: string; orders: number; totalPieces: number; totalCycleMinutes: number; totalRateMinutes: number }>()
+    for (const { c, order, pickerId, cycleMinutes, rateMinutes } of enriched) {
       if (!pickerId || !order?.assigned_time) continue
       const day = bangkokDateKey(c.picker_completed_time)
       if (!day) continue
       const key = `${pickerId}__${day}`
-      const entry = summaryByKey.get(key) ?? { pickerId, day, orders: 0, totalPieces: 0, totalMinutes: 0 }
+      const entry = summaryByKey.get(key) ?? { pickerId, day, orders: 0, totalPieces: 0, totalCycleMinutes: 0, totalRateMinutes: 0 }
       entry.orders += 1
       entry.totalPieces += c.actual_pieces ?? 0
-      entry.totalMinutes += cycleMinutes
+      entry.totalCycleMinutes += cycleMinutes
+      entry.totalRateMinutes += rateMinutes
       summaryByKey.set(key, entry)
     }
 
@@ -143,8 +152,8 @@ export async function GET(request: Request) {
         formatDate(s.day),
         s.orders,
         s.totalPieces,
-        Math.round(s.totalMinutes / s.orders),
-        s.totalMinutes > 0 ? Math.round((s.totalPieces / s.totalMinutes) * 60) : 0,
+        Math.round(s.totalCycleMinutes / s.orders),
+        s.totalRateMinutes > 0 ? Math.round((s.totalPieces / s.totalRateMinutes) * 60) : 0,
       ])
 
     // Short / Damage / Expired sheet (Purge review follow-up, item 2) -- item-level detail, same

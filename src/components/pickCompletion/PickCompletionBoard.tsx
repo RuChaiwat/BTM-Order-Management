@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Spinner } from '../Spinner'
@@ -25,6 +25,19 @@ const STATUS_LABEL: Record<string, string> = {
   assigned: 'Assigned',
   in_progress: 'In Progress',
   correction_in_progress: 'Returned for correction',
+}
+
+/** "How long have I had this order" for the picker's own reference (§Productivity follow-up --
+ * they asked for this after learning fast confirms were skewing Pcs/Hour, so a picker can now see
+ * for themselves how long they've actually spent). `now` is passed in rather than read internally
+ * so every card ticks off the same one-second-old clock instead of drifting apart. */
+function formatElapsed(assignedTime: string | null, now: number): string {
+  if (!assignedTime) return '—'
+  const minutes = Math.max(0, (now - new Date(assignedTime).getTime()) / 60000)
+  if (minutes < 60) return `${Math.floor(minutes)} min`
+  const hours = Math.floor(minutes / 60)
+  const mins = Math.floor(minutes % 60)
+  return `${hours}h ${mins}m`
 }
 
 /**
@@ -52,6 +65,15 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
   const [showCompletedAll, setShowCompletedAll] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
+  // Ticks the "Assigned Xm ago" reading on every visible order card once a minute -- only while a
+  // picker's list is actually open, not while the scan screen is showing nothing to tick.
+  useEffect(() => {
+    if (!picker) return
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [picker])
 
   async function lookupPicker() {
     const value = scanValue.trim().toUpperCase()
@@ -221,6 +243,10 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
               <div style={{ flex: '0 0 auto', textAlign: 'center' }}>
                 <div style={{ fontSize: 17, fontWeight: 700 }}>{o.planned_pieces}</div>
                 <div style={{ fontSize: 11, color: '#6B7280' }}>planned pcs</div>
+              </div>
+              <div style={{ flex: '0 0 auto', textAlign: 'center' }}>
+                <div style={{ fontSize: 17, fontWeight: 700 }}>{formatElapsed(o.assigned_time, now)}</div>
+                <div style={{ fontSize: 11, color: '#6B7280' }}>time held</div>
               </div>
               <div style={{ flex: '0 0 auto' }}>
                 <span className={`badge badge-${o.status === 'correction_in_progress' ? 'warning' : 'info'}`}>{STATUS_LABEL[o.status] ?? o.status}</span>

@@ -260,7 +260,11 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
       </div>
 
       {pending && (
-        <Modal title={pending.result === '100_percent' ? 'Confirm Completed?' : 'Confirm Completed with Short?'} subtitle="ยืนยันผลการหยิบ · หยุดเวลา">
+        <Modal
+          title={pending.result === '100_percent' ? 'Confirm Completed?' : 'Confirm Completed with Short?'}
+          subtitle="ยืนยันผลการหยิบ · หยุดเวลา"
+          onSubmit={() => submitOne(pending.orderId, pending.result)}
+        >
           <div className="modal-body">
             {orders.find((o) => o.order_id === pending.orderId)?.order_no}
             {pending.result === '100_percent'
@@ -270,14 +274,15 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
             This stops the order&apos;s clock and cannot be edited afterward.
           </div>
           <ModalFooter>
-            <button className="modal-footer-btn btn-secondary" onClick={() => setPending(null)}>
+            <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setPending(null)}>
               Cancel
             </button>
             <button
+              type="submit"
               className={`modal-footer-btn ${pending.result === '100_percent' ? 'btn-success' : 'btn-warning'}`}
               style={{ minWidth: 190, border: 0 }}
               disabled={submitting}
-              onClick={() => submitOne(pending.orderId, pending.result)}
+              autoFocus
             >
               {submitting && <Spinner />}
               {submitting ? 'Submitting…' : 'Confirm & submit'}
@@ -287,16 +292,16 @@ export function PickCompletionBoard({ apiBase = '/api/picker-completions', showR
       )}
 
       {showCompletedAll && (
-        <Modal title={`Mark all ${orders.length} orders Completed?`} subtitle="ยืนยันปิดงานทั้งหมด (100%)">
+        <Modal title={`Mark all ${orders.length} orders Completed?`} subtitle="ยืนยันปิดงานทั้งหมด (100%)" onSubmit={completeAll}>
           <div className="modal-body">
             Every order currently assigned to <strong>{picker.name_en}</strong> will be marked fully picked (100%) and sent to Admin Verification. Use this only when nothing was short-picked
             today — a short-picked order should be confirmed individually with &quot;Completed with Short&quot; instead.
           </div>
           <ModalFooter>
-            <button className="modal-footer-btn btn-secondary" onClick={() => setShowCompletedAll(false)}>
+            <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setShowCompletedAll(false)}>
               Cancel
             </button>
-            <button className="modal-footer-btn btn-success" style={{ minWidth: 190, border: 0 }} disabled={submitting} onClick={completeAll}>
+            <button type="submit" className="modal-footer-btn btn-success" style={{ minWidth: 190, border: 0 }} disabled={submitting} autoFocus>
               {submitting && <Spinner />}
               {submitting ? 'Submitting…' : `Complete all ${orders.length}`}
             </button>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Spinner } from '../Spinner'
@@ -25,6 +25,7 @@ interface FoundOrder {
  * order is confirmed still New/Pending (the one status the API allows cancelling from). */
 export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
   const router = useRouter()
+  const scanInputRef = useRef<HTMLInputElement>(null)
   const [scanValue, setScanValue] = useState('')
   const [scanError, setScanError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -52,6 +53,7 @@ export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
   function closeConfirm() {
     setFound(null)
     setSubmitError(null)
+    scanInputRef.current?.focus()
   }
 
   async function confirmCancel() {
@@ -73,6 +75,7 @@ export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
     }
     setFound(null)
     router.refresh()
+    scanInputRef.current?.focus()
   }
 
   return (
@@ -83,14 +86,16 @@ export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input
+          ref={scanInputRef}
           className="control"
           placeholder="Scan or type Order No…"
           value={scanValue}
           onChange={(e) => setScanValue(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && lookup()}
           style={{ flex: '1 1 240px', maxWidth: 320 }}
+          autoFocus
         />
-        <button className="btn btn-secondary btn-sm" disabled={loading} onClick={lookup}>
+        <button type="button" className="btn btn-secondary btn-sm" disabled={loading} onClick={lookup}>
           {loading && <Spinner />}
           {loading ? 'Looking up…' : 'Find order'}
         </button>
@@ -98,7 +103,7 @@ export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
       {scanError && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-danger)' }}>{scanError}</div>}
 
       {found && (
-        <Modal title={`Cancel ${found.order_no}?`} subtitle="ยืนยันการยกเลิกออเดอร์ · บันทึกเหตุผลถาวร">
+        <Modal title={`Cancel ${found.order_no}?`} subtitle="ยืนยันการยกเลิกออเดอร์ · บันทึกเหตุผลถาวร" onSubmit={confirmCancel}>
           <div className="modal-body">
             Store {found.store_code} · {found.planned_pieces.toLocaleString()} planned pieces. This order will move to Cancelled and can never be assigned or picked.
           </div>
@@ -106,7 +111,7 @@ export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
             <label className="field-label">
               Cancel reason <span style={{ color: '#DC2626' }}>*</span>
             </label>
-            <select className="field-input" style={{ border: '1px solid var(--color-border)' }} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
+            <select className="field-input" style={{ border: '1px solid var(--color-border)' }} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} autoFocus>
               {reasons.map((r) => (
                 <option key={r.reason_code} value={r.reason_code}>
                   {r.label_en}
@@ -116,10 +121,10 @@ export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
           </div>
           {submitError && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-danger)' }}>{submitError}</div>}
           <ModalFooter>
-            <button className="modal-footer-btn btn-secondary" disabled={submitting} onClick={closeConfirm}>
+            <button type="button" className="modal-footer-btn btn-secondary" disabled={submitting} onClick={closeConfirm}>
               Back
             </button>
-            <button className="modal-footer-btn btn-danger" style={{ minWidth: 170, border: 0 }} disabled={submitting || !reasonCode} onClick={confirmCancel}>
+            <button type="submit" className="modal-footer-btn btn-danger" style={{ minWidth: 170, border: 0 }} disabled={submitting || !reasonCode}>
               {submitting && <Spinner />}
               {submitting ? 'Cancelling…' : 'Confirm cancel'}
             </button>

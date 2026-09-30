@@ -618,7 +618,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       </div>
 
       {showConfirm && scannedPicker && (
-        <Modal title="Confirm assignment?" subtitle="ยืนยันการมอบหมายงาน">
+        <Modal title="Confirm assignment?" subtitle="ยืนยันการมอบหมายงาน" onSubmit={confirmAssignment}>
           <div className="modal-body">
             {selectedOrders.length} orders · {plannedPieces} planned pieces to picker <strong>{scannedPicker.name_en}</strong> in Zone {effectiveZone}. The Order timer starts now.
           </div>
@@ -635,10 +635,10 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
             </div>
           </div>
           <ModalFooter>
-            <button className="modal-footer-btn btn-secondary" onClick={() => setShowConfirm(false)}>
+            <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setShowConfirm(false)}>
               Cancel
             </button>
-            <button className="modal-footer-btn btn-primary" style={{ minWidth: 190, border: 0 }} disabled={submitting} onClick={confirmAssignment}>
+            <button type="submit" className="modal-footer-btn btn-primary" style={{ minWidth: 190, border: 0 }} disabled={submitting} autoFocus>
               {submitting && <Spinner />}
               {submitting ? 'Confirming…' : 'Confirm & start timer'}
             </button>

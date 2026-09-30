@@ -252,7 +252,7 @@ function PickerModal({
   }
 
   return (
-    <Modal title={isEdit ? 'Edit picker' : 'Add picker'} subtitle={isEdit ? 'แก้ไขพนักงานหยิบสินค้า' : 'เพิ่มพนักงานหยิบสินค้า'}>
+    <Modal title={isEdit ? 'Edit picker' : 'Add picker'} subtitle={isEdit ? 'แก้ไขพนักงานหยิบสินค้า' : 'เพิ่มพนักงานหยิบสินค้า'} onSubmit={submit}>
       <div style={{ padding: '16px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="field">
           <label className="field-label">
@@ -266,11 +266,18 @@ function PickerModal({
             onChange={(e) => setForm({ ...form, picker_id: e.target.value.toUpperCase() })}
             placeholder="e.g. P020"
             style={{ border: '1px solid var(--color-border)' }}
+            autoFocus={!isEdit}
           />
         </div>
         <div className="field">
           <label className="field-label">Name (EN)</label>
-          <input className="field-input" value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
+          <input
+            className="field-input"
+            value={form.name_en}
+            onChange={(e) => setForm({ ...form, name_en: e.target.value })}
+            style={{ border: '1px solid var(--color-border)' }}
+            autoFocus={isEdit}
+          />
         </div>
         <div className="field">
           <label className="field-label">
@@ -293,14 +300,14 @@ function PickerModal({
         {error && <div style={{ fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
       </div>
       <ModalFooter>
-        <button className="modal-footer-btn btn-secondary" onClick={onClose}>
+        <button type="button" className="modal-footer-btn btn-secondary" onClick={onClose}>
           Cancel
         </button>
         <button
+          type="submit"
           className="modal-footer-btn btn-primary"
           style={{ minWidth: 140, border: 0 }}
           disabled={busy || !form.picker_id || !form.name_en}
-          onClick={submit}
         >
           {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Create picker'}
         </button>

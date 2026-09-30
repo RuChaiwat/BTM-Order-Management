@@ -383,16 +383,16 @@ export function AdminVerificationBoard({
       </div>
 
       {showConfirmAll && (
-        <Modal title={`Confirm all ${fullyPickedOrders.length} fully-picked orders?`} subtitle="ยืนยันเฉพาะที่ picker ปิดงาน 100%">
+        <Modal title={`Confirm all ${fullyPickedOrders.length} fully-picked orders?`} subtitle="ยืนยันเฉพาะที่ picker ปิดงาน 100%" onSubmit={confirmAll}>
           <div className="modal-body">
             Every order the picker reported as fully picked (100%) will be marked Final Closed with every line at its full ordered quantity. Orders reported short are not included — open each
             one individually. This cannot be undone.
           </div>
           <ModalFooter>
-            <button className="modal-footer-btn btn-secondary" onClick={() => setShowConfirmAll(false)}>
+            <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setShowConfirmAll(false)}>
               Cancel
             </button>
-            <button className="modal-footer-btn btn-success" style={{ minWidth: 170, border: 0 }} disabled={working} onClick={confirmAll}>
+            <button type="submit" className="modal-footer-btn btn-success" style={{ minWidth: 170, border: 0 }} disabled={working} autoFocus>
               {working && <Spinner />}
               {working ? 'Confirming…' : `Confirm all ${fullyPickedOrders.length}`}
             </button>
@@ -401,7 +401,7 @@ export function AdminVerificationBoard({
       )}
 
       {showReject && selected && (
-        <Modal title={`Reject ${selected.order_no} for correction?`} subtitle="ส่งกลับเพื่อแก้ไข">
+        <Modal title={`Reject ${selected.order_no} for correction?`} subtitle="ส่งกลับเพื่อแก้ไข" onSubmit={reject}>
           <div className="modal-body" style={{ paddingTop: 14 }}>
             The order returns to <strong>Correction in Progress</strong> for the picker to re-check. A reason is required and written to the audit trail.
           </div>
@@ -414,13 +414,14 @@ export function AdminVerificationBoard({
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="e.g. Short quantity not verified at bin"
               style={{ width: '100%', minHeight: 76, border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 13.5, fontFamily: 'inherit' }}
+              autoFocus
             />
           </div>
           <ModalFooter>
-            <button className="modal-footer-btn btn-secondary" onClick={() => setShowReject(false)}>
+            <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setShowReject(false)}>
               Cancel
             </button>
-            <button className="modal-footer-btn btn-danger" style={{ minWidth: 170, border: 0 }} disabled={!rejectReason || working} onClick={reject}>
+            <button type="submit" className="modal-footer-btn btn-danger" style={{ minWidth: 170, border: 0 }} disabled={!rejectReason || working}>
               {working && <Spinner />}
               Reject &amp; notify picker
             </button>

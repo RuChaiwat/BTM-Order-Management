@@ -374,6 +374,7 @@ export function MatchingBoard({
         <Modal
           title={approveTarget.length === 1 ? 'Approve batch' : `Approve ${approveTarget.length} batches`}
           subtitle="สแกนรหัส Picker เพื่อมอบหมายงานหยิบก่อนอนุมัติ · orders in this batch will be assigned to the scanned picker"
+          onSubmit={confirmApprove}
         >
           <div className="modal-body">
             <div style={{ fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 8 }}>
@@ -385,7 +386,7 @@ export function MatchingBoard({
                   <div style={{ fontWeight: 700, fontSize: 13 }}>{scannedPicker.name_en}</div>
                   <div style={{ fontSize: 11, color: '#6B7280' }}>{scannedPicker.picker_id}</div>
                 </div>
-                <button className="btn btn-secondary btn-sm" onClick={() => setScannedPicker(null)}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setScannedPicker(null)}>
                   Change
                 </button>
               </div>
@@ -400,7 +401,7 @@ export function MatchingBoard({
                   style={{ flex: 1, minWidth: 0 }}
                   autoFocus
                 />
-                <button className="btn btn-secondary btn-sm" onClick={handlePickerScan}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={handlePickerScan}>
                   Scan
                 </button>
               </div>
@@ -413,10 +414,10 @@ export function MatchingBoard({
             </div>
           </div>
           <ModalFooter>
-            <button className="modal-footer-btn btn-secondary" disabled={bulkBusy} onClick={closeApproveModal}>
+            <button type="button" className="modal-footer-btn btn-secondary" disabled={bulkBusy} onClick={closeApproveModal}>
               Cancel
             </button>
-            <button className="modal-footer-btn btn-primary" style={{ minWidth: 190, border: 0 }} disabled={!scannedPicker || bulkBusy} onClick={confirmApprove}>
+            <button type="submit" className="modal-footer-btn btn-primary" style={{ minWidth: 190, border: 0 }} disabled={!scannedPicker || bulkBusy}>
               {bulkBusy ? 'Approving…' : 'Confirm & Approve'}
             </button>
           </ModalFooter>

@@ -137,7 +137,7 @@ function AddUserModal({ warehouseCode, onClose, onCreated }: { warehouseCode: st
   }
 
   return (
-    <Modal title="Add user" subtitle="เพิ่มผู้ใช้งาน">
+    <Modal title="Add user" subtitle="เพิ่มผู้ใช้งาน" onSubmit={submit}>
       <div style={{ padding: '16px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="field">
           <label className="field-label">
@@ -150,6 +150,7 @@ function AddUserModal({ warehouseCode, onClose, onCreated }: { warehouseCode: st
             onChange={(e) => setForm({ ...form, user_id: e.target.value.toUpperCase() })}
             placeholder="e.g. P020"
             style={{ border: '1px solid var(--color-border)' }}
+            autoFocus
           />
         </div>
         <div className="field">
@@ -179,14 +180,14 @@ function AddUserModal({ warehouseCode, onClose, onCreated }: { warehouseCode: st
         {error && <div style={{ fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
       </div>
       <ModalFooter>
-        <button className="modal-footer-btn btn-secondary" onClick={onClose}>
+        <button type="button" className="modal-footer-btn btn-secondary" onClick={onClose}>
           Cancel
         </button>
         <button
+          type="submit"
           className="modal-footer-btn btn-primary"
           style={{ minWidth: 140, border: 0 }}
           disabled={busy || !form.user_id || !form.password || !form.name_en}
-          onClick={submit}
         >
           {busy ? 'Creating…' : 'Create user'}
         </button>

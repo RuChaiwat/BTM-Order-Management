@@ -196,10 +196,11 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
             order individually from Pick Completion — this batch closes itself automatically once every order in it has been confirmed there.
           </div>
           <ModalFooter>
-            <button className="modal-footer-btn btn-secondary" disabled={busyBatch === completeTarget} onClick={() => setCompleteTarget(null)}>
+            <button type="button" className="modal-footer-btn btn-secondary" disabled={busyBatch === completeTarget} onClick={() => setCompleteTarget(null)}>
               Cancel
             </button>
             <button
+              type="button"
               className="modal-footer-btn btn-warning"
               style={{ border: 0 }}
               disabled={busyBatch === completeTarget}
@@ -209,6 +210,7 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
               Completed with Short
             </button>
             <button
+              type="button"
               className="modal-footer-btn btn-success"
               style={{ minWidth: 160, border: 0 }}
               disabled={busyBatch === completeTarget}

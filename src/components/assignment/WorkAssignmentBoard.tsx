@@ -121,7 +121,9 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
 
   const [pickerScanValue, setPickerScanValue] = useState('')
   const [pickerScanError, setPickerScanError] = useState<string | null>(null)
+  const [pickerScanBusy, setPickerScanBusy] = useState(false)
   const [scannedPicker, setScannedPicker] = useState<Picker | null>(null)
+  const [pickerTodayRounds, setPickerTodayRounds] = useState<number | null>(null)
 
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -260,7 +262,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     setOrderScanValue('')
   }
 
-  function handlePickerScan() {
+  async function handlePickerScan() {
     const value = pickerScanValue.trim()
     if (!value) return
     setPickerScanError(null)
@@ -273,7 +275,22 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       setPickerScanError(`${match.name_en} is not scoped to Zone ${effectiveZone}`)
       return
     }
+    setPickerScanBusy(true)
+    const res = await apiFetch(`/api/pickers/scan-status?picker_id=${encodeURIComponent(match.picker_id)}`)
+    const body = await res.json()
+    setPickerScanBusy(false)
+    if (!res.ok) {
+      setPickerScanError(body.error)
+      return
+    }
+    // A picker must clear every order still open from their last round (Pick Completion) before
+    // taking on a new one -- otherwise they'd end up holding two rounds' worth of orders at once.
+    if (body.activeOrderCount > 0) {
+      setPickerScanError(`${match.name_en} still has ${body.activeOrderCount} order(s) open from a previous round — complete them at Pick Completion first`)
+      return
+    }
     setScannedPicker(match)
+    setPickerTodayRounds(body.todayBatchCount)
     setPickerScanValue('')
   }
 
@@ -563,9 +580,16 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
                     )
                   })()}
                 </div>
+                {pickerTodayRounds !== null && <div style={{ fontSize: 11.5, color: '#166534', fontWeight: 600 }}>{pickerTodayRounds} รอบ (today)</div>}
                 <div style={{ fontSize: 11, color: '#6B7280' }}>{scannedPicker.picker_id}</div>
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => setScannedPicker(null)}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setScannedPicker(null)
+                  setPickerTodayRounds(null)
+                }}
+              >
                 Change
               </button>
             </div>
@@ -574,13 +598,14 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
               <input
                 className="control"
                 placeholder="Scan picker ID…"
+                disabled={pickerScanBusy}
                 value={pickerScanValue}
                 onChange={(e) => setPickerScanValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handlePickerScan()}
                 style={{ flex: 1, minWidth: 0 }}
               />
-              <button className="btn btn-secondary btn-sm" onClick={handlePickerScan}>
-                Scan
+              <button className="btn btn-secondary btn-sm" disabled={pickerScanBusy} onClick={handlePickerScan}>
+                {pickerScanBusy ? 'Checking…' : 'Scan'}
               </button>
             </div>
           )}

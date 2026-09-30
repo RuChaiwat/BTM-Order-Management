@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, ModalFooter } from '../Modal'
 import { formatDate } from '../../lib/formatDate'
 import { productivityMeta } from '../../lib/pickerProductivity'
@@ -119,6 +119,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
   const [orderScanError, setOrderScanError] = useState<string | null>(null)
   const [orderScanUsed, setOrderScanUsed] = useState(false)
 
+  const pickerScanInputRef = useRef<HTMLInputElement>(null)
   const [pickerScanValue, setPickerScanValue] = useState('')
   const [pickerScanError, setPickerScanError] = useState<string | null>(null)
   const [pickerScanBusy, setPickerScanBusy] = useState(false)
@@ -128,6 +129,17 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Any scan error (bad ID, wrong zone, still has open orders, ...) puts the cursor straight back
+  // in the scan box with the bad value selected -- ready to scan over it -- rather than making the
+  // admin reach for the mouse or clear it themselves. The value itself is left as-is (not blanked)
+  // so they can still see what they typed/scanned wrong.
+  useEffect(() => {
+    if (pickerScanError) {
+      pickerScanInputRef.current?.focus()
+      pickerScanInputRef.current?.select()
+    }
+  }, [pickerScanError])
 
   async function fetchPool(date: string, zone: string, page: number, band: Band | null, sort: SortColumn, dir: 'asc' | 'desc') {
     setLoadingPool(true)
@@ -598,6 +610,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
           ) : (
             <div style={{ display: 'flex', gap: 6 }}>
               <input
+                ref={pickerScanInputRef}
                 className="control"
                 placeholder="Scan picker ID…"
                 disabled={pickerScanBusy}

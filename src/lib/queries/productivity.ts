@@ -25,6 +25,14 @@ export const MIN_CYCLE_MINUTES_FOR_RATE = 5
  * without waiting on Admin to get around to Final Close. A rolling multi-day average would hide
  * exactly the thing this page exists to show: how today's shift is doing right now.
  *
+ * Only counts orders assigned directly from Work Assignment (order.consolidation_batch_id is
+ * null) -- a Consolidation Batch's own cycle time is dominated by however long Sort takes to
+ * finish before picking can even start, which has nothing to do with that picker's own
+ * throughput and would make this page misrepresent it. (An order still linked to a batch means
+ * that batch went through Consolidation's own Approve -- Matching's own candidate-stage link gets
+ * cleared the moment an order is assigned directly instead, see consolidationCleanup.ts, so this
+ * is never a false exclusion of an order that's actually a plain direct assignment.)
+ *
  * One consequence of that independence: reason-level Short Pick detail (picker_completion_lines)
  * is only ever written at Admin Verification's Final Close step (app/api/admin-verifications/
  * route.ts) -- the picker's own submission is coarse, by design (§12.2 redesign). So the Short
@@ -34,7 +42,7 @@ export const MIN_CYCLE_MINUTES_FOR_RATE = 5
  * reason breakdown. */
 export async function getProductivityData(db: SupabaseClient, warehouseCode: string, date: string) {
   const [orders, pickers, cfg] = await Promise.all([
-    fetchAllRows((from, to) => db.from('orders').select('order_id, assigned_time, assignment_batch_id').eq('warehouse_code', warehouseCode).range(from, to)),
+    fetchAllRows((from, to) => db.from('orders').select('order_id, assigned_time, assignment_batch_id, consolidation_batch_id').eq('warehouse_code', warehouseCode).range(from, to)),
     db.from('pickers').select('picker_id, name_en').eq('warehouse_code', warehouseCode).eq('active', true).then(unwrap),
     // Same target used by the weekly Picker Productivity rating (migration 0020) -- configurable
     // rather than a second hardcoded number baked into this page.
@@ -58,7 +66,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
   const completedRows = completions
     .filter((c) => bangkokDateKey(c.picker_completed_time) === date)
     .map((completion) => ({ order: orderById.get(completion.order_id), completion }))
-    .filter((r): r is { order: NonNullable<typeof r.order>; completion: typeof r.completion } => !!r.order)
+    .filter((r): r is { order: NonNullable<typeof r.order>; completion: typeof r.completion } => !!r.order && !r.order.consolidation_batch_id)
 
   const batchIds = [...new Set(completedRows.map((r) => r.order.assignment_batch_id).filter(Boolean))] as string[]
   const batchesRes = batchIds.length
@@ -75,23 +83,37 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
 
   for (const { order, completion } of completedRows) {
     const pickerId = order.assignment_batch_id ? pickerIdByBatch.get(order.assignment_batch_id) : null
+    const isShort = completion.result === 'short'
     totalPieces += completion.actual_pieces ?? 0
-    if (completion.result === 'short') shortCount += 1
-    if (!order.assigned_time) continue
-    const rawMinutes = Math.max(1, (new Date(completion.picker_completed_time).getTime() - new Date(order.assigned_time).getTime()) / 60000)
-    const rateMinutes = Math.max(MIN_CYCLE_MINUTES_FOR_RATE, rawMinutes)
-    totalMinutes += rateMinutes
-    cycleTimedCount += 1
-    const onTime = rawMinutes <= SLA_THRESHOLD_MINUTES
-    if (onTime) onTimeCount += 1
-    if (!pickerId) continue
-    const entry = productivityByPicker.get(pickerId) ?? { pieces: 0, minutes: 0, completed: 0, short: 0, onTime: 0 }
-    entry.pieces += completion.actual_pieces ?? 0
-    entry.minutes += rateMinutes
-    entry.completed += 1
-    if (completion.result === 'short') entry.short += 1
-    if (onTime) entry.onTime += 1
-    productivityByPicker.set(pickerId, entry)
+    if (isShort) shortCount += 1
+
+    const entry = pickerId ? productivityByPicker.get(pickerId) ?? { pieces: 0, minutes: 0, completed: 0, short: 0, onTime: 0 } : null
+    if (entry) {
+      entry.completed += 1
+      if (isShort) entry.short += 1
+    }
+
+    // Rate/SLA math only counts an order assigned on this SAME (Bangkok) day -- one assigned
+    // yesterday but not confirmed until today (picker went home without finishing it, or nobody
+    // got around to Unassigning it) would otherwise show a multi-day cycle time that has nothing
+    // to do with today's actual work and would drag today's Pcs/Hour down for no real reason. It
+    // still counts toward Orders Completed/Total Pieces/Short Pick Rate above, just not the rate.
+    const sameDayAssigned = !!order.assigned_time && bangkokDateKey(order.assigned_time) === date
+    if (sameDayAssigned) {
+      const rawMinutes = Math.max(1, (new Date(completion.picker_completed_time).getTime() - new Date(order.assigned_time as string).getTime()) / 60000)
+      const rateMinutes = Math.max(MIN_CYCLE_MINUTES_FOR_RATE, rawMinutes)
+      totalMinutes += rateMinutes
+      cycleTimedCount += 1
+      const onTime = rawMinutes <= SLA_THRESHOLD_MINUTES
+      if (onTime) onTimeCount += 1
+      if (entry) {
+        entry.pieces += completion.actual_pieces ?? 0
+        entry.minutes += rateMinutes
+        if (onTime) entry.onTime += 1
+      }
+    }
+
+    if (entry && pickerId) productivityByPicker.set(pickerId, entry)
   }
 
   const pickerRows = pickers.map((p) => {

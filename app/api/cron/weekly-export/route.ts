@@ -53,8 +53,23 @@ export async function GET(request: Request) {
 
     const orderIds = (completions ?? []).map((c) => c.order_id)
     const { data: orders } = orderIds.length
-      ? await admin.from('orders').select('order_id, order_no, original_order_date, store_code, warehouse_code, planned_pieces, assigned_time, assignment_batch_id').in('order_id', orderIds)
-      : { data: [] as { order_id: string; order_no: string; original_order_date: string; store_code: string; warehouse_code: string; planned_pieces: number; assigned_time: string | null; assignment_batch_id: string | null }[] }
+      ? await admin
+          .from('orders')
+          .select('order_id, order_no, original_order_date, store_code, warehouse_code, planned_pieces, assigned_time, assignment_batch_id, consolidation_batch_id')
+          .in('order_id', orderIds)
+      : {
+          data: [] as {
+            order_id: string
+            order_no: string
+            original_order_date: string
+            store_code: string
+            warehouse_code: string
+            planned_pieces: number
+            assigned_time: string | null
+            assignment_batch_id: string | null
+            consolidation_batch_id: string | null
+          }[],
+        }
     const orderById = new Map((orders ?? []).map((o) => [o.order_id, o]))
 
     const batchIds = [...new Set((orders ?? []).map((o) => o.assignment_batch_id).filter(Boolean))] as string[]
@@ -118,22 +133,35 @@ export async function GET(request: Request) {
       shortPickOrders: detailRows.filter((r) => r[11] === 'short').length,
     }
 
-    // Picker Daily Summary -- grouped by (picker, Bangkok-calendar day). Avg Cycle Minutes is a
-    // plain per-order mean of the REAL elapsed time (typical order duration); Avg Pieces/Hour is
-    // total pieces over total RATE minutes (floored, see above) for the group (throughput), not a
-    // mean of each order's own rate -- same convention Productivity's own per-day view uses, so one
-    // short order can't skew it disproportionately.
-    const summaryByKey = new Map<string, { pickerId: string; day: string; orders: number; totalPieces: number; totalCycleMinutes: number; totalRateMinutes: number }>()
+    // Picker Daily Summary -- grouped by (picker, Bangkok-calendar day), same two rules as
+    // Productivity's own per-day view (src/lib/queries/productivity.ts) so the two can never
+    // disagree: (1) a Consolidation Batch order is excluded entirely -- its cycle time is
+    // dominated by however long Sort takes, not the picker's own throughput; (2) an order not
+    // assigned on the SAME day it was completed (picker went home without finishing it, or nobody
+    // Unassigned it) still counts toward Orders/Total Pieces, but is excluded from Avg Cycle
+    // Minutes/Avg Pieces/Hour -- a multi-day cycle time isn't a meaningful same-day rate. Avg Cycle
+    // Minutes is a plain per-order mean of the real elapsed time; Avg Pieces/Hour is total pieces
+    // over total RATE minutes (floored, see above) for the group (throughput), not a mean of each
+    // order's own rate, so one short order can't skew it disproportionately.
+    const summaryByKey = new Map<
+      string,
+      { pickerId: string; day: string; orders: number; totalPieces: number; totalCycleMinutes: number; totalRateMinutes: number; rateEligibleOrders: number; rateEligiblePieces: number }
+    >()
     for (const { c, order, pickerId, cycleMinutes, rateMinutes } of enriched) {
-      if (!pickerId || !order?.assigned_time) continue
+      if (!pickerId || order?.consolidation_batch_id) continue
       const day = bangkokDateKey(c.picker_completed_time)
       if (!day) continue
       const key = `${pickerId}__${day}`
-      const entry = summaryByKey.get(key) ?? { pickerId, day, orders: 0, totalPieces: 0, totalCycleMinutes: 0, totalRateMinutes: 0 }
+      const entry = summaryByKey.get(key) ?? { pickerId, day, orders: 0, totalPieces: 0, totalCycleMinutes: 0, totalRateMinutes: 0, rateEligibleOrders: 0, rateEligiblePieces: 0 }
       entry.orders += 1
       entry.totalPieces += c.actual_pieces ?? 0
-      entry.totalCycleMinutes += cycleMinutes
-      entry.totalRateMinutes += rateMinutes
+      const sameDayAssigned = !!order?.assigned_time && bangkokDateKey(order.assigned_time) === day
+      if (sameDayAssigned) {
+        entry.totalCycleMinutes += cycleMinutes
+        entry.totalRateMinutes += rateMinutes
+        entry.rateEligibleOrders += 1
+        entry.rateEligiblePieces += c.actual_pieces ?? 0
+      }
       summaryByKey.set(key, entry)
     }
 
@@ -152,8 +180,8 @@ export async function GET(request: Request) {
         formatDate(s.day),
         s.orders,
         s.totalPieces,
-        Math.round(s.totalCycleMinutes / s.orders),
-        s.totalRateMinutes > 0 ? Math.round((s.totalPieces / s.totalRateMinutes) * 60) : 0,
+        s.rateEligibleOrders > 0 ? Math.round(s.totalCycleMinutes / s.rateEligibleOrders) : 0,
+        s.totalRateMinutes > 0 ? Math.round((s.rateEligiblePieces / s.totalRateMinutes) * 60) : 0,
       ])
 
     // Short / Damage / Expired sheet (Purge review follow-up, item 2) -- item-level detail, same

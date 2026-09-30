@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
+import { releaseFromPendingConsolidationBatch } from '@/lib/consolidationCleanup'
 
 /**
  * §12.1 Create an Assignment Batch — either method (list_selection / barcode_scan, FR-031) goes
@@ -85,6 +86,9 @@ export async function POST(request: Request) {
       writeStatusHistory(admin, { entityType: 'orders', entityId: orderId, oldStatus: 'new', newStatus: 'assigned', changedBy: caller.user_id }),
     ),
   )
+  // An order assigned here may still be a matching CANDIDATE that was never actually approved as
+  // a Consolidation group -- see consolidationCleanup.ts. No-ops for every order that isn't.
+  await Promise.all(order_ids.map((orderId: string) => releaseFromPendingConsolidationBatch(admin, orderId, caller.user_id)))
   await writeAudit(admin, {
     userId: caller.user_id,
     action: 'assignment.create',

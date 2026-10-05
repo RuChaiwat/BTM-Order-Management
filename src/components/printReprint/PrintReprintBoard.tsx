@@ -47,7 +47,7 @@ type DocType = 'pick_slip' | 'pick_sheet'
  * Slip (the thermal one) are different physical machines. */
 export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pickers: Picker[] }) {
   const [docType, setDocType] = useState<DocType | 'consolidation'>('pick_slip')
-  const [pickerFilter, setPickerFilter] = useState('ALL')
+  const [pickerIdInput, setPickerIdInput] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const [batchQuery, setBatchQuery] = useState('')
@@ -55,7 +55,12 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
 
-  const filteredOrders = useMemo(() => (pickerFilter === 'ALL' ? orders : orders.filter((o) => o.pickerId === pickerFilter)), [orders, pickerFilter])
+  // Scan/type a Picker ID directly rather than picking from a dropdown -- same "scan ID" pattern
+  // as Work Assignment/Pick Completion, chosen because this warehouse has too many pickers for a
+  // dropdown to stay usable.
+  const pickerQuery = pickerIdInput.trim().toUpperCase()
+  const matchedPicker = pickerQuery ? pickers.find((p) => p.picker_id === pickerQuery) : null
+  const filteredOrders = useMemo(() => (pickerQuery ? orders.filter((o) => o.pickerId === pickerQuery) : orders), [orders, pickerQuery])
 
   function toggleSelected(orderId: string) {
     setSelected((prev) => {
@@ -119,21 +124,17 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Picker</span>
-              <select
+              <input
                 className="control"
-                value={pickerFilter}
+                placeholder="Scan or type Picker ID… (blank = all)"
+                value={pickerIdInput}
                 onChange={(e) => {
-                  setPickerFilter(e.target.value)
+                  setPickerIdInput(e.target.value)
                   setSelected(new Set())
                 }}
-              >
-                <option value="ALL">All pickers</option>
-                {pickers.map((p) => (
-                  <option key={p.picker_id} value={p.picker_id}>
-                    {p.name_en} ({p.picker_id})
-                  </option>
-                ))}
-              </select>
+                style={{ width: 220 }}
+              />
+              {pickerQuery && <span style={{ fontSize: 12, color: matchedPicker ? 'var(--color-text-secondary)' : 'var(--color-danger)' }}>{matchedPicker ? matchedPicker.name_en : 'No picker with this ID'}</span>}
             </div>
             <button className="btn btn-primary btn-sm" disabled={selected.size === 0} onClick={printSelected}>
               Print {docType === 'pick_sheet' ? 'Pick Sheet' : 'Pick Slip'} ({selected.size})
@@ -168,7 +169,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
               {filteredOrders.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                    No open orders{pickerFilter === 'ALL' ? '' : ' for this picker'} right now.
+                    No open orders{pickerQuery ? ' for this picker' : ''} right now.
                   </td>
                 </tr>
               )}

@@ -39,6 +39,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 9, en: 'Zone Dashboard', th: 'แดชบอร์ดโซน', path: '/zone-dashboard' },
       { id: 10, en: 'Control Tower', th: 'ศูนย์ควบคุม', path: '/control-tower' },
       { id: 11, en: 'Pending Actions Monitor', th: 'รายการที่ต้องดำเนินการ', path: '/backlog' },
+      { id: 20, en: 'Print & Reprint', th: 'พิมพ์ / พิมพ์ซ้ำเอกสาร', path: '/print-reprint' },
     ],
   },
   {

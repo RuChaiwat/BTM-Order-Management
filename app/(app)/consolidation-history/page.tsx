@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { TopBar } from '@/components/TopBar'
 import { AutoRefresh } from '@/components/AutoRefresh'
+import { ConsolidationHistoryFilter } from '@/components/consolidation/ConsolidationHistoryFilter'
+import { ConsolidationHistoryBoard } from '@/components/consolidation/ConsolidationHistoryBoard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
-import { formatDate, formatDateTime } from '@/lib/formatDate'
+import { getConsolidationHistory, type ConsolidationHistorySearchField } from '@/lib/queries/consolidationHistory'
+import { bangkokDateKey } from '@/lib/formatDate'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -13,65 +14,29 @@ import { formatDate, formatDateTime } from '@/lib/formatDate'
 // this route (and its data) to always be fresh.
 export const dynamic = 'force-dynamic'
 
-export default async function ConsolidationHistoryPage() {
+const VALID_FIELDS: ConsolidationHistorySearchField[] = ['released', 'order_date', 'batch_no']
+
+export default async function ConsolidationHistoryPage({ searchParams }: { searchParams: { field?: string; date?: string; q?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const admin = createAdminClient()
 
-  const { data: batches, error } = await admin
-    .from('consolidation_batches')
-    .select('consol_batch_id, batch_no, order_date, priority, stores_count, orders_count, total_pieces, status, released_at, created_at')
-    .in('status', ['report_released', 'picking', 'at_consolidation', 'sorting', 'completed', 'cancelled'])
-    .order('created_at', { ascending: false })
-    .limit(100)
-  if (error) console.error('[consolidation-history] consolidation_batches error', error.message)
+  const field: ConsolidationHistorySearchField = VALID_FIELDS.includes(searchParams.field as ConsolidationHistorySearchField)
+    ? (searchParams.field as ConsolidationHistorySearchField)
+    : 'released'
+  const date = searchParams.date || bangkokDateKey(new Date()) || new Date().toISOString().slice(0, 10)
+  const batchNo = searchParams.q ?? ''
+
+  const rows = await getConsolidationHistory(admin, { field, date, batchNo })
 
   return (
     <>
       <AutoRefresh />
-      <TopBar title="Consolidation History" subtitle="ประวัติการรวมออเดอร์ · released, completed and cancelled batches" />
+      <TopBar title="Consolidation History" subtitle="ประวัติการรวมออเดอร์ · released, completed and cancelled batches">
+        <ConsolidationHistoryFilter field={field} date={date} batchNo={batchNo} />
+      </TopBar>
       <div className="page-body">
-        <div className="card" style={{ flex: 1, minHeight: 0 }}>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>BATCH</th>
-                <th>ORDER DATE</th>
-                <th>PRIORITY</th>
-                <th>STORES</th>
-                <th>ORDERS</th>
-                <th>PIECES</th>
-                <th>RELEASED</th>
-                <th>STATUS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(batches ?? []).map((b) => (
-                <tr key={b.consol_batch_id}>
-                  <td className="link">
-                    <Link href={`/pick-report/${b.consol_batch_id}`}>{b.batch_no}</Link>
-                  </td>
-                  <td>{formatDate(b.order_date)}</td>
-                  <td>{b.priority}</td>
-                  <td>{b.stores_count}</td>
-                  <td>{b.orders_count}</td>
-                  <td>{b.total_pieces}</td>
-                  <td>{b.released_at ? formatDateTime(b.released_at) : '—'}</td>
-                  <td>
-                    <span className={`badge badge-${batchStatusTone(b.status)}`}>{batchStatusLabel(b.status)}</span>
-                  </td>
-                </tr>
-              ))}
-              {(!batches || batches.length === 0) && (
-                <tr>
-                  <td colSpan={8} style={{ color: 'var(--color-text-secondary)' }}>
-                    No released or completed batches yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <ConsolidationHistoryBoard rows={rows} />
       </div>
     </>
   )

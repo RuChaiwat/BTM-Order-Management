@@ -58,10 +58,16 @@ export function PickCompletionBoard({
   apiBase = '/api/picker-completions',
   showReprint = true,
   showUnassign = true,
+  autoPickerId,
+  highlightOrderId,
 }: {
   apiBase?: string
   showReprint?: boolean
   showUnassign?: boolean
+  /** §Pending Action Monitor deep link: jump straight into this picker's queue instead of making
+   * the admin re-scan an ID they already identified by clicking an order. */
+  autoPickerId?: string
+  highlightOrderId?: string
 }) {
   const router = useRouter()
   const scanInputRef = useRef<HTMLInputElement>(null)
@@ -96,12 +102,10 @@ export function PickCompletionBoard({
     }
   }, [scanError])
 
-  async function lookupPicker() {
-    const value = scanValue.trim().toUpperCase()
-    if (!value) return
+  async function loadPicker(pickerId: string) {
     setLoading(true)
     setScanError(null)
-    const res = await apiFetch(`${apiBase}?picker_id=${encodeURIComponent(value)}`)
+    const res = await apiFetch(`${apiBase}?picker_id=${encodeURIComponent(pickerId)}`)
     const body = await res.json()
     setLoading(false)
     if (!res.ok) {
@@ -112,6 +116,20 @@ export function PickCompletionBoard({
     setOrders(body.orders)
     setScanValue('')
   }
+
+  async function lookupPicker() {
+    const value = scanValue.trim().toUpperCase()
+    if (!value) return
+    await loadPicker(value)
+  }
+
+  // Deep link from Pending Action Monitor -- load that picker's queue on arrival rather than
+  // waiting for a manual scan. Only fires once per mount: a picker already open (e.g. the admin
+  // switched manually) is left alone.
+  useEffect(() => {
+    if (autoPickerId && !picker) loadPicker(autoPickerId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPickerId])
 
   function reprintSlip(orderIds: string[]) {
     if (orderIds.length === 0) return
@@ -275,7 +293,19 @@ export function PickCompletionBoard({
             instead of forcing horizontal scroll, so this same page works on PC and Handheld. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {orders.map((o) => (
-            <div key={o.order_id} className="card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '14px 18px' }}>
+            <div
+              key={o.order_id}
+              className="card"
+              style={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 16,
+                flexWrap: 'wrap',
+                padding: '14px 18px',
+                border: o.order_id === highlightOrderId ? '2px solid var(--color-primary)' : undefined,
+              }}
+            >
               <div style={{ flex: '1 1 160px' }}>
                 <div className="link" style={{ fontWeight: 700, fontSize: 15 }}>
                   {o.order_no}

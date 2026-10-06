@@ -50,14 +50,18 @@ export function AdminVerificationBoard({
   queue,
   linesByOrder,
   shortPickReasons,
+  initialSelectedId,
 }: {
   queue: QueueOrder[]
   linesByOrder: Record<string, VerificationLine[]>
   shortPickReasons: Reason[]
+  initialSelectedId?: string
 }) {
   const router = useRouter()
   const [isRefreshing, startRefresh] = useTransition()
-  const [selectedId, setSelectedId] = useState(queue[0]?.order_id ?? '')
+  // A deep link from Pending Action Monitor names an order_id directly -- fall back to the queue's
+  // own default (oldest first) when it's missing or the order isn't actually in this queue.
+  const [selectedId, setSelectedId] = useState(initialSelectedId && queue.some((o) => o.order_id === initialSelectedId) ? initialSelectedId : queue[0]?.order_id ?? '')
   const [lineState, setLineState] = useState<Record<string, LineState>>({})
   const [initializedFor, setInitializedFor] = useState<string | null>(null)
   const [showReject, setShowReject] = useState(false)

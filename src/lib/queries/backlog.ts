@@ -53,7 +53,7 @@ export async function getBacklogData(db: SupabaseClient, warehouseCode: string) 
       const pickerId = o.assignment_batch_id ? pickerIdByBatch.get(o.assignment_batch_id) : null
       const backlogType: 'picking' | 'verification' | 'both' =
         o.alert?.is_picking_backlog && o.alert?.is_verification_backlog ? 'both' : o.alert?.is_picking_backlog ? 'picking' : 'verification'
-      return { ...o, pickerName: pickerId ? nameByPicker.get(pickerId) ?? pickerId : '—', backlogType }
+      return { ...o, pickerId: pickerId ?? null, pickerName: pickerId ? nameByPicker.get(pickerId) ?? pickerId : '—', backlogType }
     })
     .sort((a, b) => (b.alert?.elapsed_minutes ?? 0) - (a.alert?.elapsed_minutes ?? 0))
 

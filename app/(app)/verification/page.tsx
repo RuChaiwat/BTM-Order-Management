@@ -11,7 +11,7 @@ import { getVerificationData } from '@/lib/queries/verification'
 // this route (and its data) to always be fresh.
 export const dynamic = 'force-dynamic'
 
-export default async function AdminVerificationPage() {
+export default async function AdminVerificationPage({ searchParams }: { searchParams: { order_id?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const admin = createAdminClient()
@@ -20,7 +20,7 @@ export default async function AdminVerificationPage() {
   return (
     <>
       <TopBar title="Admin Verification" subtitle={`รอตรวจสอบยืนยัน (สำนักงาน) · ${data.queue.length} orders`} />
-      <AdminVerificationBoard queue={data.queue} linesByOrder={data.linesByOrder} shortPickReasons={data.shortPickReasons} />
+      <AdminVerificationBoard queue={data.queue} linesByOrder={data.linesByOrder} shortPickReasons={data.shortPickReasons} initialSelectedId={searchParams.order_id} />
     </>
   )
 }

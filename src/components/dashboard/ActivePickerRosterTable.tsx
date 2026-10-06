@@ -35,10 +35,22 @@ function sortValue(p: ActivePicker, key: SortKey): string | number {
   }
 }
 
-function SortHeader({ label, sortKey, sort, onSort }: { label: string; sortKey: SortKey; sort: { key: SortKey; dir: 'asc' | 'desc' }; onSort: (key: SortKey) => void }) {
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  align = 'left',
+}: {
+  label: string
+  sortKey: SortKey
+  sort: { key: SortKey; dir: 'asc' | 'desc' }
+  onSort: (key: SortKey) => void
+  align?: 'left' | 'right'
+}) {
   const active = sort.key === sortKey
   return (
-    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(sortKey)}>
+    <th style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: align }} onClick={() => onSort(sortKey)}>
       {label} <span style={{ opacity: active ? 1 : 0.3 }}>{active ? (sort.dir === 'asc' ? '▲' : '▼') : '▲'}</span>
     </th>
   )
@@ -72,17 +84,17 @@ export function ActivePickerRosterTable({ pickers }: { pickers: ActivePicker[] }
       <table className="table" style={{ tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: 'auto' }} />
-          <col style={{ width: 70 }} />
-          <col style={{ width: 90 }} />
-          <col style={{ width: 80 }} />
+          <col style={{ width: 85 }} />
+          <col style={{ width: 95 }} />
+          <col style={{ width: 85 }} />
           <col style={{ width: 110 }} />
         </colgroup>
         <thead>
           <tr>
             <SortHeader label="PICKER" sortKey="name" sort={sort} onSort={toggleSort} />
-            <SortHeader label="ORDERS" sortKey="orders" sort={sort} onSort={toggleSort} />
-            <SortHeader label="PIECES" sortKey="pieces" sort={sort} onSort={toggleSort} />
-            <SortHeader label="TIME" sortKey="elapsedMinutes" sort={sort} onSort={toggleSort} />
+            <SortHeader label="ORDERS" sortKey="orders" sort={sort} onSort={toggleSort} align="right" />
+            <SortHeader label="PIECES" sortKey="pieces" sort={sort} onSort={toggleSort} align="right" />
+            <SortHeader label="TIME" sortKey="elapsedMinutes" sort={sort} onSort={toggleSort} align="right" />
             <SortHeader label="STATUS" sortKey="timeAlert" sort={sort} onSort={toggleSort} />
           </tr>
         </thead>

@@ -78,7 +78,7 @@ export function PickSheetDocument({ sheets, generatedAt }: { sheets: PickSheetRo
         return pages.map((pageUnits, pageIndex) => {
           const isLastPageOfOrder = pageIndex === pages.length - 1
           const totalPieces = s.lines.reduce((sum, l) => sum + l.qty, 0)
-          const uniqueSkus = new Set(s.lines.map((l) => l.sku)).size
+          const uniqueSkus = new Set(s.lines.map((l) => l.skuBarcode)).size
 
           return (
             <div className="pick-sheet-page" key={`${s.orderId}-${pageIndex}`}>
@@ -125,7 +125,7 @@ export function PickSheetDocument({ sheets, generatedAt }: { sheets: PickSheetRo
                 >
                   <div>#</div>
                   <div>BIN</div>
-                  <div>SKU</div>
+                  <div>BARCODE</div>
                   <div>ITEM DESCRIPTION</div>
                   <div style={{ textAlign: 'right' }}>QTY</div>
                   <div style={{ textAlign: 'center' }}>PICK</div>
@@ -144,7 +144,7 @@ export function PickSheetDocument({ sheets, generatedAt }: { sheets: PickSheetRo
                     >
                       <div>{u.seq}</div>
                       <div>{u.line.binCode}</div>
-                      <div>{u.line.sku}</div>
+                      <div>{u.line.skuBarcode}</div>
                       <div style={{ paddingRight: 6 }}>{u.line.itemDescription ?? '—'}</div>
                       <div style={{ textAlign: 'right', fontWeight: 700 }}>
                         {u.line.qty} {u.line.uomCode}

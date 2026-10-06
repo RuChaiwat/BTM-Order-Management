@@ -5,7 +5,7 @@ export interface PickSheetLine {
   lineId: string
   zoneCode: string
   binCode: string
-  sku: string
+  skuBarcode: string
   itemDescription: string | null
   qty: number
   uomCode: string
@@ -34,7 +34,7 @@ export async function getPickSheetData(db: SupabaseClient, orderIds: string[]): 
 
   const [ordersRes, linesRes] = await Promise.all([
     db.from('orders').select('order_id, order_no, store_code, original_order_date, warehouse_code, assignment_batch_id').in('order_id', orderIds),
-    db.from('order_lines').select('line_id, order_id, zone_code, bin_code, sku, item_description, qty, uom_code, pick_sequence').in('order_id', orderIds),
+    db.from('order_lines').select('line_id, order_id, zone_code, bin_code, sku, sku_barcode, item_description, qty, uom_code, pick_sequence').in('order_id', orderIds),
   ])
   const orders = unwrap(ordersRes)
   const allLines = unwrap(linesRes)
@@ -75,7 +75,10 @@ export async function getPickSheetData(db: SupabaseClient, orderIds: string[]): 
           lineId: l.line_id,
           zoneCode: l.zone_code ?? '—',
           binCode: l.bin_code,
-          sku: l.sku,
+          // SKU Barcode is the supplier's barcode actually printed on the item (migration 0008) --
+          // the internal sku/Item No. was never scannable against the physical item. Falls back to
+          // sku only for pre-migration rows that genuinely have no barcode on record.
+          skuBarcode: l.sku_barcode ?? l.sku,
           itemDescription: l.item_description,
           qty: Number(l.qty),
           uomCode: l.uom_code ?? 'PCS',

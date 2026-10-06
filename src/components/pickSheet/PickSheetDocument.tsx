@@ -115,7 +115,7 @@ export function PickSheetDocument({ sheets, generatedAt }: { sheets: PickSheetRo
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '22px 62px 66px minmax(0,1fr) 52px 42px',
+                    gridTemplateColumns: '18px 54px 88px minmax(0,1fr) 46px 36px',
                     fontSize: 8.5,
                     fontWeight: 800,
                     letterSpacing: 0.4,
@@ -140,13 +140,13 @@ export function PickSheetDocument({ sheets, generatedAt }: { sheets: PickSheetRo
                   ) : (
                     <div
                       key={u.line.lineId}
-                      style={{ display: 'grid', gridTemplateColumns: '22px 62px 66px minmax(0,1fr) 52px 42px', fontSize: 9.5, padding: '3.5px 0', borderBottom: '1px solid #ddd', alignItems: 'center' }}
+                      style={{ display: 'grid', gridTemplateColumns: '18px 54px 88px minmax(0,1fr) 46px 36px', fontSize: 9.5, padding: '3.5px 0', borderBottom: '1px solid #ddd', alignItems: 'center' }}
                     >
                       <div>{u.seq}</div>
-                      <div>{u.line.binCode}</div>
-                      <div>{u.line.skuBarcode}</div>
-                      <div style={{ paddingRight: 6 }}>{u.line.itemDescription ?? '—'}</div>
-                      <div style={{ textAlign: 'right', fontWeight: 700 }}>
+                      <div style={{ fontSize: 8.5, paddingRight: 4 }}>{u.line.binCode}</div>
+                      <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 8, whiteSpace: 'nowrap', paddingRight: 6 }}>{u.line.skuBarcode}</div>
+                      <div style={{ paddingRight: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.line.itemDescription ?? '—'}</div>
+                      <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 8.5 }}>
                         {u.line.qty} {u.line.uomCode}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'center' }}>

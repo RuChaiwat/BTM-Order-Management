@@ -10,7 +10,16 @@
 -- from elapsed_minutes against configurable thresholds, consistent with everything else -- and
 -- seeds the one missing key needed to complete Verification's own Warning/Overdue/Critical set
 -- (0003 only ever seeded warning_minutes/overdue_minutes for admin_verification.*).
-create or replace view order_alerts as
+--
+-- `create or replace view` can only ADD columns at the end, never drop/reorder one (Postgres
+-- error 42P16) -- removing time_alert needs an actual drop + recreate. get_order_alerts_by_ids
+-- (migration 0022) returns `setof order_alerts`, so it depends on the view's exact column set and
+-- has to be dropped and recreated right along with it (CASCADE handles the drop; the function and
+-- its grants are then restored explicitly below, identical to how 0022 first created them).
+drop function if exists get_order_alerts_by_ids(uuid[]);
+drop view if exists order_alerts cascade;
+
+create view order_alerts as
 select
   o.order_id,
   o.status,
@@ -35,6 +44,16 @@ comment on view order_alerts is
   'see migration 0030). time_alert (Warning/Overdue/Critical) moved out of this view into JS '
   '(src/lib/orderAlerts.ts), computed against configurable thresholds (configuration keys '
   'order_sla.*/admin_verification.*, editable on the Configuration page) -- see migration 0031.';
+
+create function get_order_alerts_by_ids(p_order_ids uuid[])
+returns setof order_alerts
+language sql
+stable
+as $$
+  select * from order_alerts where order_id = any(p_order_ids);
+$$;
+
+grant execute on function get_order_alerts_by_ids(uuid[]) to authenticated, service_role;
 
 insert into configuration (key, value, scope, version, active, change_reason)
 values ('admin_verification.critical_minutes', '90', 'global', 1, true, 'illustrative default, completes the Warning/Overdue/Critical set for Verification (migration 0031)')

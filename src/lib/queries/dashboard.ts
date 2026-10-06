@@ -6,6 +6,7 @@ import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
 import { getActiveConfig } from './config'
 import { bangkokDateKey } from '../formatDate'
 import { bandForPct } from '../pickerProductivity'
+import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
 
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
 // assignment_batches.status is not a reliable "is this picker still working" signal: nothing in
@@ -55,21 +56,23 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   // URL, so it stays correct no matter how many orders this warehouse has, and only transfers rows
   // that are actually relevant instead of the whole table on every page load.
   const orderIds = orders.map((o) => o.order_id)
-  const [completions, alerts] = await Promise.all([
+  const [completions, alerts, thresholds] = await Promise.all([
     fetchScopedByOrderIds<{ order_id: string; actual_pieces: number | null; picker_completed_time: string; result: string }>(
       db,
       'get_picker_completions_by_ids',
       'order_id, actual_pieces, picker_completed_time, result',
       orderIds,
     ),
-    fetchScopedByOrderIds<{ order_id: string; time_alert: string | null; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
+    fetchScopedByOrderIds<{ order_id: string; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
       db,
       'get_order_alerts_by_ids',
-      'order_id, time_alert, is_picking_backlog, is_verification_backlog',
+      'order_id, elapsed_minutes, is_picking_backlog, is_verification_backlog',
       orderIds,
     ),
+    getSlaThresholds(db),
   ])
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
+  const statusByOrderId = new Map(orders.map((o) => [o.order_id, o.status]))
 
   // §management KPI funnel: Total Orders -> Assigned -> Completed (admin-verified only) -> %
   // Completed -> Total Backlog. Cancelled orders are excluded from every stage here -- they were
@@ -123,7 +126,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     .map(([orderDate, v]) => ({ orderDate, orders: v.orders, pieces: v.pieces, daysOld: daysBetween(orderDate, today) }))
     .sort((a, b) => a.orderDate.localeCompare(b.orderDate))
 
-  const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
+  const alertByOrder = new Map(alerts.map((a) => [a.order_id, { ...a, time_alert: computeTimeAlert(statusByOrderId.get(a.order_id) ?? '', a.elapsed_minutes, thresholds) }]))
   const critical = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'critical').length
   const overdue = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'overdue').length
   const statusCounts = new Map<string, number>()

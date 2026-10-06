@@ -4,10 +4,13 @@
  * table + a free-text "value (JSON)" field). Deliberately covers ONLY the keys actually read by
  * the app (see getActiveConfig() callers across src/lib/queries and app/api) -- `configuration`
  * also holds several keys seeded per spec but never wired to any live calculation (assignment.*,
- * order_sla.*, admin_verification.*, operational_day_cutoff, report.barcode_symbology,
- * export.weekly_productivity_enabled/drive_folder_naming, retention.active_warehouse_codes --
- * order_alerts' own view comment says as much for the SLA ones). Showing those here as editable
- * would silently do nothing when changed, which is worse than not showing them.
+ * operational_day_cutoff, report.barcode_symbology, export.weekly_productivity_enabled/
+ * drive_folder_naming, retention.active_warehouse_codes). Showing those here as editable would
+ * silently do nothing when changed, which is worse than not showing them.
+ *
+ * order_sla.* and admin_verification.* WERE in that dead-key list too until src/lib/orderAlerts.ts
+ * started reading them (previously order_alerts' own SQL view hardcoded 45/60/120 directly,
+ * ignoring these seeded-but-unused rows entirely -- see migration 0031).
  *
  * retention.transaction_days WAS wrongly left out of that dead-key list in an earlier pass -- it's
  * read directly (not via getActiveConfig()) by both app/api/cron/purge and its own safety gate, so
@@ -44,6 +47,8 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
   { id: 'matching', labelEn: 'Order Matching', labelTh: 'การจับคู่ออเดอร์' },
   { id: 'consolidation', labelEn: 'Order Consolidation', labelTh: 'การรวมออเดอร์' },
   { id: 'order_complexity', labelEn: 'Order Complexity', labelTh: 'ความซับซ้อนของออเดอร์' },
+  { id: 'order_sla', labelEn: 'Picking SLA & Alerts', labelTh: 'เกณฑ์เวลาแจ้งเตือน (ขั้น Picking)' },
+  { id: 'admin_verification', labelEn: 'Verification SLA & Alerts', labelTh: 'เกณฑ์เวลาแจ้งเตือน (ขั้น Verification)' },
   { id: 'picker_productivity', labelEn: 'Picker Productivity', labelTh: 'ผลิตภาพพนักงานหยิบสินค้า' },
   { id: 'housekeeping', labelEn: 'Data Retention', labelTh: 'ระยะเวลาเก็บข้อมูล' },
 ]
@@ -205,6 +210,72 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     kind: 'integer',
     unit: 'pcs/item',
     min: 0,
+  },
+  {
+    key: 'order_sla.warning_minutes',
+    category: 'order_sla',
+    labelEn: 'Warning threshold',
+    labelTh: 'เกณฑ์แจ้งเตือน Warning',
+    descriptionEn: 'An order still being picked this long after assignment is flagged Warning on Pending Action Monitor, the Operations Dashboard, and Control Tower.',
+    descriptionTh: 'ออเดอร์ที่ยังอยู่ระหว่าง Picking นานเกินเวลานี้นับจากมอบหมายงาน จะถูกตั้งค่าสถานะ Warning ในหน้า Pending Action Monitor, Operations Dashboard และ Control Tower',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+  },
+  {
+    key: 'order_sla.overdue_minutes',
+    category: 'order_sla',
+    labelEn: 'Overdue threshold',
+    labelTh: 'เกณฑ์แจ้งเตือน Overdue',
+    descriptionEn: 'An order still being picked this long after assignment is flagged Overdue.',
+    descriptionTh: 'ออเดอร์ที่ยังอยู่ระหว่าง Picking นานเกินเวลานี้นับจากมอบหมายงาน จะถูกตั้งค่าสถานะ Overdue',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+  },
+  {
+    key: 'order_sla.critical_minutes',
+    category: 'order_sla',
+    labelEn: 'Critical threshold',
+    labelTh: 'เกณฑ์แจ้งเตือน Critical',
+    descriptionEn: 'An order still being picked this long after assignment is flagged Critical -- the highest-priority alert.',
+    descriptionTh: 'ออเดอร์ที่ยังอยู่ระหว่าง Picking นานเกินเวลานี้นับจากมอบหมายงาน จะถูกตั้งค่าสถานะ Critical ซึ่งเป็นระดับแจ้งเตือนสูงสุด',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+  },
+  {
+    key: 'admin_verification.warning_minutes',
+    category: 'admin_verification',
+    labelEn: 'Warning threshold',
+    labelTh: 'เกณฑ์แจ้งเตือน Warning',
+    descriptionEn: 'An order still waiting on Admin Verification this long after the picker submitted it is flagged Warning.',
+    descriptionTh: 'ออเดอร์ที่รอ Admin ตรวจสอบนานเกินเวลานี้นับจาก Picker ส่งงาน จะถูกตั้งค่าสถานะ Warning',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+  },
+  {
+    key: 'admin_verification.overdue_minutes',
+    category: 'admin_verification',
+    labelEn: 'Overdue threshold',
+    labelTh: 'เกณฑ์แจ้งเตือน Overdue',
+    descriptionEn: 'An order still waiting on Admin Verification this long after the picker submitted it is flagged Overdue.',
+    descriptionTh: 'ออเดอร์ที่รอ Admin ตรวจสอบนานเกินเวลานี้นับจาก Picker ส่งงาน จะถูกตั้งค่าสถานะ Overdue',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+  },
+  {
+    key: 'admin_verification.critical_minutes',
+    category: 'admin_verification',
+    labelEn: 'Critical threshold',
+    labelTh: 'เกณฑ์แจ้งเตือน Critical',
+    descriptionEn: 'An order still waiting on Admin Verification this long after the picker submitted it is flagged Critical -- the highest-priority alert.',
+    descriptionTh: 'ออเดอร์ที่รอ Admin ตรวจสอบนานเกินเวลานี้นับจาก Picker ส่งงาน จะถูกตั้งค่าสถานะ Critical ซึ่งเป็นระดับแจ้งเตือนสูงสุด',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
   },
   {
     key: 'picker_productivity.target_pcs_per_hour',

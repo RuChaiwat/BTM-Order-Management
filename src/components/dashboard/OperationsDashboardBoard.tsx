@@ -305,8 +305,8 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
           รายการที่ต้องดำเนินการ
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-          <ActionRow icon="!" iconBg="#DC2626" title="Critical orders (over 120 min)" count={data.actionRequired.critical} border="#FECACA" bg="#FEF2F2" countColor="#DC2626" />
-          <ActionRow icon="⌛" iconBg="#F59E0B" title="Overdue orders (60–120 min)" count={data.actionRequired.overdue} border="#FED7AA" bg="#FFFBEB" countColor="#B45309" />
+          <ActionRow icon="!" iconBg="#DC2626" title="Critical orders" count={data.actionRequired.critical} border="#FECACA" bg="#FEF2F2" countColor="#DC2626" />
+          <ActionRow icon="⌛" iconBg="#F59E0B" title="Overdue orders" count={data.actionRequired.overdue} border="#FED7AA" bg="#FFFBEB" countColor="#B45309" />
           <ActionRow icon="✓" iconBg="#2563EB" title="Waiting admin verification" count={data.actionRequired.waitingVerification} border="#E5E7EB" bg="#fff" />
           <ActionRow icon="↺" iconBg="#7C3AED" title="Rejected / correction in progress" count={data.actionRequired.correctionInProgress} border="#E5E7EB" bg="#fff" />
           <ActionRow icon="✕" iconBg="#6B7280" title="Invalid Bin Code in error queue" count={data.actionRequired.invalidBinCode} border="#E5E7EB" bg="#fff" />

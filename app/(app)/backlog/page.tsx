@@ -45,8 +45,8 @@ export default async function BacklogPage() {
             style={{ padding: 14 }}
           />
           <KpiCard
-            label="OVERDUE 45-120M (PCS)"
-            labelTh="เกินกำหนด 45-120 นาที (ชิ้น)"
+            label="OVERDUE (PCS)"
+            labelTh="เกินกำหนด (ชิ้น)"
             value={data.summary.overduePieces.toLocaleString()}
             sub={`${data.summary.overdueOrders.toLocaleString()} orders`}
             valueColor="#EA580C"
@@ -54,8 +54,8 @@ export default async function BacklogPage() {
             style={{ padding: 14 }}
           />
           <KpiCard
-            label="CRITICAL 120M+ (PCS)"
-            labelTh="วิกฤต เกิน 120 นาที (ชิ้น)"
+            label="CRITICAL (PCS)"
+            labelTh="วิกฤต (ชิ้น)"
             value={data.summary.criticalPieces.toLocaleString()}
             sub={`${data.summary.criticalOrders.toLocaleString()} orders`}
             valueColor="#DC2626"

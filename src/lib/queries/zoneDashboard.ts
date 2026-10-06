@@ -3,6 +3,7 @@ import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
+import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists) -- every live order/batch just sits
@@ -56,18 +57,19 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   // order volume) and matched back to an order via completionById below, which is itself already
   // scoped to this warehouse.
   const orderIds = orders.map((o) => o.order_id)
-  const [alerts, completions, allShortLines, reasonRows] = await Promise.all([
-    fetchScopedByOrderIds<{ order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
+  const [alerts, completions, allShortLines, reasonRows, thresholds] = await Promise.all([
+    fetchScopedByOrderIds<{ order_id: string; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
       db,
       'get_order_alerts_by_ids',
-      'order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog',
+      'order_id, elapsed_minutes, is_picking_backlog, is_verification_backlog',
       orderIds,
     ),
     fetchScopedByOrderIds<{ completion_id: string; order_id: string; actual_pieces: number | null }>(db, 'get_picker_completions_by_ids', 'completion_id, order_id, actual_pieces', orderIds),
     fetchAllRows((from, to) => db.from('picker_completion_lines').select('completion_id, line_id, ordered_qty, picked_qty, short_reason_code').eq('is_short', true).range(from, to)),
     db.from('reason_master').select('reason_code, label_en').eq('reason_type', 'short_pick'),
+    getSlaThresholds(db),
   ])
-  const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
+  const alertByOrder = new Map(alerts.map((a) => [a.order_id, { ...a, time_alert: computeTimeAlert(orderById.get(a.order_id)?.status ?? '', a.elapsed_minutes, thresholds) }]))
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const completionById = new Map(completions.map((c) => [c.completion_id, c]))
   const reasonLabelByCode = new Map(unwrap(reasonRows).map((r) => [r.reason_code, r.label_en]))

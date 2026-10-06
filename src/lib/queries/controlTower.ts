@@ -4,6 +4,7 @@ import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
+import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists), so treating it as a distinct state
@@ -33,11 +34,11 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
   // order_alerts/picker_completions have no warehouse_code column, so both are fetched via an RPC
   // scoped to exactly this warehouse's order_ids (migration 0022) instead of the whole table.
   const orderIds = orders.map((o) => o.order_id)
-  const [alerts, completions] = await Promise.all([
-    fetchScopedByOrderIds<{ order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
+  const [alerts, completions, thresholds] = await Promise.all([
+    fetchScopedByOrderIds<{ order_id: string; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
       db,
       'get_order_alerts_by_ids',
-      'order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog',
+      'order_id, elapsed_minutes, is_picking_backlog, is_verification_backlog',
       orderIds,
     ),
     fetchScopedByOrderIds<{ order_id: string; actual_pieces: number | null; result: string; picker_completed_time: string }>(
@@ -46,10 +47,11 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
       'order_id, actual_pieces, result, picker_completed_time',
       orderIds,
     ),
+    getSlaThresholds(db),
   ])
-  const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
-  const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
+  const alertByOrder = new Map(alerts.map((a) => [a.order_id, { ...a, time_alert: computeTimeAlert(orderStatusById.get(a.order_id) ?? '', a.elapsed_minutes, thresholds) }]))
+  const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
 
   const zoneOrders = new Map<string, Set<string>>()

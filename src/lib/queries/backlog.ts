@@ -2,12 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
+import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
 
 /** §13 Backlog Monitor — orders flagged by order_alerts as Picking Backlog (still open past
  * original_order_date) or Verification Backlog (picker done, waiting on Admin), sorted by how
  * long they've been sitting. */
 export async function getBacklogData(db: SupabaseClient, warehouseCode: string) {
-  const [orders, lines] = await Promise.all([
+  const [orders, lines, thresholds] = await Promise.all([
     fetchAllRows((from, to) =>
       db
         .from('orders')
@@ -16,17 +17,20 @@ export async function getBacklogData(db: SupabaseClient, warehouseCode: string) 
         .range(from, to),
     ),
     fetchOrderZoneTouches(db, warehouseCode),
+    getSlaThresholds(db),
   ])
 
   // order_alerts has no warehouse_code column, so it's fetched via an RPC scoped to exactly this
-  // warehouse's order_ids (migration 0022) instead of the whole table.
-  const alerts = await fetchScopedByOrderIds<{ order_id: string; time_alert: string | null; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
+  // warehouse's order_ids (migration 0022) instead of the whole table. time_alert itself is
+  // computed here, not by the view (migration 0031), against the configurable thresholds above.
+  const alerts = await fetchScopedByOrderIds<{ order_id: string; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
     db,
     'get_order_alerts_by_ids',
-    'order_id, time_alert, elapsed_minutes, is_picking_backlog, is_verification_backlog',
+    'order_id, elapsed_minutes, is_picking_backlog, is_verification_backlog',
     orders.map((o) => o.order_id),
   )
-  const alertByOrder = new Map(alerts.map((a) => [a.order_id, a]))
+  const statusByOrderId = new Map(orders.map((o) => [o.order_id, o.status]))
+  const alertByOrder = new Map(alerts.map((a) => [a.order_id, { ...a, time_alert: computeTimeAlert(statusByOrderId.get(a.order_id) ?? '', a.elapsed_minutes, thresholds) }]))
 
   const zonesByOrder = new Map<string, Set<string>>()
   for (const l of lines) {

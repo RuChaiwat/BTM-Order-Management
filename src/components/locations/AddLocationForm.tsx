@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { computePickSequence } from '@/lib/locations/pickSequence'
+import { stripLocationDashes } from '@/lib/locations/locationDisplay'
 
 interface AisleOption {
   aisle: string
@@ -52,7 +53,7 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         warehouse_code: warehouseCode,
-        bin_code: form.bin_code.trim(),
+        bin_code: stripLocationDashes(form.bin_code.trim()),
         zone_code: form.zone_code.trim(),
         zone_name: form.zone_name.trim() || undefined,
         aisle,
@@ -93,8 +94,10 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         <div className="field">
-          <label className="field-label">Bin Code *</label>
-          <input className="field-input" style={{ border: '1px solid var(--color-border)' }} value={form.bin_code} onChange={(e) => setForm({ ...form, bin_code: e.target.value })} placeholder="e.g. A1A-01-A01" />
+          <label className="field-label">
+            Bin Code * <span className="field-hint">Location ID — dashes typed here are stripped automatically; shown with dashes everywhere else</span>
+          </label>
+          <input className="field-input" style={{ border: '1px solid var(--color-border)' }} value={form.bin_code} onChange={(e) => setForm({ ...form, bin_code: e.target.value })} placeholder="e.g. A1A01A01" />
         </div>
         <div className="field">
           <label className="field-label">Zone Code *</label>

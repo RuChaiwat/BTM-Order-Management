@@ -1,6 +1,7 @@
 import { Barcode } from '@/components/Barcode'
 import type { PickReportLine } from '@/lib/queries/consolidation'
 import { formatDate } from '@/lib/formatDate'
+import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
 
 export const PICK_REPORT_PRINT_CSS = `
   .a4-report { font-family: 'Noto Sans Thai', Arial, sans-serif; color: #1F2937; max-width: 800px; margin: 0 auto 0; padding: 24px; }
@@ -125,7 +126,7 @@ export function BatchReportDocument({ batch, warehouseCode, orders, pickLines, g
                   <td>{i * ROWS_PER_PAGE + j + 1}</td>
                   <td>{l.zoneCode ?? '—'}</td>
                   <td>
-                    <Barcode value={l.binCode} height={18} width={1} fontSize={8} />
+                    <Barcode value={l.binCode} displayText={formatLocationDisplay(l.binCode)} height={18} width={1} fontSize={8} />
                   </td>
                   <td>
                     <Barcode value={l.skuBarcode ?? l.sku} height={18} width={1} fontSize={8} />

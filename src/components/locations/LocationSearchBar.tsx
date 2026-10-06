@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { stripLocationDashes } from '@/lib/locations/locationDisplay'
 
 export function LocationSearchBar() {
   const router = useRouter()
@@ -13,7 +14,9 @@ export function LocationSearchBar() {
   function apply() {
     const params = new URLSearchParams()
     if (warehouse.trim()) params.set('warehouse', warehouse.trim())
-    if (bin.trim()) params.set('bin', bin.trim())
+    // Bin Code is always shown with dashes (Location Display) now, so a search typed the same way
+    // ("A5J-08-A04") must still match the dash-free Location ID actually stored in bin_code.
+    if (bin.trim()) params.set('bin', stripLocationDashes(bin.trim()))
     if (zone.trim()) params.set('zone', zone.trim())
     router.push(params.size > 0 ? `/locations?${params.toString()}` : '/locations')
   }

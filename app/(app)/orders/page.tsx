@@ -32,7 +32,7 @@ export default async function OrderPoolPage() {
       <div className="page-body">
         <OrderImportForm
           endpointBase="/api/imports/orders"
-          hint="Upload the Transfer Order export (.csv or .xlsx) — required columns: Transfer, Warehouse Code, Shipment Date, Store Code, Item No., SKU Barcode, Bin Code, Quantity"
+          hint={'Upload the WMS Transfer Order export (.xlsx) — must contain both the "Transfer List" (order header, only BT Status = Picking is imported) and "Warehouse Pick Lines" (order lines) sheets'}
         />
 
         <div className="card">

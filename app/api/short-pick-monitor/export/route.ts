@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { buildXlsxBuffer } from '@/lib/xlsxExport'
 import { getShortPickMonitorData } from '@/lib/queries/shortPickMonitor'
 import { formatDateTime } from '@/lib/formatDate'
+import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
 
 /** §Item 5 (Purge review follow-up): "Export รายการเพื่อส่งให้ทีม Inventory" -- a direct on-demand
  * download for one day (optionally one zone), not a scheduled job stored in Supabase Storage like
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
     r.zoneCode,
     r.sku,
     r.itemDescription ?? '',
-    r.binCode,
+    formatLocationDisplay(r.binCode),
     r.reasonLabelEn,
     r.reasonLabelTh,
     r.orderedQty,

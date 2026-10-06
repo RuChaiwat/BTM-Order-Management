@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Spinner } from '../Spinner'
 import { apiFetch } from '../../lib/apiFetch'
+import { formatLocationDisplay } from '../../lib/locations/locationDisplay'
 
 interface VerificationLine {
   line_id: string
@@ -291,7 +292,7 @@ export function AdminVerificationBoard({
                           {l.sku_barcode && <div style={{ fontSize: 11, color: '#6B7280' }}>Barcode: {l.sku_barcode}</div>}
                           {l.item_description && <div style={{ fontSize: 11, color: '#6B7280' }}>{l.item_description}</div>}
                         </td>
-                        <td>{l.bin_code}</td>
+                        <td>{formatLocationDisplay(l.bin_code)}</td>
                         <td style={{ fontWeight: 700 }}>
                           {l.qty} {l.uom_code}
                         </td>

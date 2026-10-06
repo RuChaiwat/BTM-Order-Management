@@ -5,6 +5,7 @@ import { getSessionUser } from '@/lib/auth'
 import { bangkokDateKey, formatDate, formatDateTime } from '@/lib/formatDate'
 import { getShortPickDetailRows } from '@/lib/queries/shortPickMonitor'
 import { MIN_CYCLE_MINUTES_FOR_RATE } from '@/lib/queries/productivity'
+import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
 
 /**
  * §20.1 weekly productivity export — one row per Order productivity result, into a new
@@ -197,7 +198,7 @@ export async function GET(request: Request) {
       r.zoneCode,
       r.sku,
       r.itemDescription ?? '',
-      r.binCode,
+      formatLocationDisplay(r.binCode),
       r.reasonLabelEn,
       r.reasonLabelTh,
       r.orderedQty,

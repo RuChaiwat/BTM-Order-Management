@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
 import { computePickSequence, directionForSide, sidePairCode } from '@/lib/locations/pickSequence'
 import { getOrAssignAisleRanks } from '@/lib/locations/aisleRank'
+import { stripLocationDashes } from '@/lib/locations/locationDisplay'
 
 /** Adds one Location (bin). Pick Sequence, Side Pair, and Direction are always computed from
  * Aisle/Side/Bay/Level/Block — see src/lib/locations/pickSequence.ts. A brand-new Aisle is
@@ -16,7 +17,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
 
-  const { warehouse_code, bin_code, zone_code, zone_name, aisle, side, bay, level, block, active } = await request.json()
+  const body = await request.json()
+  const { warehouse_code, zone_code, zone_name, aisle, side, bay, level, block, active } = body
+  // Location ID (bin_code) never carries the display dashes shown elsewhere in the app -- stripped
+  // here (not just client-side in AddLocationForm) so a direct API call can't bypass it and leave
+  // a dashed bin_code that would never match anything imported against it.
+  const bin_code = typeof body.bin_code === 'string' ? stripLocationDashes(body.bin_code) : body.bin_code
   const missing = [
     !warehouse_code && 'Warehouse',
     !bin_code && 'Bin Code',
@@ -79,7 +85,8 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
 
-  const { warehouse_code, bin_code, active } = await request.json()
+  const { warehouse_code, bin_code: rawBinCode, active } = await request.json()
+  const bin_code = typeof rawBinCode === 'string' ? stripLocationDashes(rawBinCode) : rawBinCode
   if (!warehouse_code || !bin_code || typeof active !== 'boolean') {
     return NextResponse.json({ error: 'warehouse_code, bin_code, and active (boolean) are required' }, { status: 400 })
   }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { parseSpreadsheet, orderGroupKey } from '@/lib/importers/parseSpreadsheet'
+import { parseWmsOrderWorkbook, orderGroupKey } from '@/lib/importers/parseSpreadsheet'
 
 // processOrderRowsBatch now does a small constant number of DB round trips per HTTP call
 // (bulk order lookup/insert/line-upsert/re-aggregate) instead of one round trip per order or per
@@ -62,8 +62,8 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
     setResult(null)
 
     try {
-      const rows = await parseSpreadsheet(file)
-      if (rows.length === 0) throw new Error('File has no data rows')
+      const rows = await parseWmsOrderWorkbook(file)
+      if (rows.length === 0) throw new Error('No Picking-status order lines found — check BT Status in "Transfer List" and that "Warehouse Pick Lines" has matching Source No. rows')
       const rawRows = rows.map((data, i) => ({ rowNumber: i + 2, data }))
 
       const groups = new Map<string, typeof rawRows>()
@@ -179,7 +179,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
         <input
           key={inputKey}
           type="file"
-          accept=".csv,.xlsx,.xls"
+          accept=".xlsx,.xls"
           disabled={busy}
           onChange={(e) => {
             setFile(e.target.files?.[0] ?? null)

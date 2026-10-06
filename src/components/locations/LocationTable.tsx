@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
 
 interface Location {
   bin_code: string
@@ -62,7 +63,7 @@ export function LocationTable({ locations }: { locations: Location[] }) {
         <tbody>
           {locations.map((l) => (
             <tr key={`${l.warehouse_code}-${l.bin_code}`} className={l.bin_code === selectedBin ? 'row-flag' : undefined} onClick={() => setSelectedBin(l.bin_code)} style={{ cursor: 'pointer' }}>
-              <td style={{ fontWeight: 700 }}>{l.bin_code}</td>
+              <td style={{ fontWeight: 700 }}>{formatLocationDisplay(l.bin_code)}</td>
               <td>{l.warehouse_code}</td>
               <td>{l.zone_code}</td>
               <td>{l.aisle}</td>
@@ -88,7 +89,7 @@ export function LocationTable({ locations }: { locations: Location[] }) {
         <div className="card" style={{ minHeight: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 14 }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>{selected.bin_code}</div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{formatLocationDisplay(selected.bin_code)}</div>
               <div style={{ fontSize: 11.5, color: '#6B7280' }}>{selected.warehouse_code}</div>
             </div>
             <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setSelectedBin(null)}>

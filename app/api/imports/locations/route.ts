@@ -5,6 +5,7 @@ import { writeAudit } from '@/lib/audit'
 import { parseSpreadsheet, col } from '@/lib/importers/parseSpreadsheet'
 import { computePickSequence, directionForSide, sidePairCode } from '@/lib/locations/pickSequence'
 import { getOrAssignAisleRanks } from '@/lib/locations/aisleRank'
+import { stripLocationDashes } from '@/lib/locations/locationDisplay'
 
 /**
  * §6 Location Master upload — Excel/CSV, upserted on (warehouse_code, bin_code).
@@ -36,7 +37,10 @@ export async function POST(request: Request) {
 
   const parsed = rows
     .map((row) => ({
-      bin_code: col(row, 'Bin Code', 'BinCode'),
+      // Location ID (bin_code) never carries the display dashes shown elsewhere in the app --
+      // stripped here in case this source file (like the WMS order export) also exports it dashed,
+      // so bin_code stays canonical regardless of which WMS report it came from.
+      bin_code: stripLocationDashes(col(row, 'Bin Code', 'BinCode')),
       warehouse_code: col(row, 'Warehouse Code', 'WarehouseCode'),
       zone_code: col(row, 'Zone Code', 'ZoneCode'),
       zone_name: col(row, 'Zone Name', 'ZoneName') || null,

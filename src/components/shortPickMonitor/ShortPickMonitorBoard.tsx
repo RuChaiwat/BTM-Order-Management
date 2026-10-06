@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { formatDateTime } from '@/lib/formatDate'
+import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
 
 interface DetailRow {
   lineId: string
@@ -115,7 +116,7 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
               <td>{r.zoneCode}</td>
               <td>{r.sku}</td>
               <td>{r.itemDescription ?? '—'}</td>
-              <td>{r.binCode}</td>
+              <td>{formatLocationDisplay(r.binCode)}</td>
               <td>
                 {r.reasonLabelEn} <span style={{ color: '#6B7280' }}>({r.reasonLabelTh})</span>
               </td>

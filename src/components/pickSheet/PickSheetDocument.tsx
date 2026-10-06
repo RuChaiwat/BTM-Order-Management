@@ -1,5 +1,6 @@
 import { Barcode } from '@/components/Barcode'
 import { formatDateWithWeekday } from '@/lib/formatDate'
+import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
 import type { PickSheetRow, PickSheetLine } from '@/lib/queries/pickSheet'
 
 /** A5 sheet, one (or more, if the line count overflows) per requested order -- item list sorted by
@@ -143,7 +144,7 @@ export function PickSheetDocument({ sheets, generatedAt }: { sheets: PickSheetRo
                       style={{ display: 'grid', gridTemplateColumns: '18px 54px 88px minmax(0,1fr) 46px 36px', fontSize: 9.5, padding: '3.5px 0', borderBottom: '1px solid #ddd', alignItems: 'center' }}
                     >
                       <div>{u.seq}</div>
-                      <div style={{ fontSize: 8.5, paddingRight: 4 }}>{u.line.binCode}</div>
+                      <div style={{ fontSize: 8.5, paddingRight: 4 }}>{formatLocationDisplay(u.line.binCode)}</div>
                       <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 8, whiteSpace: 'nowrap', paddingRight: 6 }}>{u.line.skuBarcode}</div>
                       <div style={{ paddingRight: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.line.itemDescription ?? '—'}</div>
                       <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 8.5 }}>

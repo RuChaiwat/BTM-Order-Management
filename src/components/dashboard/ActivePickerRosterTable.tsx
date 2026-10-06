@@ -69,31 +69,38 @@ export function ActivePickerRosterTable({ pickers }: { pickers: ActivePicker[] }
 
   return (
     <>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: 'auto' }} />
+          <col style={{ width: 70 }} />
+          <col style={{ width: 90 }} />
+          <col style={{ width: 80 }} />
+          <col style={{ width: 110 }} />
+        </colgroup>
         <thead>
           <tr>
             <SortHeader label="PICKER" sortKey="name" sort={sort} onSort={toggleSort} />
-            <SortHeader label="STATUS" sortKey="timeAlert" sort={sort} onSort={toggleSort} />
-            <SortHeader label="TIME" sortKey="elapsedMinutes" sort={sort} onSort={toggleSort} />
-            <SortHeader label="PIECES" sortKey="pieces" sort={sort} onSort={toggleSort} />
             <SortHeader label="ORDERS" sortKey="orders" sort={sort} onSort={toggleSort} />
+            <SortHeader label="PIECES" sortKey="pieces" sort={sort} onSort={toggleSort} />
+            <SortHeader label="TIME" sortKey="elapsedMinutes" sort={sort} onSort={toggleSort} />
+            <SortHeader label="STATUS" sortKey="timeAlert" sort={sort} onSort={toggleSort} />
           </tr>
         </thead>
         <tbody>
           {pageRows.map((p) => (
             <tr key={p.pickerId}>
-              <td style={{ fontWeight: 700 }}>
+              <td style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.pickerId})</span>
               </td>
+              <td style={{ textAlign: 'right' }}>{p.orders}</td>
+              <td style={{ fontWeight: 700, textAlign: 'right' }}>{p.pieces.toLocaleString()}</td>
+              <td style={{ textAlign: 'right' }}>{p.elapsedMinutes} min</td>
               <td>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.timeAlert ? ALERT_COLOR[p.timeAlert] : '#16A34A', flex: '0 0 auto' }} />
                   {p.timeAlert ?? 'On track'}
                 </span>
               </td>
-              <td>{p.elapsedMinutes} min</td>
-              <td style={{ fontWeight: 700 }}>{p.pieces.toLocaleString()}</td>
-              <td>{p.orders}</td>
             </tr>
           ))}
           {pageRows.length === 0 && (

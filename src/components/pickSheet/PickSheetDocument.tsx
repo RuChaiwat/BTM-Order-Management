@@ -157,8 +157,9 @@ export function PickSheetDocument({ sheets, generatedAt }: { sheets: PickSheetRo
                 )}
               </div>
 
-              {/* Footer -- signature + page number on every page; running totals + Time Completed
-                  only on an order's last page */}
+              {/* Footer -- page number on every page; signature, Time Completed, and running totals
+                  only on an order's last page (there's nothing to sign off on a page that isn't
+                  the end of the picking run) */}
               <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid #141414' }}>
                 {isLastPageOfOrder && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
@@ -169,15 +170,19 @@ export function PickSheetDocument({ sheets, generatedAt }: { sheets: PickSheetRo
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: isLastPageOfOrder ? 'repeat(2, minmax(0,1fr)) auto' : '1fr auto', alignItems: 'flex-end', gap: 16 }}>
-                  <div>
-                    <div style={{ borderBottom: '1px solid #141414', height: 16 }} />
-                    <div style={{ marginTop: 3, fontSize: 9.5, color: '#6b6b6b' }}>Picker Signature</div>
-                  </div>
-                  {isLastPageOfOrder && (
-                    <div>
-                      <div style={{ borderBottom: '1px solid #141414', height: 16 }} />
-                      <div style={{ marginTop: 3, fontSize: 9.5, color: '#6b6b6b' }}>Time Completed</div>
-                    </div>
+                  {isLastPageOfOrder ? (
+                    <>
+                      <div>
+                        <div style={{ borderBottom: '1px solid #141414', height: 16 }} />
+                        <div style={{ marginTop: 3, fontSize: 9.5, color: '#6b6b6b' }}>Picker Signature</div>
+                      </div>
+                      <div>
+                        <div style={{ borderBottom: '1px solid #141414', height: 16 }} />
+                        <div style={{ marginTop: 3, fontSize: 9.5, color: '#6b6b6b' }}>Time Completed</div>
+                      </div>
+                    </>
+                  ) : (
+                    <div />
                   )}
                   <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
                     Page {pageIndex + 1} of {pages.length}

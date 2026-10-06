@@ -19,6 +19,12 @@ const ZONE_ROW_STYLE: Record<string, { background?: string }> = {
   none: {},
 }
 
+// Same red/yellow/green convention used everywhere else (Zone Status, Zone Dashboard, Active
+// Pickers) -- 'warning' reads as the same caution yellow as 'overdue' here, one tier short of the
+// full Warning/Overdue/Critical breakdown, to keep a plain 3-color read at a glance.
+const ALERT_ACCENT: Record<'critical' | 'overdue' | 'warning', string> = { critical: '#DC2626', overdue: '#F59E0B', warning: '#F59E0B' }
+const ALERT_BADGE_TONE: Record<'critical' | 'overdue' | 'warning', string> = { critical: 'danger', overdue: 'warning', warning: 'warning' }
+
 export default async function ControlTowerPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
@@ -121,8 +127,9 @@ export default async function ControlTowerPage() {
             label="PENDING CONFIRMATION (PCS)"
             labelTh="รอ Admin Confirm"
             value={data.kpis.waitingVerifyPieces.toLocaleString()}
-            valueColor={data.kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
-            sub={`${data.kpis.waitingVerifyOrders.toLocaleString()} orders`}
+            valueColor={data.worstVerificationAlert ? ALERT_ACCENT[data.worstVerificationAlert] : data.kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
+            accentColor={data.worstVerificationAlert ? ALERT_ACCENT[data.worstVerificationAlert] : undefined}
+            sub={`${data.kpis.waitingVerifyOrders.toLocaleString()} orders · ${data.worstVerificationAlert ?? 'on track'}`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
@@ -169,8 +176,8 @@ export default async function ControlTowerPage() {
             </table>
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '18px 0 10px' }}>
-              <span className="card-title">Top Overdue Orders</span>
-              <span className="card-subtitle">ออเดอร์ที่ล่าช้าที่สุด · top 20 by elapsed time, longest first</span>
+              <span className="card-title">Top Overdue Picks</span>
+              <span className="card-subtitle">ออเดอร์ที่กำลังหยิบล่าช้าที่สุด · Picking only, not Admin Verification · top 20 by elapsed time, longest first</span>
             </div>
             <table className="table">
               <thead>
@@ -208,7 +215,7 @@ export default async function ControlTowerPage() {
           <div className="card">
             <div className="card-header">
               <span className="card-title">Top Pending Confirmations</span>
-              <span className="card-subtitle">รายการรอ Admin ยืนยันสูงสุด · top 20 by waiting time, longest first</span>
+              <span className="card-subtitle">รายการรอ Admin ยืนยันสูงสุด · top 20, most critical first</span>
             </div>
             <table className="table">
               <thead>
@@ -217,6 +224,7 @@ export default async function ControlTowerPage() {
                   <th>PICKER</th>
                   <th>PIECES</th>
                   <th>WAITING</th>
+                  <th>STATUS</th>
                 </tr>
               </thead>
               <tbody>
@@ -226,20 +234,24 @@ export default async function ControlTowerPage() {
                     <td>{o.pickerName}</td>
                     <td>{o.pieces.toLocaleString()}</td>
                     <td>{o.waitMinutes} min</td>
+                    <td>
+                      {o.timeAlert ? (
+                        <span className={`badge badge-${ALERT_BADGE_TONE[o.timeAlert]}`}>{o.timeAlert}</span>
+                      ) : (
+                        <span className="badge badge-success">On track</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {data.pendingVerification.length === 0 && (
                   <tr>
-                    <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
+                    <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
                       No orders waiting on Admin verification.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-            <div style={{ marginTop: 'auto', paddingTop: 12, fontSize: 11.5, color: 'var(--color-text-secondary)' }}>
-              Backlog = orders whose work isn&apos;t finished yet. Pending P/V (Zone Overview) = Picking backlog + Verification backlog for that zone.
-            </div>
           </div>
         </div>
       </div>

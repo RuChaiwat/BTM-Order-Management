@@ -58,3 +58,12 @@ export function computeTimeAlert(status: string, elapsedMinutes: number, t: SlaT
   }
   return null
 }
+
+/** Ranks an alert worst-first, for sorting a list by severity and for picking the single worst
+ * alert out of a group (e.g. the whole Verification queue) to color a summary card by. */
+export function alertSeverityRank(alert: 'warning' | 'overdue' | 'critical' | null): number {
+  if (alert === 'critical') return 3
+  if (alert === 'overdue') return 2
+  if (alert === 'warning') return 1
+  return 0
+}

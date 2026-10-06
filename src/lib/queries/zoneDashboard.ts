@@ -121,20 +121,18 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
     shortPickRowsByZone.get(line.zone_code)!.push(row)
   }
 
-  // Which zone an ACTIVE order is really being worked in -- the assignment batch's own zone_code,
-  // not "any zone one of its lines touches" (an order can touch multiple zones, but FR-030 confines
-  // it to being actively picked as part of ONE batch, in ONE zone). Using the broader line-based
-  // set for both the Orders list AND Active Pickers previously let an order with a named Picker and
-  // an Assigned status show up in a zone's order list while never counting toward that same zone's
-  // Active Pickers, because the two used different definitions of "this zone" for the same order --
-  // a real, confusing inconsistency. Both are now derived from this one map, so they can't disagree.
+  // Which zone(s) an ACTIVE order is really being worked in -- every zone the order's OWN LINES
+  // actually touch, not just its assignment batch's single declared zone_code. FR-030's trigger
+  // (enforce_assignment_zone_warehouse, migration 0001) only requires that ANY line of the order
+  // sit in the batch's zone, not that EVERY line does, so even a single (non-consolidated) batch
+  // can legitimately cover an order whose lines span more than one physical zone -- same as a
+  // consolidation-linked batch (zone_code='MULTI', migration 0027) always could. Previously only
+  // the MULTI case was attributed to every touched zone, so a picker working an ordinary batch on
+  // a 2-zone order only ever showed as active in ONE of those zones, and that zone's own risk badge
+  // only ever reflected that order's lateness in one place instead of both.
   //
-  // A consolidation-linked batch (zone_code='MULTI', migration 0027) is the one deliberate
-  // exception: it spans multiple zones by design (its orders were clustered by SKU/store overlap
-  // across the warehouse, not confined to one zone), so its orders genuinely ARE being worked in
-  // every zone their own lines touch -- attributed there directly (same zoneOrderIds map "touching"
-  // already uses below) instead of a single zone_code the batch was never confined to. A picker
-  // working one of these batches can correctly show as active in more than one zone at once.
+  // Both the Orders list AND Active Pickers are derived from this one map, so they can't disagree
+  // with each other the way they used to when batch zone_code and line-touch were used separately.
   const zoneOfBatch = new Map(batches.filter((b) => b.zone_code).map((b) => [b.assignment_batch_id, b.zone_code as string]))
   const activeOrdersByZone = new Map<string, ZoneActiveOrderRow[]>()
   const zonePickerWork = new Map<string, Map<string, { orders: number; pieces: number }>>()
@@ -143,7 +141,7 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
     const batchZone = zoneOfBatch.get(o.assignment_batch_id)
     const pickerId = pickerIdByBatch.get(o.assignment_batch_id)
     if (!batchZone || !pickerId) continue
-    const targetZones = batchZone === 'MULTI' ? [...zoneOrderIds.keys()].filter((z) => zoneOrderIds.get(z)!.has(o.order_id)) : [batchZone]
+    const targetZones = [...zoneOrderIds.keys()].filter((z) => zoneOrderIds.get(z)!.has(o.order_id))
 
     const alert = alertByOrder.get(o.order_id)
     for (const zone of targetZones) {

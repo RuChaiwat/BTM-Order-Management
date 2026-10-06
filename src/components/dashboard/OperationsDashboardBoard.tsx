@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { KpiCard } from '../KpiCard'
 import { formatDate } from '../../lib/formatDate'
-import { productivityMeta } from '../../lib/pickerProductivity'
+import { PickerProductivityTable } from './PickerProductivityTable'
+import { ActivePickerRosterTable } from './ActivePickerRosterTable'
 
 interface BacklogRow {
   orderDate: string
@@ -34,6 +35,8 @@ interface ActivePickerRow {
   name: string
   orders: number
   pieces: number
+  elapsedMinutes: number
+  timeAlert: 'warning' | 'overdue' | 'critical' | null
 }
 
 interface DashboardData {
@@ -218,46 +221,9 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
         <div className="card">
           <div className="card-title">Today&apos;s Picker Productivity</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            ผลิตภาพผู้หยิบสินค้า · pieces per hour
+            ผลิตภาพผู้หยิบสินค้า · pieces per hour · click a column to sort
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>PICKER</th>
-                <th>PCS/HR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.pickerProductivity.map((p) => {
-                const meta = productivityMeta(p.level)
-                return (
-                  <tr key={p.pickerId}>
-                    <td style={{ fontWeight: 700 }}>{p.name}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span
-                          style={{
-                            height: 10,
-                            borderRadius: 5,
-                            background: meta.color,
-                            width: Math.max(8, Math.min(100, (p.pcsPerHour / data.targetPcsPerHour) * 100)),
-                          }}
-                        />
-                        <span style={{ fontWeight: 700 }}>{p.pcsPerHour.toLocaleString()}</span>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-              {data.pickerProductivity.length === 0 && (
-                <tr>
-                  <td colSpan={2} style={{ color: 'var(--color-text-secondary)' }}>
-                    No completed picks yet today.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <PickerProductivityTable pickers={data.pickerProductivity} targetPcsPerHour={data.targetPcsPerHour} />
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed var(--color-border)', fontSize: 11.5, color: 'var(--color-text-secondary)' }}>
             Target {data.targetPcsPerHour.toLocaleString()} pcs/hr · dark green above target, green 80–100%, yellow 60–80%, red below 60% — adjustable via Configuration
             (picker_productivity.target_pcs_per_hour)
@@ -267,35 +233,9 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
         <div className="card">
           <div className="card-title">Active Pickers — In Progress Now</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            ผู้หยิบที่กำลังดำเนินการอยู่ · orders &amp; pieces still in hand
+            ผู้หยิบที่กำลังดำเนินการอยู่ · orders &amp; pieces still in hand · sorted by longest-held order · click a column to sort
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>PICKER</th>
-                <th>PIECES</th>
-                <th>ORDERS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.activePickerRoster.map((p) => (
-                <tr key={p.pickerId}>
-                  <td style={{ fontWeight: 700 }}>
-                    {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.pickerId})</span>
-                  </td>
-                  <td style={{ fontWeight: 700 }}>{p.pieces.toLocaleString()}</td>
-                  <td>{p.orders}</td>
-                </tr>
-              ))}
-              {data.activePickerRoster.length === 0 && (
-                <tr>
-                  <td colSpan={3} style={{ color: 'var(--color-text-secondary)' }}>
-                    No pickers actively working right now.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <ActivePickerRosterTable pickers={data.activePickerRoster} />
         </div>
       </div>
 

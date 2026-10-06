@@ -4,13 +4,18 @@ import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
-import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
+import { getSlaThresholds, computeTimeAlert, alertSeverityRank } from '../orderAlerts'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists), so treating it as a distinct state
 // from 'assigned' just reads as a permanently-zero number. Anything meant to mean "still being
 // worked, not yet submitted" checks both, plus 'correction_in_progress' for orders sent back.
 const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in_progress'])
+// Narrower than ACTIVE_ORDER_STATUSES: exactly the Picking phase (Assigned -> Confirm Pick), with
+// no Verification-phase status mixed in. Used by the Warning/Overdue/Critical KPIs and Top Overdue
+// Picks, which are meant to track picking lateness only -- Verification lateness has its own
+// Pending Confirmation / Top Pending Confirmations below, on its own (later, looser) thresholds.
+const PICKING_ONLY_STATUSES = new Set(['assigned', 'in_progress'])
 
 /**
  * Control Tower has its own real-time-monitoring KPI set (all orders including cancelled, raw
@@ -61,20 +66,21 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     zoneOrders.get(l.zone_code)!.add(l.order_id)
   }
 
-  // Row highlight must key off the SAME "which zone is this order really being picked in"
-  // definition Zone Dashboard uses (the order's assignment batch's own zone_code), not "any zone
-  // this order's lines touch" -- otherwise this row can flag a zone red/yellow for an order that's
-  // actually late in a DIFFERENT zone, disagreeing with what Zone Dashboard itself would show for
-  // that same zone (see the identical fix in dashboard.ts). A consolidation-linked batch
-  // (zone_code='MULTI', migration 0027) is the one exception: it spans multiple zones by design,
-  // so it's attributed to every real zone its orders' lines actually touch instead.
+  // Row highlight must key off every zone an active order's OWN LINES actually touch, not just its
+  // assignment batch's single declared zone_code -- FR-030's trigger only requires that ANY line of
+  // the order sit in the batch's zone, not that EVERY line does (migration 0001's
+  // enforce_assignment_zone_warehouse), so even a single (non-consolidated) batch can legitimately
+  // cover an order whose lines span more than one physical zone, same as a consolidation-linked
+  // batch (zone_code='MULTI', migration 0027) always could. Previously only the MULTI case was
+  // attributed to every touched zone, so an order picked out of two zones under an ordinary batch
+  // only ever flagged ONE of those zones -- the other showed on-track despite genuinely having that
+  // same late order running in it too (see the identical fix in dashboard.ts).
   const zoneOfBatch = new Map(assignmentBatches.filter((b) => b.zone_code).map((b) => [b.assignment_batch_id, b.zone_code as string]))
   const activeOrderIdsByZone = new Map<string, string[]>()
   for (const o of orders) {
     if (!o.assignment_batch_id || !ACTIVE_ORDER_STATUSES.has(o.status)) continue
-    const zone = zoneOfBatch.get(o.assignment_batch_id)
-    if (!zone) continue
-    const targetZones = zone === 'MULTI' ? [...zoneOrders.keys()].filter((z) => zoneOrders.get(z)!.has(o.order_id)) : [zone]
+    if (!zoneOfBatch.get(o.assignment_batch_id)) continue
+    const targetZones = [...zoneOrders.keys()].filter((z) => zoneOrders.get(z)!.has(o.order_id))
     for (const z of targetZones) {
       if (!activeOrderIdsByZone.has(z)) activeOrderIdsByZone.set(z, [])
       activeOrderIdsByZone.get(z)!.push(o.order_id)
@@ -107,16 +113,29 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     zonesByOrder.get(l.order_id)!.add(l.zone_code)
   }
 
+  // Picking only -- an order already past Picking and sitting in Admin Verification has its own
+  // (looser) thresholds and its own list below; mixing the two in one "overdue picks" list would
+  // mean a single number no longer maps to one consistent SLA.
   const overdueOrdersRaw = orders
+    .filter((o) => PICKING_ONLY_STATUSES.has(o.status))
     .map((o) => ({ ...o, alert: alertByOrder.get(o.order_id), zones: [...(zonesByOrder.get(o.order_id) ?? new Set())] }))
     .filter((o) => o.alert?.time_alert === 'critical' || o.alert?.time_alert === 'overdue')
     .sort((a, b) => (b.alert?.elapsed_minutes ?? 0) - (a.alert?.elapsed_minutes ?? 0))
     .slice(0, 20)
 
-  const pendingVerificationRaw = orders
-    .filter((o) => o.status === 'picker_completed_100' || o.status === 'picker_completed_short')
-    .map((o) => ({ ...o, completion: completionByOrderId.get(o.order_id) }))
-    .sort((a, b) => (a.completion?.picker_completed_time ?? '').localeCompare(b.completion?.picker_completed_time ?? ''))
+  const verificationStatusOrders = orders.filter((o) => o.status === 'picker_completed_100' || o.status === 'picker_completed_short')
+  // Worst alert across the WHOLE Verification queue, not just the top-20 slice below -- this is
+  // what colors the Pending Confirmation KPI card itself (§ control-tower/page.tsx).
+  const worstVerificationAlert = verificationStatusOrders.reduce<'warning' | 'overdue' | 'critical' | null>((worst, o) => {
+    const alert = alertByOrder.get(o.order_id)?.time_alert ?? null
+    return alertSeverityRank(alert) > alertSeverityRank(worst) ? alert : worst
+  }, null)
+
+  const pendingVerificationRaw = verificationStatusOrders
+    .map((o) => ({ ...o, completion: completionByOrderId.get(o.order_id), alert: alertByOrder.get(o.order_id)?.time_alert ?? null }))
+    // Most critical first -- a picker who's been waiting past Critical needs Admin's attention
+    // before one still inside Warning, regardless of which submitted first.
+    .sort((a, b) => alertSeverityRank(b.alert) - alertSeverityRank(a.alert) || (a.completion?.picker_completed_time ?? '').localeCompare(b.completion?.picker_completed_time ?? ''))
     .slice(0, 20)
 
   const batchIds = [
@@ -144,11 +163,13 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     pickerName: pickerNameFor(o.assignment_batch_id),
     pieces: o.completion?.actual_pieces ?? 0,
     waitMinutes: o.completion ? Math.round((Date.now() - new Date(o.completion.picker_completed_time).getTime()) / 60000) : 0,
+    timeAlert: o.alert,
   }))
 
-  const warningOrdersList = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'warning')
-  const overdueOrdersList = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'overdue')
-  const criticalOrdersList = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'critical')
+  // Picking only -- see PICKING_ONLY_STATUSES above.
+  const warningOrdersList = orders.filter((o) => PICKING_ONLY_STATUSES.has(o.status) && alertByOrder.get(o.order_id)?.time_alert === 'warning')
+  const overdueOrdersList = orders.filter((o) => PICKING_ONLY_STATUSES.has(o.status) && alertByOrder.get(o.order_id)?.time_alert === 'overdue')
+  const criticalOrdersList = orders.filter((o) => PICKING_ONLY_STATUSES.has(o.status) && alertByOrder.get(o.order_id)?.time_alert === 'critical')
 
   const pickingBacklogOrders = orders.filter((o) => alertByOrder.get(o.order_id)?.is_picking_backlog)
   const verificationBacklogOrders = orders.filter((o) => alertByOrder.get(o.order_id)?.is_verification_backlog)
@@ -190,6 +211,7 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     zoneOverview,
     topOverdueOrders: overdueOrders,
     pendingVerification,
+    worstVerificationAlert,
     secondaryKpis: {
       warningOrders: warningOrdersList.length,
       warningPieces: warningOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),

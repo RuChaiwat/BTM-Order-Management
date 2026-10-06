@@ -140,25 +140,22 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   }
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
   const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
-  // Risk level must key off the SAME "which zone is this order really being picked in" definition
-  // Zone Dashboard uses (the order's assignment batch's own zone_code -- FR-030 confines an active
-  // order to being picked as part of ONE batch in ONE zone), not "any zone this order's lines
-  // touch". Using the broader line-based set here previously flagged a zone red/yellow for an
-  // order that was actually late in a DIFFERENT zone, just because one of its SKUs also happened to
-  // be stored there -- a real disagreement with Zone Dashboard's own risk badges for the same data.
-  //
-  // A consolidation-linked batch (zone_code='MULTI', migration 0027) is the one deliberate
-  // exception: it spans multiple zones by design (its orders were clustered by SKU/store overlap,
-  // not confined to one zone), so it's attributed to every real zone its orders' lines actually
-  // touch instead of a single zone_code it was never confined to -- same as the "touching"
-  // pieces/backlog totals below, and the same convention Zone Dashboard itself uses.
+  // Risk level must key off the SAME "which zone(s) is this order really being picked in"
+  // definition Zone Dashboard uses: every zone the order's OWN LINES actually touch, not just its
+  // assignment batch's single declared zone_code. FR-030's trigger (enforce_assignment_zone_
+  // warehouse, migration 0001) only requires that ANY line of the order sits in the batch's zone --
+  // it does not require EVERY line to be confined there -- so a single (non-consolidated) batch can
+  // legitimately cover an order whose lines span more than one physical zone, same as a
+  // consolidation-linked batch (zone_code='MULTI', migration 0027) always could. Previously only
+  // the MULTI case was attributed to every touched zone, so a critical/overdue order picked out of
+  // two zones under an ordinary batch only ever lit up ONE of those zones' risk badges -- the other
+  // zone showed green despite genuinely having that same order running late in it too.
   const zoneOfBatch = new Map(assignmentBatches.filter((b) => b.zone_code).map((b) => [b.assignment_batch_id, b.zone_code as string]))
   const activeOrderIdsByZone = new Map<string, string[]>()
   for (const o of orders) {
     if (!o.assignment_batch_id || !ACTIVE_ORDER_STATUSES.has(o.status)) continue
-    const zone = zoneOfBatch.get(o.assignment_batch_id)
-    if (!zone) continue
-    const targetZones = zone === 'MULTI' ? [...zoneOrders.keys()].filter((z) => zoneOrders.get(z)!.has(o.order_id)) : [zone]
+    if (!zoneOfBatch.get(o.assignment_batch_id)) continue
+    const targetZones = [...zoneOrders.keys()].filter((z) => zoneOrders.get(z)!.has(o.order_id))
     for (const z of targetZones) {
       if (!activeOrderIdsByZone.has(z)) activeOrderIdsByZone.set(z, [])
       activeOrderIdsByZone.get(z)!.push(o.order_id)
@@ -213,15 +210,25 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   // Active Pickers itself (below) is just this map's size, so the KPI and the roster it explains
   // can never disagree with each other.
   const pickerIdByBatchId = new Map(assignmentBatches.filter((b) => b.picker_id).map((b) => [b.assignment_batch_id, b.picker_id as string]))
-  const activePickerWork = new Map<string, { orders: number; pieces: number }>()
+  // worstElapsedMinutes/worstAlert track whichever of a picker's active orders has been open
+  // longest -- the one that would actually need attention first -- so the roster can show a single
+  // status/time per picker instead of forcing the user into a separate per-order drill-down just to
+  // see who's actually running late.
+  const activePickerWork = new Map<string, { orders: number; pieces: number; worstElapsedMinutes: number; worstAlert: string | null }>()
   for (const o of orders) {
     if (!o.assignment_batch_id) continue
     if (!ACTIVE_ORDER_STATUSES.has(o.status)) continue
     const pickerId = pickerIdByBatchId.get(o.assignment_batch_id)
     if (!pickerId) continue
-    const entry = activePickerWork.get(pickerId) ?? { orders: 0, pieces: 0 }
+    const entry = activePickerWork.get(pickerId) ?? { orders: 0, pieces: 0, worstElapsedMinutes: 0, worstAlert: null as string | null }
     entry.orders += 1
     entry.pieces += o.planned_pieces ?? 0
+    const orderAlert = alertByOrder.get(o.order_id)
+    const elapsed = orderAlert?.elapsed_minutes ?? 0
+    if (elapsed >= entry.worstElapsedMinutes) {
+      entry.worstElapsedMinutes = elapsed
+      entry.worstAlert = orderAlert?.time_alert ?? null
+    }
     activePickerWork.set(pickerId, entry)
   }
   const activePickers = activePickerWork.size
@@ -239,17 +246,25 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const cfg = await getActiveConfig(db, ['picker_productivity.target_pcs_per_hour'])
   const targetPcsPerHour = Number(cfg.value('picker_productivity.target_pcs_per_hour') ?? 4500)
 
+  // Full lists -- both tables paginate/sort client-side now (20/page), so capping here would just
+  // hide pickers past the old top-6 cutoff from ever being reachable.
   const pickerProductivity = [...pickerTotals.entries()]
     .map(([pickerId, t]) => {
       const pcsPerHour = Math.round((t.pieces / t.minutes) * 60)
       return { pickerId, name: nameByPickerId.get(pickerId) ?? pickerId, pcsPerHour, level: bandForPct((pcsPerHour / targetPcsPerHour) * 100) }
     })
     .sort((a, b) => b.pcsPerHour - a.pcsPerHour)
-    .slice(0, 6)
 
   const activePickerRoster = [...activePickerWork.entries()]
-    .map(([pickerId, w]) => ({ pickerId, name: nameByPickerId.get(pickerId) ?? pickerId, orders: w.orders, pieces: w.pieces }))
-    .sort((a, b) => b.pieces - a.pieces)
+    .map(([pickerId, w]) => ({
+      pickerId,
+      name: nameByPickerId.get(pickerId) ?? pickerId,
+      orders: w.orders,
+      pieces: w.pieces,
+      elapsedMinutes: Math.round(w.worstElapsedMinutes),
+      timeAlert: w.worstAlert as 'warning' | 'overdue' | 'critical' | null,
+    }))
+    .sort((a, b) => b.elapsedMinutes - a.elapsedMinutes)
 
   return {
     kpis: {

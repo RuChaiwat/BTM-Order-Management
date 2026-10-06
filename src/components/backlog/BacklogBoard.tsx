@@ -106,7 +106,7 @@ export function BacklogBoard({ rows }: { rows: BacklogRow[] }) {
     <div className="card" style={{ flex: 1, minHeight: 0 }}>
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Pending Action</span>
-        <span className="card-subtitle">click a column to sort</span>
+        <span className="card-subtitle">รายการที่ต้องดำเนินการ · click a column to sort</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
           {FILTERS.map((f) => (
             <button key={f.key} className={`btn btn-sm ${filter === f.key ? 'btn-primary' : 'btn-secondary'}`} onClick={() => selectFilter(f.key)}>

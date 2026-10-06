@@ -5,6 +5,7 @@ import { KpiCard } from '@/components/KpiCard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getControlTowerData } from '@/lib/queries/controlTower'
+import { ALERT_COLOR, ALERT_LABEL_COLOR, ALERT_BADGE_TONE } from '@/lib/alertColors'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -18,12 +19,6 @@ const ZONE_ROW_STYLE: Record<string, { background?: string }> = {
   warning: { background: 'var(--color-warning-bg)' },
   none: {},
 }
-
-// Same red/yellow/green convention used everywhere else (Zone Status, Zone Dashboard, Active
-// Pickers) -- 'warning' reads as the same caution yellow as 'overdue' here, one tier short of the
-// full Warning/Overdue/Critical breakdown, to keep a plain 3-color read at a glance.
-const ALERT_ACCENT: Record<'critical' | 'overdue' | 'warning', string> = { critical: '#DC2626', overdue: '#F59E0B', warning: '#F59E0B' }
-const ALERT_BADGE_TONE: Record<'critical' | 'overdue' | 'warning', string> = { critical: 'danger', overdue: 'warning', warning: 'warning' }
 
 export default async function ControlTowerPage() {
   const user = await getSessionUser()
@@ -107,9 +102,9 @@ export default async function ControlTowerPage() {
             labelTh="ออเดอร์เกินกำหนด (Overdue)"
             value={data.secondaryKpis.overduePieces.toLocaleString()}
             sub={`${data.secondaryKpis.overdueOrders.toLocaleString()} orders`}
-            accentColor="#EA580C"
-            labelColor="#C2410C"
-            valueColor="#C2410C"
+            accentColor={ALERT_COLOR.overdue}
+            labelColor={ALERT_LABEL_COLOR.overdue}
+            valueColor={ALERT_LABEL_COLOR.overdue}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
@@ -127,8 +122,8 @@ export default async function ControlTowerPage() {
             label="PENDING CONFIRMATION (PCS)"
             labelTh="รอ Admin Confirm"
             value={data.kpis.waitingVerifyPieces.toLocaleString()}
-            valueColor={data.worstVerificationAlert ? ALERT_ACCENT[data.worstVerificationAlert] : data.kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
-            accentColor={data.worstVerificationAlert ? ALERT_ACCENT[data.worstVerificationAlert] : undefined}
+            valueColor={data.worstVerificationAlert ? ALERT_COLOR[data.worstVerificationAlert] : data.kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
+            accentColor={data.worstVerificationAlert ? ALERT_COLOR[data.worstVerificationAlert] : undefined}
             sub={`${data.kpis.waitingVerifyOrders.toLocaleString()} orders · ${data.worstVerificationAlert ?? 'on track'}`}
             compact
             style={{ padding: 14, textAlign: 'center' }}

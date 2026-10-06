@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { ALERT_COLOR } from '@/lib/alertColors'
 
 interface ActivePicker {
   pickerId: string
@@ -12,10 +13,6 @@ interface ActivePicker {
 }
 
 const PAGE_SIZE = 20
-// Same red/yellow/green convention as Zone Status and Zone Dashboard's own risk badges --
-// 'warning' reads as the same caution yellow as 'overdue' here, one tier short of the full
-// Warning/Overdue/Critical breakdown, to keep a plain 3-color read at a glance.
-const ALERT_COLOR: Record<'critical' | 'overdue' | 'warning', string> = { critical: '#DC2626', overdue: '#F59E0B', warning: '#F59E0B' }
 const ALERT_RANK: Record<string, number> = { critical: 3, overdue: 2, warning: 1 }
 
 type SortKey = 'name' | 'timeAlert' | 'elapsedMinutes' | 'pieces' | 'orders'

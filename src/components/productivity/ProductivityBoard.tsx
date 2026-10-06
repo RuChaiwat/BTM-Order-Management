@@ -161,7 +161,7 @@ export function ProductivityBoard({
         <div className="card" style={{ minHeight: 0 }}>
           <div className="card-header" style={{ marginBottom: 10 }}>
             <span className="card-title">Picker Productivity</span>
-            <span className="card-subtitle">{formatDate(date)} · click a column to sort</span>
+            <span className="card-subtitle">ผลิตภาพผู้หยิบสินค้า · {formatDate(date)} · click a column to sort</span>
           </div>
           <table className="table">
             <thead>
@@ -201,7 +201,7 @@ export function ProductivityBoard({
         <div className="card" style={{ minHeight: 0 }}>
           <div className="card-header" style={{ marginBottom: 10 }}>
             <span className="card-title">Short Pick Reasons</span>
-            <span className="card-subtitle">click a column to sort</span>
+            <span className="card-subtitle">สาเหตุการหยิบขาด · click a column to sort</span>
           </div>
           <table className="table">
             <thead>

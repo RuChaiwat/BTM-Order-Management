@@ -91,15 +91,43 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
 
     const nowIso = new Date().toISOString()
     const newOrderStatus = result === '100_percent' ? 'picker_completed_100' : 'picker_completed_short'
+    let completedCount = 0
+    const conflictedOrderIds: string[] = []
     for (const o of activeOrders) {
+      // Guarded on the exact status just read (compare-and-swap), and done BEFORE
+      // picker_completions -- same principle as submitPickerCompletion -- so a concurrent action
+      // on this same order from a different terminal (an individual Pick Completion submit, an
+      // Unassign) can't be silently overwritten by this bulk action, or vice versa.
+      const { data: updatedOrder } = await admin
+        .from('orders')
+        .update({ status: newOrderStatus, picker_completed_time: nowIso })
+        .eq('order_id', o.order_id)
+        .eq('status', o.status)
+        .select('order_id')
+        .maybeSingle()
+      if (!updatedOrder) {
+        conflictedOrderIds.push(o.order_id)
+        continue
+      }
       const actualPieces = result === '100_percent' ? o.planned_pieces : null
       await admin.from('picker_completions').upsert({ order_id: o.order_id, picker_completed_time: nowIso, actual_pieces: actualPieces, result }, { onConflict: 'order_id' })
-      await admin.from('orders').update({ status: newOrderStatus, picker_completed_time: nowIso }).eq('order_id', o.order_id)
       await writeStatusHistory(admin, { entityType: 'orders', entityId: o.order_id, oldStatus: o.status, newStatus: newOrderStatus, changedBy: caller.user_id })
+      completedCount++
     }
 
-    const { data: updated, error } = await admin.from('consolidation_batches').update({ status: 'completed' }).eq('consol_batch_id', params.batchId).select().single()
+    // Same CAS guard on the batch itself -- a concurrent cancel, or this same action fired twice,
+    // can't silently stomp each other's write.
+    const { data: updated, error } = await admin
+      .from('consolidation_batches')
+      .update({ status: 'completed' })
+      .eq('consol_batch_id', params.batchId)
+      .eq('status', batch.status)
+      .select()
+      .maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (!updated) {
+      return NextResponse.json({ error: 'This batch was already changed by someone else — refresh and try again' }, { status: 409 })
+    }
 
     await writeStatusHistory(admin, { entityType: 'consolidation_batches', entityId: params.batchId, oldStatus: batch.status, newStatus: 'completed', changedBy: caller.user_id })
     await writeAudit(admin, {
@@ -108,10 +136,10 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
       entityType: 'consolidation_batches',
       entityId: params.batchId,
       before: batch,
-      after: { ...updated, result, orders_completed: activeOrders.length },
+      after: { ...updated, result, orders_completed: completedCount, conflicted_order_ids: conflictedOrderIds.length ? conflictedOrderIds : undefined },
     })
 
-    return NextResponse.json({ batch: updated, orders_completed: activeOrders.length })
+    return NextResponse.json({ batch: updated, orders_completed: completedCount, conflicted_order_ids: conflictedOrderIds })
   }
 
   // action === 'cancel' -- only meaningful while the batch is still a matching candidate/review

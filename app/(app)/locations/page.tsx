@@ -58,7 +58,8 @@ export default async function LocationMasterPage({ searchParams }: { searchParam
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
             <span className="card-title">Locations</span>
             <span className="card-subtitle">
-              {total} bin code{total === 1 ? '' : 's'} match{isFiltered ? 'ing search' : ''} · showing first {Math.min(total, RESULT_LIMIT)} by Pick Sequence
+              รายการตำแหน่งจัดเก็บ · {total} bin code{total === 1 ? '' : 's'} match{isFiltered ? 'ing search' : ''} · showing first {Math.min(total, RESULT_LIMIT)} by
+              Pick Sequence
               {total > RESULT_LIMIT ? ' — refine your search to see more' : ''}
             </span>
           </div>

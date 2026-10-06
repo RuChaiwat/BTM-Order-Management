@@ -1,13 +1,12 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
 import { OrderImportForm } from '@/components/orderPool/OrderImportForm'
-import { ImportErrorsViewer } from '@/components/ImportErrorsViewer'
+import { RecentImportsTable } from '@/components/orderPool/RecentImportsTable'
 import { OrderPoolOverview } from '@/components/orderPool/OrderPoolOverview'
 import { CancelOrderPanel } from '@/components/orderPool/CancelOrderPanel'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getOrderPoolOverview } from '@/lib/queries/orderPool'
 import { getSessionUser } from '@/lib/auth'
-import { formatDateTime } from '@/lib/formatDate'
 
 // The Recent Imports table must reflect the import that just happened, not a stale server-cached
 // render — force this route to always be server-rendered per request.
@@ -20,7 +19,9 @@ export default async function OrderPoolPage() {
   const admin = createAdminClient()
 
   const [{ data: importBatches, error: importsError }, overview, { data: cancelReasons }] = await Promise.all([
-    admin.from('import_batches').select('import_id, file_name, uploaded_at, status, total_rows, success_rows, error_rows').order('uploaded_at', { ascending: false }).limit(10),
+    // Capped well past a single page's worth (20/page in RecentImportsTable) -- an append-only
+    // operational log, same shape as Audit Trail, not a "last 10" preview.
+    admin.from('import_batches').select('import_id, file_name, uploaded_at, status, total_rows, success_rows, error_rows').order('uploaded_at', { ascending: false }).limit(200),
     getOrderPoolOverview(admin, warehouseCode),
     admin.from('reason_master').select('reason_code, label_en').eq('reason_type', 'cancel').eq('active', true).order('label_en'),
   ])
@@ -38,43 +39,9 @@ export default async function OrderPoolPage() {
         <div className="card">
           <div className="card-title">Recent imports</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            ประวัติการนำเข้าล่าสุด
+            ประวัติการนำเข้าล่าสุด · click a column to sort
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>FILE</th>
-                <th>UPLOADED</th>
-                <th>STATUS</th>
-                <th>ROWS</th>
-                <th>SUCCESS</th>
-                <th>ERRORS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(importBatches ?? []).map((b) => (
-                <tr key={b.import_id}>
-                  <td>{b.file_name}</td>
-                  <td>{formatDateTime(b.uploaded_at)}</td>
-                  <td>
-                    <span className={`badge badge-${b.status === 'completed' ? 'success' : b.status === 'failed' ? 'danger' : 'warning'}`}>{b.status}</span>
-                  </td>
-                  <td>{b.total_rows}</td>
-                  <td>{b.success_rows}</td>
-                  <td>
-                    <ImportErrorsViewer importId={b.import_id} errorCount={b.error_rows} />
-                  </td>
-                </tr>
-              ))}
-              {(!importBatches || importBatches.length === 0) && (
-                <tr>
-                  <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
-                    No imports yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <RecentImportsTable rows={importBatches ?? []} />
         </div>
 
         <OrderPoolOverview totalOrders={overview.totalOrders} zoneDensity={overview.zoneDensity} bands={overview.bands} thresholds={overview.thresholds} />

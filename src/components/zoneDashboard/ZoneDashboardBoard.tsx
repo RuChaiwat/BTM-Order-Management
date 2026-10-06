@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { KpiCard } from '../KpiCard'
+import { RISK_COLOR } from '@/lib/alertColors'
 
 interface ZoneActiveOrderRow {
   orderId: string
@@ -54,7 +55,6 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
-const RISK_COLOR: Record<ZoneDetail['riskLevel'], string> = { red: '#DC2626', yellow: '#F59E0B', green: '#16A34A' }
 const PAGE_SIZE = 15
 
 type OrderSortColumn = 'orderNo' | 'pickerName' | 'status' | 'elapsedMinutes' | 'timeAlert'

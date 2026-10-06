@@ -7,6 +7,7 @@ import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
 import { formatDate, formatDateTime } from '@/lib/formatDate'
 import { Modal, ModalFooter } from '@/components/Modal'
 import { Spinner } from '@/components/Spinner'
+import { PRIORITY_COLOR } from '@/lib/alertColors'
 
 interface Batch {
   consol_batch_id: string
@@ -22,7 +23,6 @@ interface Batch {
   report_generated_at: string | null
 }
 
-const PRIORITY_COLOR: Record<string, string> = { P1: '#16A34A', P2: '#2563EB', P3: '#F59E0B', P4: '#DC2626' }
 const PAGE_SIZE = 15
 
 type SortKey = 'batch_no' | 'order_date' | 'priority' | 'stores_count' | 'orders_count' | 'total_pieces' | 'released_at' | 'status'
@@ -105,7 +105,7 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
       <div className="card">
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Active pick &amp; sort worklist</span>
-        <span className="card-subtitle">click a column to sort</span>
+        <span className="card-subtitle">รายการที่กำลังหยิบ/จัดเรียง · click a column to sort</span>
       </div>
       {error && <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
       <table className="table">

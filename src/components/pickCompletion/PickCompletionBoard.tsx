@@ -290,8 +290,11 @@ export function PickCompletionBoard({
         )}
 
         {/* Card-per-order, not a <table> -- flex rows wrap naturally on a narrow Handheld screen
-            instead of forcing horizontal scroll, so this same page works on PC and Handheld. */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            instead of forcing horizontal scroll, so this same page works on PC and Handheld.
+            flex:1/minHeight:0 so an unbounded-length order list scrolls within the page instead of
+            squeezing/spilling past the other cards above it -- same fix as BacklogBoard/
+            ConsolidationHistoryBoard. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }}>
           {orders.map((o) => (
             <div
               key={o.order_id}

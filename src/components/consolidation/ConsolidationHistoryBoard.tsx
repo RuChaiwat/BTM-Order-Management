@@ -51,7 +51,7 @@ export function ConsolidationHistoryBoard({ rows }: { rows: ConsolidationHistory
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Consolidation History</span>
         <span className="card-subtitle">
-          {rows.length.toLocaleString()} batch(es) · click a column to sort
+          ประวัติการรวมออเดอร์ · {rows.length.toLocaleString()} batch(es) · click a column to sort
         </span>
       </div>
       <table className="table">

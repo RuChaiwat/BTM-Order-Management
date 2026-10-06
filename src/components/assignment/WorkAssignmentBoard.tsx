@@ -496,6 +496,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <span className="card-title">Unassigned Order Pool</span>
             <span className="card-subtitle">
+              ออเดอร์ที่ยังไม่มอบหมาย ·{' '}
               {orderDate && zoneCode ? `${poolTotal.toLocaleString()} orders · ${formatDate(orderDate)} · Zone ${zoneCode}${bandFilter ? ` · ${BAND_META[bandFilter].label}` : ''}` : 'Select a date and zone to see orders'}
             </span>
           </div>

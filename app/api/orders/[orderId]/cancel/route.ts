@@ -25,7 +25,21 @@ export async function POST(request: Request, { params }: { params: { orderId: st
   }
 
   const nowIso = new Date().toISOString()
-  await admin.from('orders').update({ status: 'cancelled', cancelled_by: caller.user_id, cancelled_reason: reason, cancelled_at: nowIso }).eq('order_id', params.orderId)
+  // Guarded on the exact status just read (compare-and-swap) -- the check above only proves the
+  // order was 'new' at read time; without this, a concurrent Work Assignment / Run Matching that
+  // assigns this same order between that read and this write would still let the cancel go through
+  // unconditionally, stamping status='cancelled' onto an order that's now actually live picking
+  // work linked to a real assignment/consolidation batch.
+  const { data: updatedOrder } = await admin
+    .from('orders')
+    .update({ status: 'cancelled', cancelled_by: caller.user_id, cancelled_reason: reason, cancelled_at: nowIso })
+    .eq('order_id', params.orderId)
+    .eq('status', 'new')
+    .select('order_id')
+    .maybeSingle()
+  if (!updatedOrder) {
+    return NextResponse.json({ error: 'This order was just assigned or changed elsewhere — refresh and try again' }, { status: 409 })
+  }
   await writeStatusHistory(admin, { entityType: 'orders', entityId: params.orderId, oldStatus: 'new', newStatus: 'cancelled', changedBy: caller.user_id, reason })
   await writeAudit(admin, { userId: caller.user_id, action: 'order.cancel', entityType: 'orders', entityId: params.orderId, after: { reason } })
 

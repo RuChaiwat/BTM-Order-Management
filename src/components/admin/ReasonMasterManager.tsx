@@ -50,7 +50,7 @@ export function ReasonMasterManager({ reasons }: { reasons: ReasonRow[] }) {
     <div className="card">
       <div className="card-title">Reason Master</div>
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        Short Pick + Cancel reasons — maintainable without a code change (§17.1)
+        สาเหตุการหยิบขาด + ยกเลิกออเดอร์ · Short Pick + Cancel reasons — maintainable without a code change (§17.1)
       </div>
       <table className="table">
         <thead>

@@ -3,6 +3,7 @@ import { KpiCard } from '../KpiCard'
 import { formatDate } from '../../lib/formatDate'
 import { PickerProductivityTable } from './PickerProductivityTable'
 import { ActivePickerRosterTable } from './ActivePickerRosterTable'
+import { RISK_COLOR } from '../../lib/alertColors'
 
 interface BacklogRow {
   orderDate: string
@@ -187,7 +188,7 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {data.zoneStatus.map((z) => {
-            const riskColor = { red: '#DC2626', yellow: '#F59E0B', green: '#16A34A' }[z.riskLevel]
+            const riskColor = RISK_COLOR[z.riskLevel]
             const riskLabel =
               z.riskLevel === 'red' ? `${z.criticalCount} critical` : z.riskLevel === 'yellow' ? `${z.overdueCount} overdue` : 'On track'
             return (

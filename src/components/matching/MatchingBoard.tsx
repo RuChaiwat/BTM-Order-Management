@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/formatDate'
 import { DateInput } from '@/components/DateInput'
 import { Modal, ModalFooter } from '@/components/Modal'
 import type { PickerRow } from '@/lib/queries/pickers'
+import { PRIORITY_COLOR } from '@/lib/alertColors'
 
 interface Batch {
   consol_batch_id: string
@@ -22,7 +23,6 @@ interface Batch {
   status: string
 }
 
-const PRIORITY_COLOR: Record<string, string> = { P1: '#16A34A', P2: '#2563EB', P3: '#F59E0B', P4: '#DC2626' }
 const PAGE_SIZE = 10
 
 type SortKey = 'batch_no' | 'priority' | 'match_pct' | 'stores_count' | 'orders_count' | 'total_pieces' | 'status'

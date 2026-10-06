@@ -6,6 +6,7 @@ import { BacklogBoard } from '@/components/backlog/BacklogBoard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBacklogData } from '@/lib/queries/backlog'
+import { ALERT_LABEL_COLOR } from '@/lib/alertColors'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -49,7 +50,7 @@ export default async function BacklogPage() {
             labelTh="เกินกำหนด (ชิ้น)"
             value={data.summary.overduePieces.toLocaleString()}
             sub={`${data.summary.overdueOrders.toLocaleString()} orders`}
-            valueColor="#EA580C"
+            valueColor={ALERT_LABEL_COLOR.overdue}
             compact
             style={{ padding: 14 }}
           />

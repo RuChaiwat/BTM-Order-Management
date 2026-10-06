@@ -204,7 +204,7 @@ export function AdminVerificationBoard({
   return (
     <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div className="page-body" style={{ display: 'grid', gridTemplateColumns: '280px 1fr 340px', gap: 16, alignItems: 'start' }}>
-        <div className="card">
+        <div className="card" style={{ minHeight: 0 }}>
           <div className="card-title">Verification queue</div>
           <div className="card-subtitle" style={{ marginBottom: 10 }}>
             คิวรอตรวจสอบ · เรียงตามเวลาที่ picker ปิดงาน
@@ -243,7 +243,7 @@ export function AdminVerificationBoard({
           </div>
         </div>
 
-        <div className="card">
+        <div className="card" style={{ minHeight: 0 }}>
           {selected ? (
             <>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
@@ -342,7 +342,7 @@ export function AdminVerificationBoard({
           )}
         </div>
 
-        <div className="card">
+        <div className="card" style={{ minHeight: 0 }}>
           <div className="card-title">Verification Summary</div>
           <div className="card-subtitle" style={{ marginBottom: 14 }}>
             สรุปผลตรวจสอบ

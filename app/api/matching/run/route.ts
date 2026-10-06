@@ -133,15 +133,38 @@ export async function POST(request: Request) {
       continue
     }
 
-    const { error: updateError } = await admin.from('orders').update({ consolidation_batch_id: batch.consol_batch_id }).in('order_id', group.orderIds)
-    if (updateError) {
+    // Guarded (status='new' AND consolidation_batch_id IS NULL, re-checked here, not just at the
+    // initial read above) and re-selected to see exactly which orders this update actually claimed
+    // -- two supervisors running Matching for the same warehouse/date within moments of each other
+    // would otherwise both read the same eligible orders, both create their own candidate batch
+    // and both link the same orders into consolidation_orders, then this plain update would let
+    // whichever request runs last silently win every order regardless of which batch "should" have
+    // them -- leaving the other batch a phantom that claims (via consolidation_orders) orders it
+    // was never actually granted (via orders.consolidation_batch_id).
+    const { data: linkedOrders, error: updateError } = await admin
+      .from('orders')
+      .update({ consolidation_batch_id: batch.consol_batch_id })
+      .in('order_id', group.orderIds)
+      .eq('status', 'new')
+      .is('consolidation_batch_id', null)
+      .select('order_id')
+    const linkedOrderIds = new Set((linkedOrders ?? []).map((o) => o.order_id))
+    const lostToConcurrentRun = group.orderIds.filter((id) => !linkedOrderIds.has(id))
+
+    if (updateError || lostToConcurrentRun.length > 0) {
+      // Same cleanup as the consolidation_orders linkError branch above -- don't leave a batch
+      // behind whose stored orders_count/total_pieces no longer match what it actually claimed.
+      await admin.from('consolidation_orders').delete().eq('consol_batch_id', batch.consol_batch_id)
+      await admin.from('orders').update({ consolidation_batch_id: null }).eq('consolidation_batch_id', batch.consol_batch_id)
+      await admin.from('consolidation_batches').delete().eq('consol_batch_id', batch.consol_batch_id)
       await writeAudit(admin, {
         userId: caller.user_id,
         action: 'matching.order_link_failed',
         entityType: 'consolidation_batches',
         entityId: batch.consol_batch_id,
-        after: { error: updateError.message, order_ids: group.orderIds },
+        after: { error: updateError?.message, lost_to_concurrent_run: lostToConcurrentRun, order_ids: group.orderIds },
       })
+      continue
     }
     createdBatches.push(batch)
   }

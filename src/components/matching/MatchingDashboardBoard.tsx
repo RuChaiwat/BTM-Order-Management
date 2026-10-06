@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { KpiCard } from '../KpiCard'
 import { batchStatusLabel } from '@/lib/matching/batchStatus'
 import { formatDate } from '@/lib/formatDate'
+import { PRIORITY_COLOR } from '@/lib/alertColors'
 
 interface OverviewData {
   orderDate: string
@@ -29,8 +30,6 @@ interface OverviewData {
   actionRequired: { lowMatchRateBatches: number; oversizedSingleOrders: number; awaitingApproval: number }
   topBatches: { consol_batch_id: string; batch_no: string; priority: string; match_pct: number | null; stores_count: number; orders_count: number; total_pieces: number; status: string }[]
 }
-
-const PRIORITY_COLOR: Record<string, string> = { P1: '#16A34A', P2: '#2563EB', P3: '#F59E0B', P4: '#DC2626' }
 
 export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
   const maxZonePieces = Math.max(1, ...data.zoneDistribution.map((z) => z.pieces))
@@ -194,7 +193,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
         <div className="card">
           <div className="card-header" style={{ marginBottom: 10 }}>
             <span className="card-title">Top Batches</span>
-            <span className="card-subtitle">ranked by pieces</span>
+            <span className="card-subtitle">Batch ที่มีจำนวนชิ้นมากที่สุด · ranked by pieces</span>
             <Link href="/matching-analysis" className="link" style={{ marginLeft: 'auto', fontSize: 12.5 }}>
               View all →
             </Link>

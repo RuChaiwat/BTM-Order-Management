@@ -77,21 +77,33 @@ export async function submitPickerCompletion(
     if ((stillActive ?? 0) === 0) {
       const { data: consolBatch } = await admin.from('consolidation_batches').select('status').eq('consol_batch_id', order.consolidation_batch_id).maybeSingle()
       if (consolBatch && !['completed', 'cancelled'].includes(consolBatch.status)) {
-        await admin.from('consolidation_batches').update({ status: 'completed' }).eq('consol_batch_id', order.consolidation_batch_id)
-        await writeStatusHistory(admin, {
-          entityType: 'consolidation_batches',
-          entityId: order.consolidation_batch_id,
-          oldStatus: consolBatch.status,
-          newStatus: 'completed',
-          changedBy,
-        })
-        await writeAudit(admin, {
-          userId: changedBy,
-          action: 'consolidation_batch.auto_complete',
-          entityType: 'consolidation_batches',
-          entityId: order.consolidation_batch_id,
-          after: { triggered_by_order_id: orderId },
-        })
+        // CAS-guarded: a concurrent manual "Mark Completed" (Consolidation Pick Report) or Cancel
+        // on this same batch from another terminal can't race with this auto-complete tail --
+        // whichever gets there first wins, the other sees zero rows matched and simply does nothing
+        // instead of overwriting it a second time.
+        const { data: updatedBatch } = await admin
+          .from('consolidation_batches')
+          .update({ status: 'completed' })
+          .eq('consol_batch_id', order.consolidation_batch_id)
+          .eq('status', consolBatch.status)
+          .select('status')
+          .maybeSingle()
+        if (updatedBatch) {
+          await writeStatusHistory(admin, {
+            entityType: 'consolidation_batches',
+            entityId: order.consolidation_batch_id,
+            oldStatus: consolBatch.status,
+            newStatus: 'completed',
+            changedBy,
+          })
+          await writeAudit(admin, {
+            userId: changedBy,
+            action: 'consolidation_batch.auto_complete',
+            entityType: 'consolidation_batches',
+            entityId: order.consolidation_batch_id,
+            after: { triggered_by_order_id: orderId },
+          })
+        }
       }
     }
   }

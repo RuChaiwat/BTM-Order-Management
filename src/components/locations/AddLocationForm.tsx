@@ -85,7 +85,7 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
         <span className="card-title">Add Location</span>
         <span className="card-subtitle" style={{ marginLeft: 8 }}>
-          Pick Sequence is computed automatically — not entered by hand
+          เพิ่มตำแหน่งจัดเก็บใหม่ · Pick Sequence is computed automatically — not entered by hand
         </span>
         <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setOpen(false)}>
           Cancel

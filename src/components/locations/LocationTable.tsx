@@ -44,7 +44,7 @@ export function LocationTable({ locations }: { locations: Location[] }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 320px' : '1fr', gap: 14, minHeight: 0 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 320px' : '1fr', gap: 14 }}>
       <table className="table">
         <thead>
           <tr>

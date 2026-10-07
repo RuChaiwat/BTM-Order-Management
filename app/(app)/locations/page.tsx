@@ -81,7 +81,16 @@ export default async function LocationMasterPage({ searchParams }: { searchParam
             <span className="card-subtitle">
               รายการตำแหน่งจัดเก็บ · {total.toLocaleString()} bin code{total === 1 ? '' : 's'} match{isFiltered ? 'ing search' : ''} · sorted by Pick Sequence
             </span>
-            <a className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} href={exportHref} download>
+            <a
+              className="btn btn-success btn-sm"
+              style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              href={exportHref}
+              download
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
               Export to Excel
             </a>
           </div>

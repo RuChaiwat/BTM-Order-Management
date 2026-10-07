@@ -74,7 +74,7 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
 
   if (!open) {
     return (
-      <button className="btn btn-primary btn-sm" onClick={() => setOpen(true)}>
+      <button className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setOpen(true)}>
         + Add Location
       </button>
     )

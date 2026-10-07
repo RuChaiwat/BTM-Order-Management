@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { TopBar } from '@/components/TopBar'
 import { UploadForm } from '@/components/UploadForm'
 import { AddLocationForm } from '@/components/locations/AddLocationForm'
@@ -13,19 +14,27 @@ import { getSessionUser } from '@/lib/auth'
 // this route (and its data) to always be fresh.
 export const dynamic = 'force-dynamic'
 
-const RESULT_LIMIT = 100
+const PAGE_SIZE = 30
 
-export default async function LocationMasterPage({ searchParams }: { searchParams: { warehouse?: string; bin?: string; zone?: string } }) {
+export default async function LocationMasterPage({ searchParams }: { searchParams: { warehouse?: string; bin?: string; zone?: string; page?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
 
+  // Server-side pagination, not a one-shot `.limit()` with no way to see anything past it --
+  // Location Master easily runs into the thousands of bins for a real warehouse, so (unlike
+  // Backlog/Consolidation History's "fetch a bounded set, paginate client-side") this fetches only
+  // the current page's own 30 rows from Postgres, keyed off `?page=`.
+  const page = Math.max(1, Number(searchParams.page ?? '1') || 1)
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
   let query = admin
     .from('locations')
     .select('bin_code, warehouse_code, zone_code, zone_name, aisle, side, bay, level, block, pick_sequence, active', { count: 'exact' })
     .order('pick_sequence', { ascending: true })
-    .limit(RESULT_LIMIT)
+    .range(from, to)
   if (searchParams.warehouse) query = query.ilike('warehouse_code', `%${searchParams.warehouse}%`)
   if (searchParams.bin) query = query.ilike('bin_code', `%${searchParams.bin}%`)
   if (searchParams.zone) query = query.ilike('zone_code', `%${searchParams.zone}%`)
@@ -41,6 +50,18 @@ export default async function LocationMasterPage({ searchParams }: { searchParam
   const nextAisleRank = existingAisles.length > 0 ? Math.max(...existingAisles.map((a) => a.aisle_rank)) + 1 : 1
   const isFiltered = Boolean(searchParams.warehouse || searchParams.bin || searchParams.zone)
   const total = count ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  const filterParams = new URLSearchParams()
+  if (searchParams.warehouse) filterParams.set('warehouse', searchParams.warehouse)
+  if (searchParams.bin) filterParams.set('bin', searchParams.bin)
+  if (searchParams.zone) filterParams.set('zone', searchParams.zone)
+  const exportHref = `/api/locations/export${filterParams.toString() ? `?${filterParams.toString()}` : ''}`
+  function pageHref(p: number) {
+    const params = new URLSearchParams(filterParams)
+    params.set('page', String(p))
+    return `/locations?${params.toString()}`
+  }
 
   return (
     <>
@@ -58,13 +79,39 @@ export default async function LocationMasterPage({ searchParams }: { searchParam
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
             <span className="card-title">Locations</span>
             <span className="card-subtitle">
-              รายการตำแหน่งจัดเก็บ · {total} bin code{total === 1 ? '' : 's'} match{isFiltered ? 'ing search' : ''} · showing first {Math.min(total, RESULT_LIMIT)} by
-              Pick Sequence
-              {total > RESULT_LIMIT ? ' — refine your search to see more' : ''}
+              รายการตำแหน่งจัดเก็บ · {total.toLocaleString()} bin code{total === 1 ? '' : 's'} match{isFiltered ? 'ing search' : ''} · sorted by Pick Sequence
             </span>
+            <a className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} href={exportHref} download>
+              Export to Excel
+            </a>
           </div>
           <LocationSearchBar />
           <LocationTable locations={locations ?? []} />
+          {total > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 12.5 }}>
+              <span style={{ color: 'var(--color-text-secondary)' }}>
+                Page {page} of {totalPages}
+              </span>
+              {page <= 1 ? (
+                <span className="btn btn-secondary btn-sm" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+                  Prev
+                </span>
+              ) : (
+                <Link href={pageHref(page - 1)} className="btn btn-secondary btn-sm">
+                  Prev
+                </Link>
+              )}
+              {page >= totalPages ? (
+                <span className="btn btn-secondary btn-sm" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+                  Next
+                </span>
+              ) : (
+                <Link href={pageHref(page + 1)} className="btn btn-secondary btn-sm">
+                  Next
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>

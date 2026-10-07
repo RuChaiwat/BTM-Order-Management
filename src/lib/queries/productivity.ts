@@ -42,7 +42,7 @@ export const MIN_CYCLE_MINUTES_FOR_RATE = 5
  * reason breakdown. */
 export async function getProductivityData(db: SupabaseClient, warehouseCode: string, date: string) {
   const [orders, pickers, cfg] = await Promise.all([
-    fetchAllRows((from, to) => db.from('orders').select('order_id, assigned_time, assignment_batch_id, consolidation_batch_id').eq('warehouse_code', warehouseCode).range(from, to)),
+    fetchAllRows((from, to) => db.from('orders').select('order_id, assigned_time, assignment_batch_id, consolidation_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).range(from, to)),
     db.from('pickers').select('picker_id, name_en').eq('warehouse_code', warehouseCode).eq('active', true).then(unwrap),
     // Same target used by the weekly Picker Productivity rating (migration 0020) -- configurable
     // rather than a second hardcoded number baked into this page.
@@ -74,7 +74,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     : { data: [] as { assignment_batch_id: string; picker_id: string | null }[] }
   const pickerIdByBatch = new Map(unwrap(batchesRes).map((b) => [b.assignment_batch_id, b.picker_id]))
 
-  const productivityByPicker = new Map<string, { pieces: number; minutes: number; completed: number; short: number; onTime: number }>()
+  const productivityByPicker = new Map<string, { pieces: number; minutes: number; completed: number; short: number; onTime: number; piecesCompleted: number; piecesShort: number }>()
   let totalPieces = 0
   let totalMinutes = 0
   let onTimeCount = 0
@@ -87,10 +87,12 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     totalPieces += completion.actual_pieces ?? 0
     if (isShort) shortCount += 1
 
-    const entry = pickerId ? productivityByPicker.get(pickerId) ?? { pieces: 0, minutes: 0, completed: 0, short: 0, onTime: 0 } : null
+    const entry = pickerId ? productivityByPicker.get(pickerId) ?? { pieces: 0, minutes: 0, completed: 0, short: 0, onTime: 0, piecesCompleted: 0, piecesShort: 0 } : null
     if (entry) {
       entry.completed += 1
       if (isShort) entry.short += 1
+      entry.piecesCompleted += completion.actual_pieces ?? 0
+      entry.piecesShort += Math.max(0, (order.planned_pieces ?? 0) - (completion.actual_pieces ?? 0))
     }
 
     // Rate/SLA math only counts an order assigned on this SAME (Bangkok) day -- one assigned
@@ -123,6 +125,8 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
       name: p.name_en,
       pcsPerHour: e && e.minutes > 0 ? Math.round((e.pieces / e.minutes) * 60) : null,
       completed: e?.completed ?? 0,
+      piecesCompleted: e?.piecesCompleted ?? 0,
+      piecesShort: e?.piecesShort ?? 0,
       shortRate: e && e.completed > 0 ? Math.round((e.short / e.completed) * 1000) / 10 : null,
       slaPct: e && e.completed > 0 ? Math.round((e.onTime / e.completed) * 1000) / 10 : null,
     }

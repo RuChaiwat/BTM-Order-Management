@@ -32,6 +32,13 @@ Every "export to Excel" action uses `<ExportExcelButton href={exportHref} />` fr
 
 - Thai subtitle under every page/card title (see `TopBar` usage and `card-subtitle` across
   existing pages) — every screen is bilingual, Thai first.
+- `.btn` (`app/globals.css`) is defined with `display: inline-flex` + centering +
+  `text-decoration: none` specifically so the class renders identically on `<button>`, `<a>`, and
+  `<span>`. Don't remove that — before it was added, `.btn` relied on `<button>`'s own default box
+  behavior, so any `<a>`/`<span>` styled with `.btn` (e.g. a Link-based Prev/Next, or a disabled
+  state rendered as a `<span>`) lost vertical centering and anchors kept their underline. If you
+  ever need one-off centering for a `.btn` element again, that's a sign `.btn` itself regressed —
+  fix it there, not with a per-usage inline style.
 - A `.card` that holds a table and is meant to grow/shrink with its flex parent should use
   `style={{ flex: 1 }}` only — never add `minHeight: 0` to a card or to a wrapper around a table
   unless you are certain the table's own content should be clipped and independently scrollable.

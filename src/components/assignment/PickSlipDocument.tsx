@@ -66,8 +66,8 @@ export function PickSlipDocument({ slips }: { slips: PickSlipRow[] }) {
             <span className="pick-slip-value">{s.pickerName}</span>
           </div>
 
-          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
-            <Barcode value={s.orderNo} height={40} width={1.6} fontSize={12} />
+          <div style={{ marginTop: 10, marginBottom: 20, display: 'flex', justifyContent: 'center' }}>
+            <Barcode value={s.orderNo} height={40} width={1.6} fontSize={14} />
           </div>
         </div>
       ))}

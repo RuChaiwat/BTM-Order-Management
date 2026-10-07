@@ -23,6 +23,7 @@ interface LeaderboardRow {
   name: string
   pcsPerHour: number
   completed: number
+  piecesCompleted: number
 }
 
 interface ReasonRow {
@@ -66,29 +67,38 @@ function Leaderboard({ title, subtitle, rows, valueColor, emptyText }: { title: 
         <span className="card-title">{title}</span>
         <span className="card-subtitle">{subtitle}</span>
       </div>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '45%' }} />
+          <col style={{ width: '16%' }} />
+          <col style={{ width: '16%' }} />
+          <col style={{ width: '16%' }} />
+        </colgroup>
         <thead>
           <tr>
             <th>#</th>
             <th>PICKER</th>
             <th>PCS / HR</th>
             <th>ORDERS</th>
+            <th>PIECES</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((p, i) => (
             <tr key={p.user_id}>
               <td>{i + 1}</td>
-              <td style={{ fontWeight: 700 }}>
+              <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
                 {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.user_id})</span>
               </td>
               <td style={{ fontWeight: 700, color: valueColor }}>{p.pcsPerHour.toLocaleString()}</td>
               <td>{p.completed}</td>
+              <td>{p.piecesCompleted.toLocaleString()}</td>
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
+              <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
                 {emptyText}
               </td>
             </tr>
@@ -119,6 +129,7 @@ export function ProductivityBoard({
   const [pickerSort, setPickerSort] = useState<{ key: PickerSortKey; dir: 'asc' | 'desc' }>({ key: 'pcsPerHour', dir: 'desc' })
   const [reasonSort, setReasonSort] = useState<{ key: ReasonSortKey; dir: 'asc' | 'desc' }>({ key: 'shortPieces', dir: 'desc' })
   const [pickerPage, setPickerPage] = useState(1)
+  const [reasonPage, setReasonPage] = useState(1)
 
   function togglePickerSort(key: PickerSortKey) {
     setPickerSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' ? 'asc' : 'desc' }))
@@ -126,6 +137,7 @@ export function ProductivityBoard({
   }
   function toggleReasonSort(key: ReasonSortKey) {
     setReasonSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'label' || key === 'zone' ? 'asc' : 'desc' }))
+    setReasonPage(1)
   }
 
   const sortedPickers = useMemo(
@@ -148,6 +160,8 @@ export function ProductivityBoard({
       }),
     [reasonBreakdown, reasonSort],
   )
+  const reasonTotalPages = Math.max(1, Math.ceil(sortedReasons.length / PAGE_SIZE))
+  const reasonPageRows = sortedReasons.slice((reasonPage - 1) * PAGE_SIZE, reasonPage * PAGE_SIZE)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
@@ -175,7 +189,16 @@ export function ProductivityBoard({
             <span className="card-subtitle">ผลิตภาพผู้หยิบสินค้า · {formatDate(date)} · click a column to sort</span>
             <ExportExcelButton href={productivityExportHref} style={{ marginLeft: 'auto' }} />
           </div>
-          <table className="table">
+          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '32%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '14%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>#</th>
@@ -206,14 +229,25 @@ export function ProductivityBoard({
                   onSort={togglePickerSort}
                 />
                 <SortHeader label="SLA %" sortKey="slaPct" sort={pickerSort} onSort={togglePickerSort} />
-                <SortHeader label="SHORT PICK %" sortKey="shortRate" sort={pickerSort} onSort={togglePickerSort} />
+                <SortHeader
+                  label={
+                    <>
+                      SHORT
+                      <br />
+                      PICK %
+                    </>
+                  }
+                  sortKey="shortRate"
+                  sort={pickerSort}
+                  onSort={togglePickerSort}
+                />
               </tr>
             </thead>
             <tbody>
               {pickerPageRows.map((p, i) => (
                 <tr key={p.user_id}>
                   <td>{(pickerPage - 1) * PAGE_SIZE + i + 1}</td>
-                  <td style={{ fontWeight: 700 }}>
+                  <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
                     {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.user_id})</span>
                   </td>
                   <td style={{ fontWeight: p.pcsPerHour ? 700 : 400, color: p.pcsPerHour ? undefined : '#6B7280' }}>{p.pcsPerHour ?? '—'}</td>
@@ -240,25 +274,42 @@ export function ProductivityBoard({
             <span className="card-title">Short Pick Reasons</span>
             <span className="card-subtitle">สาเหตุการหยิบขาด · click a column to sort</span>
           </div>
-          <table className="table">
+          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              <col style={{ width: '44%' }} />
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '20%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <SortHeader label="REASON" sortKey="label" sort={reasonSort} onSort={toggleReasonSort} />
                 <SortHeader label="ZONE" sortKey="zone" sort={reasonSort} onSort={toggleReasonSort} />
                 <SortHeader label="OCCURRENCES" sortKey="count" sort={reasonSort} onSort={toggleReasonSort} />
-                <SortHeader label="PIECES SHORT" sortKey="shortPieces" sort={reasonSort} onSort={toggleReasonSort} />
+                <SortHeader
+                  label={
+                    <>
+                      PIECES
+                      <br />
+                      SHORT
+                    </>
+                  }
+                  sortKey="shortPieces"
+                  sort={reasonSort}
+                  onSort={toggleReasonSort}
+                />
               </tr>
             </thead>
             <tbody>
-              {sortedReasons.map((r) => (
+              {reasonPageRows.map((r) => (
                 <tr key={`${r.code}__${r.zone}`}>
-                  <td>{r.label}</td>
+                  <td style={{ overflowWrap: 'break-word' }}>{r.label}</td>
                   <td>{r.zone}</td>
                   <td>{r.count}</td>
                   <td style={{ fontWeight: 700, color: '#F59E0B' }}>{r.shortPieces}</td>
                 </tr>
               ))}
-              {sortedReasons.length === 0 && (
+              {reasonPageRows.length === 0 && (
                 <tr>
                   <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
                     No short picks on this date.
@@ -267,6 +318,7 @@ export function ProductivityBoard({
               )}
             </tbody>
           </table>
+          {sortedReasons.length > 0 && <Pagination page={reasonPage} totalPages={reasonTotalPages} onChange={setReasonPage} />}
         </div>
       </div>
     </div>

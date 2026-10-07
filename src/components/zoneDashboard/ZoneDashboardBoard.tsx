@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { KpiCard } from '../KpiCard'
+import { Pagination } from '@/components/Pagination'
 import { RISK_COLOR } from '@/lib/alertColors'
 
 interface ZoneActiveOrderRow {
@@ -100,24 +101,6 @@ function SortHeader<K extends string>({ label, column, active, dir, onSort }: { 
     <th onClick={() => onSort(column)} style={{ cursor: 'pointer', userSelect: 'none' }}>
       {label} {active === column ? (dir === 'asc' ? '▲' : '▼') : ''}
     </th>
-  )
-}
-
-function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
-  // Always rendered (even for a single page) so the table's bottom edge is always visually
-  // anchored by a "Page X of Y" footer instead of ending abruptly right where the next card begins.
-  return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--color-border-light)', fontSize: 12 }}>
-      <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-        Prev
-      </button>
-      <span style={{ color: '#6B7280' }}>
-        Page {page} of {totalPages}
-      </span>
-      <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
-        Next
-      </button>
-    </div>
   )
 }
 

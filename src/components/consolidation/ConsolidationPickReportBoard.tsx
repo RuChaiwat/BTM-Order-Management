@@ -7,6 +7,7 @@ import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
 import { formatDate, formatDateTime } from '@/lib/formatDate'
 import { Modal, ModalFooter } from '@/components/Modal'
 import { Spinner } from '@/components/Spinner'
+import { Pagination } from '@/components/Pagination'
 import { PRIORITY_COLOR } from '@/lib/alertColors'
 
 interface Batch {
@@ -173,19 +174,7 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
           )}
         </tbody>
       </table>
-      {sorted.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 12.5 }}>
-          <span style={{ color: 'var(--color-text-secondary)' }}>
-            Page {page} of {totalPages} · {sorted.length} batch(es)
-          </span>
-          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            Prev
-          </button>
-          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-            Next
-          </button>
-        </div>
-      )}
+      {sorted.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} suffix={<> · {sorted.length} batch(es)</>} />}
       </div>
 
       {completeBatch && (

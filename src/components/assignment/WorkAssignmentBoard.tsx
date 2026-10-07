@@ -5,6 +5,7 @@ import { Modal, ModalFooter } from '../Modal'
 import { formatDate } from '../../lib/formatDate'
 import { productivityMeta } from '../../lib/pickerProductivity'
 import { Spinner } from '../Spinner'
+import { Pagination } from '../Pagination'
 import { apiFetch } from '../../lib/apiFetch'
 
 const TARGET = 300
@@ -550,19 +551,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
               )}
             </tbody>
           </table>
-          {orderDate && zoneCode && totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10, fontSize: 12 }}>
-              <button className="btn btn-secondary btn-sm" disabled={poolPage <= 1} onClick={() => changePage(poolPage - 1)}>
-                Prev
-              </button>
-              <span style={{ color: '#6B7280', alignSelf: 'center' }}>
-                Page {poolPage} of {totalPages}
-              </span>
-              <button className="btn btn-secondary btn-sm" disabled={poolPage >= totalPages} onClick={() => changePage(poolPage + 1)}>
-                Next
-              </button>
-            </div>
-          )}
+          {orderDate && zoneCode && totalPages > 1 && <Pagination page={poolPage} totalPages={totalPages} onChange={changePage} />}
         </div>
 
         {/* Section 3: Assignment Summary */}

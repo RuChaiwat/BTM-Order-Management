@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDate, formatDateTime } from '@/lib/formatDate'
+import { Pagination } from '@/components/Pagination'
 
 interface ExportJob {
   id: string
@@ -49,22 +50,6 @@ function SortHeader<K extends string>({ label, sortKey, sort, onSort }: { label:
     <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(sortKey)}>
       {label} <span style={{ opacity: active ? 1 : 0.3 }}>{active ? (sort.dir === 'asc' ? '▲' : '▼') : '▲'}</span>
     </th>
-  )
-}
-
-function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 16, fontSize: 12 }}>
-      <span style={{ color: '#6B7280' }}>
-        Page {page} of {totalPages}
-      </span>
-      <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-        Prev
-      </button>
-      <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
-        Next
-      </button>
-    </div>
   )
 }
 

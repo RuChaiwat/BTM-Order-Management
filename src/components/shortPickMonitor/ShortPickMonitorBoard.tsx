@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react'
 import { formatDateTime } from '@/lib/formatDate'
 import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
+import { Pagination } from '@/components/Pagination'
+import { ExportExcelButton } from '@/components/ExportExcelButton'
 
 interface DetailRow {
   lineId: string
@@ -88,9 +90,7 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
             {sorted.length.toLocaleString()} of {rows.length.toLocaleString()} item(s)
           </span>
         </div>
-        <a className="btn btn-secondary btn-sm" href={exportHref} download>
-          Export to Excel
-        </a>
+        <ExportExcelButton href={exportHref} />
       </div>
       <table className="table">
         <thead>
@@ -135,19 +135,7 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
           )}
         </tbody>
       </table>
-      {sorted.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 12.5 }}>
-          <span style={{ color: 'var(--color-text-secondary)' }}>
-            Page {page} of {totalPages}
-          </span>
-          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            Prev
-          </button>
-          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-            Next
-          </button>
-        </div>
-      )}
+      {sorted.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
     </div>
   )
 }

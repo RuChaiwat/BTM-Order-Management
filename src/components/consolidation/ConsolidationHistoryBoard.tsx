@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
 import { formatDate, formatDateTime } from '@/lib/formatDate'
+import { Pagination } from '@/components/Pagination'
 import type { ConsolidationHistoryRow } from '@/lib/queries/consolidationHistory'
 
 const PAGE_SIZE = 30
@@ -93,19 +94,7 @@ export function ConsolidationHistoryBoard({ rows }: { rows: ConsolidationHistory
           )}
         </tbody>
       </table>
-      {sorted.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 12.5 }}>
-          <span style={{ color: 'var(--color-text-secondary)' }}>
-            Page {page} of {totalPages}
-          </span>
-          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            Prev
-          </button>
-          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-            Next
-          </button>
-        </div>
-      )}
+      {sorted.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { formatDateTime } from '@/lib/formatDate'
+import { Pagination } from '@/components/Pagination'
 
 interface AuditTrailRow {
   id: string
@@ -78,19 +79,7 @@ export function AuditTrailBoard({ rows }: { rows: AuditTrailRow[] }) {
           )}
         </tbody>
       </table>
-      {filtered.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 12.5 }}>
-          <span style={{ color: 'var(--color-text-secondary)' }}>
-            Page {page} of {totalPages}
-          </span>
-          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            Prev
-          </button>
-          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-            Next
-          </button>
-        </div>
-      )}
+      {filtered.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
     </>
   )
 }

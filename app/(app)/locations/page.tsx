@@ -75,7 +75,7 @@ export default async function LocationMasterPage({ searchParams }: { searchParam
 
         <AddLocationForm warehouseCode={warehouseCode} existingAisles={existingAisles} nextAisleRank={nextAisleRank} />
 
-        <div className="card" style={{ flex: 1, minHeight: 0 }}>
+        <div className="card" style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
             <span className="card-title">Locations</span>
             <span className="card-subtitle">

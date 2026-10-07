@@ -502,11 +502,16 @@ table { border-collapse: collapse; width: 100%; }
 /* ---------- buttons ---------- */
 .btn {
   height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 0;
   border-radius: var(--radius-md);
   font-family: inherit;
   font-size: 14px;
   font-weight: 700;
+  text-decoration: none;
   cursor: pointer;
 }
 

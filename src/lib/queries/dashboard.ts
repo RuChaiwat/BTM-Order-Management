@@ -7,6 +7,7 @@ import { getActiveConfig } from './config'
 import { bangkokDateKey } from '../formatDate'
 import { bandForPct } from '../pickerProductivity'
 import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
+import { MIN_CYCLE_MINUTES_FOR_RATE } from './productivity'
 
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
 // assignment_batches.status is not a reliable "is this picker still working" signal: nothing in
@@ -39,7 +40,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     fetchAllRows((from, to) =>
       db
         .from('orders')
-        .select('order_id, status, planned_pieces, original_order_date, assigned_time, picker_completed_time, assignment_batch_id')
+        .select('order_id, status, planned_pieces, original_order_date, assigned_time, picker_completed_time, assignment_batch_id, consolidation_batch_id')
         .eq('warehouse_code', warehouseCode)
         .range(from, to),
     ),
@@ -191,17 +192,28 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   // (that's only written on submit), so it can never distort this regardless of how long it's been
   // open or whether it crosses midnight into tomorrow; the date filter here is what stops a
   // completion from a PRIOR day still showing up under "today" indefinitely.
+  //
+  // Same three rules as Picker Productivity's own PCS/HR (queries/productivity.ts) -- this widget
+  // and that page used to disagree because this loop was never updated when those rules were
+  // added there: (1) skip orders linked to a Consolidation Batch, whose cycle time is dominated by
+  // however long Sort took, not the picker's own speed; (2) only count an order's cycle time
+  // toward the rate if it was also ASSIGNED today, so a multi-day-old order finished today doesn't
+  // drag the rate down with a cycle time that has nothing to do with today's work; (3) floor each
+  // order's minutes at MIN_CYCLE_MINUTES_FOR_RATE, not 1, so a near-instant confirm (rush or test
+  // data) doesn't produce an inflated thousands/hour rate.
   const todayBangkok = bangkokDateKey(new Date())
   const pickerTotals = new Map<string, { pieces: number; minutes: number }>()
   for (const c of completions) {
     if (bangkokDateKey(c.picker_completed_time) !== todayBangkok) continue
     const order = orderById.get(c.order_id)
+    if (order?.consolidation_batch_id) continue
     const pickerId = order?.assignment_batch_id ? batchByAssignmentId.get(order.assignment_batch_id)?.picker_id : null
     if (!pickerId || !order?.assigned_time) continue
-    const minutes = (new Date(c.picker_completed_time).getTime() - new Date(order.assigned_time).getTime()) / 60000
+    if (bangkokDateKey(order.assigned_time) !== todayBangkok) continue
+    const rawMinutes = (new Date(c.picker_completed_time).getTime() - new Date(order.assigned_time).getTime()) / 60000
     const entry = pickerTotals.get(pickerId) ?? { pieces: 0, minutes: 0 }
     entry.pieces += c.actual_pieces ?? 0
-    entry.minutes += Math.max(minutes, 1)
+    entry.minutes += Math.max(MIN_CYCLE_MINUTES_FOR_RATE, rawMinutes)
     pickerTotals.set(pickerId, entry)
   }
 

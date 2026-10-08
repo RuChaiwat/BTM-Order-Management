@@ -33,47 +33,68 @@ const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'zone_controll
 // flagged in src/lib/roles.ts's own comments.
 const ROLE_SUMMARY: Record<string, string> = {
   system_admin: 'สิทธิ์เต็มทุกอย่าง — role เดียวที่จัดการ User Management, Location Master, Configuration ได้ และแก้ไข/ปิดใช้งาน System Admin คนอื่นได้',
-  warehouse_manager: 'กำกับดูแลภาพรวม จัดการ Picker Management ได้ แต่ไม่มีสิทธิ์ Run Matching, Approve/Reject Verification, Work Assignment, หรือ Cancel/Unassign Order',
+  warehouse_manager: 'กำกับดูแลภาพรวม จัดการ Picker Management และ User Management ได้ (สร้าง/แก้ไข/Deactivate — ยกเว้นบัญชี System Admin) แต่ไม่มีสิทธิ์ Run Matching, Approve/Reject Verification, Work Assignment, หรือ Cancel/Unassign Order',
   supervisor: 'คุมงานปฏิบัติการเต็มรูปแบบ — Matching, Admin Verification, Work Assignment, Cancel/Unassign Order, Picker Management, Reason Master — ยกเว้น User Management และ Location Master',
   zone_controller: 'จำกัดเฉพาะโซนที่รับผิดชอบ (ดู Scope) ทำ action ได้แค่บันทึก Pick Completion แทนพนักงาน ที่เหลือดูได้อย่างเดียว',
   viewer: 'ดูรายงาน/dashboard ได้เท่านั้น ทำ action ใดๆ ในระบบไม่ได้เลย',
 }
 
-function screensForRole(role: string): string {
-  const names: string[] = []
+function screensForRole(role: string): { accessible: string[]; blocked: string[] } {
+  const accessible: string[] = []
+  const blocked: string[] = []
   for (const group of NAV_GROUPS) {
     for (const item of group.items) {
-      if (canAccessMenuItem(role, item.id)) names.push(item.en)
+      ;(canAccessMenuItem(role, item.id) ? accessible : blocked).push(item.en)
     }
   }
-  return names.join(', ')
+  return { accessible, blocked }
 }
 
 function RoleScopeReference() {
   return (
     <div className="card">
       <div className="card-title">Role &amp; Scope</div>
-      <div className="card-subtitle" style={{ marginBottom: 12 }}>คำอธิบายสิทธิ์การใช้งานของแต่ละ Role และความหมายของ Scope</div>
-      <div style={{ fontSize: 12.5, color: '#374151', background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
-        <b>Scope</b> (ขอบเขตโซน) จำกัดว่าผู้ใช้คนนั้นทำงานกับออเดอร์ในโซนไหนได้บ้าง — เป็นคนละเรื่องกับ Role: Role กำหนดว่าเข้าเมนู/ทำ action อะไรได้ ส่วน Scope กำหนดว่า &ldquo;ในโซนไหน&rdquo;
-        หากไม่ได้ระบุ Scope จะแสดงเป็น &ldquo;All zones&rdquo; คือทำงานได้ทุกโซนในคลังนี้
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {ROLES.map((r, i) => (
-          <div key={r} style={{ paddingBottom: 14, borderBottom: i < ROLES.length - 1 ? '1px solid var(--color-border-light)' : undefined }}>
-            <span className="badge badge-info" style={{ marginBottom: 6 }}>
-              {ROLE_LABELS[r]}
-            </span>
-            <div style={{ fontSize: 12.5, color: '#374151', marginTop: 6, marginBottom: 4 }}>{ROLE_SUMMARY[r]}</div>
-            <div style={{ fontSize: 11.5, color: '#6B7280' }}>เข้าหน้าได้: {screensForRole(r)}</div>
-          </div>
-        ))}
-      </div>
+      <div className="card-subtitle" style={{ marginBottom: 12 }}>คำอธิบายสิทธิ์การใช้งานของแต่ละ Role — Scope คือหน้าจอที่เข้าได้/เข้าไม่ได้ (คนละเรื่องกับ Scope ของโซนในตาราง User List ด้านบน)</div>
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '24%' }} />
+          <col style={{ width: '76%' }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>ROLE</th>
+            <th>SCOPE</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ROLES.map((r) => {
+            const { accessible, blocked } = screensForRole(r)
+            return (
+              <tr key={r}>
+                <td style={{ verticalAlign: 'top' }}>
+                  <span className="badge badge-info" style={{ marginBottom: 6 }}>
+                    {ROLE_LABELS[r]}
+                  </span>
+                  <div style={{ fontSize: 11.5, color: '#374151', marginTop: 6 }}>{ROLE_SUMMARY[r]}</div>
+                </td>
+                <td style={{ verticalAlign: 'top', overflowWrap: 'break-word' }}>
+                  <div style={{ fontSize: 11.5, marginBottom: 6 }}>
+                    <span style={{ color: '#16A34A', fontWeight: 700 }}>เข้าได้:</span> {accessible.join(', ')}
+                  </div>
+                  <div style={{ fontSize: 11.5 }}>
+                    <span style={{ color: '#9CA3AF', fontWeight: 700 }}>เข้าไม่ได้:</span> {blocked.length > 0 ? blocked.join(', ') : '— (เข้าได้ทุกหน้า)'}
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
 
-type SortKey = 'user_id' | 'name_en' | 'role' | 'zone_scope' | 'active'
+type SortKey = 'user_id' | 'name_en' | 'role' | 'active'
 
 function sortRows(rows: WorkerRow[], key: SortKey, dir: 'asc' | 'desc'): WorkerRow[] {
   function value(r: WorkerRow): string | number {
@@ -84,8 +105,6 @@ function sortRows(rows: WorkerRow[], key: SortKey, dir: 'asc' | 'desc'): WorkerR
         return r.name_en
       case 'role':
         return ROLE_LABELS[r.role] ?? r.role
-      case 'zone_scope':
-        return r.zone_scope.length > 0 ? r.zone_scope.join(',') : ''
       case 'active':
         return r.active ? 1 : 0
     }
@@ -177,18 +196,16 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '25%' }} />
-            <col style={{ width: '15%' }} />
-            <col style={{ width: '32%' }} />
-            <col style={{ width: '17%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '38%' }} />
+            <col style={{ width: '22%' }} />
+            <col style={{ width: '24%' }} />
           </colgroup>
           <thead>
             <tr>
               <SortHeader label="USER ID" sortKey="user_id" sort={sort} onSort={toggleSort} />
               <SortHeader label="NAME" sortKey="name_en" sort={sort} onSort={toggleSort} />
               <SortHeader label="ROLE" sortKey="role" sort={sort} onSort={toggleSort} />
-              <SortHeader label="SCOPE" sortKey="zone_scope" sort={sort} onSort={toggleSort} />
               <SortHeader label="STATUS" sortKey="active" sort={sort} onSort={toggleSort} />
             </tr>
           </thead>
@@ -203,13 +220,12 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
                 <td>
                   <span className="badge badge-info">{ROLE_LABELS[u.role] ?? u.role}</span>
                 </td>
-                <td style={{ overflowWrap: 'break-word' }}>{u.zone_scope.length > 0 ? `Zones ${u.zone_scope.join(', ')}` : 'All zones'}</td>
                 <td>{u.active ? <span style={{ color: '#16A34A' }}>● Active</span> : <span style={{ color: '#9CA3AF' }}>● Inactive</span>}</td>
               </tr>
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
+                <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
                   No users yet — add one to get started.
                 </td>
               </tr>
@@ -270,9 +286,9 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
 
       <RoleScopeReference />
 
-      {showAdd && <UserModal warehouseCode={warehouseCode} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); router.refresh() }} />}
+      {showAdd && <UserModal warehouseCode={warehouseCode} currentUserRole={currentUserRole} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); router.refresh() }} />}
       {editing && selected && canManageSelected && (
-        <UserModal warehouseCode={warehouseCode} user={selected} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); router.refresh() }} />
+        <UserModal warehouseCode={warehouseCode} currentUserRole={currentUserRole} user={selected} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); router.refresh() }} />
       )}
     </div>
   )
@@ -280,16 +296,19 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
 
 function UserModal({
   warehouseCode,
+  currentUserRole,
   user,
   onClose,
   onSaved,
 }: {
   warehouseCode: string
+  currentUserRole: string
   user?: WorkerRow
   onClose: () => void
   onSaved: () => void
 }) {
   const isEdit = Boolean(user)
+  const assignableRoles = ROLES.filter((r) => canManageUserRole(currentUserRole, r))
   const [form, setForm] = useState({
     user_id: user?.user_id ?? '',
     email: user?.email ?? '',
@@ -368,7 +387,7 @@ function UserModal({
         <div className="field">
           <label className="field-label">Role</label>
           <select className="field-input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} style={{ border: '1px solid var(--color-border)' }}>
-            {ROLES.map((r) => (
+            {assignableRoles.map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABELS[r]}
               </option>

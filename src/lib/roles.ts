@@ -29,10 +29,14 @@ export const ROLE_LABELS: Record<string, string> = {
 // Audit Trail (split out of Configuration, id 15 -- same roles as 15 kept access to it, since it
 // was simply a card on that same page before); id 19 = Short/Damage/Expired Monitor (same roles as
 // 12, Productivity -- it's the other Analytics menu item); id 20 = Print & Reprint (same roles as
-// 7/8, Work Assignment/Pick Completion -- the two screens whose documents it reprints).
+// 7/8, Work Assignment/Pick Completion -- the two screens whose documents it reprints); id 13 =
+// User Management, given to warehouse_manager (on top of system_admin) by explicit request --
+// warehouse_manager can create/edit/deactivate any user EXCEPT a System Admin account, enforced by
+// canManageUserRole() below both in the UI and in /api/users (the actual authority; the menu entry
+// here only controls whether the link/page is reachable at all).
 export const ROLE_MENU_ACCESS: Record<string, number[]> = {
   system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-  warehouse_manager: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20],
+  warehouse_manager: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
   supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20],
   zone_controller: [1, 3, 8, 9, 10, 11, 12, 19, 20],
   viewer: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 16, 19],

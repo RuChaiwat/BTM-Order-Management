@@ -16,7 +16,7 @@ const VALID_ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'zone_co
 export async function POST(request: Request) {
   let caller
   try {
-    caller = await requireRole(['system_admin'])
+    caller = await requireRole(['system_admin', 'warehouse_manager'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
@@ -32,6 +32,9 @@ export async function POST(request: Request) {
   }
   if (!VALID_ROLES.includes(role)) {
     return NextResponse.json({ error: `role must be one of ${VALID_ROLES.join(', ')}` }, { status: 400 })
+  }
+  if (!canManageUserRole(caller.role, role)) {
+    return NextResponse.json({ error: 'Only a System Admin can create a System Admin account' }, { status: 403 })
   }
 
   const admin = createAdminClient()
@@ -83,7 +86,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   let caller
   try {
-    caller = await requireRole(['system_admin'])
+    caller = await requireRole(['system_admin', 'warehouse_manager'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
@@ -104,6 +107,9 @@ export async function PATCH(request: Request) {
   }
   if (!canManageUserRole(caller.role, before.role)) {
     return NextResponse.json({ error: 'Only a System Admin can edit another System Admin account' }, { status: 403 })
+  }
+  if (typeof patch.role === 'string' && !canManageUserRole(caller.role, patch.role)) {
+    return NextResponse.json({ error: 'Only a System Admin can promote a user to System Admin' }, { status: 403 })
   }
 
   const { data: after, error } = await admin.from('employees_users').update(patch).eq('user_id', user_id).select().single()

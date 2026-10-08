@@ -219,7 +219,7 @@ export function AdminVerificationBoard({
                 onClick={() => selectOrder(o.order_id)}
                 style={{
                   textAlign: 'left',
-                  border: o.order_id === selectedId ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  border: o.order_id === selected?.order_id ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                   borderRadius: 8,
                   padding: '8px 10px',
                   background: 'var(--color-surface)',

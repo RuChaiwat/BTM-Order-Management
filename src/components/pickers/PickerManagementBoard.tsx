@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
+import { Pagination } from '@/components/Pagination'
 import { Avatar } from '@/components/Avatar'
 import { createClient } from '../../lib/supabase/client'
 import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
@@ -22,6 +23,44 @@ interface PickerRow {
   productivity_pcs_per_hour: number | null
   productivity_updated_at: string | null
   created_at: string
+}
+
+const PAGE_SIZE = 20
+
+type SortKey = 'picker_id' | 'name_en' | 'zone_scope' | 'productivity_pcs_per_hour' | 'active'
+
+function sortRows(rows: PickerRow[], key: SortKey, dir: 'asc' | 'desc'): PickerRow[] {
+  function value(r: PickerRow): string | number {
+    switch (key) {
+      case 'picker_id':
+        return r.picker_id
+      case 'name_en':
+        return r.name_en
+      case 'zone_scope':
+        return r.zone_scope.length > 0 ? r.zone_scope.join(',') : ''
+      case 'productivity_pcs_per_hour':
+        return r.productivity_pcs_per_hour ?? -1
+      case 'active':
+        return r.active ? 1 : 0
+    }
+  }
+  const copy = [...rows]
+  copy.sort((a, b) => {
+    const av = value(a)
+    const bv = value(b)
+    const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number)
+    return dir === 'asc' ? cmp : -cmp
+  })
+  return copy
+}
+
+function SortHeader<K extends string>({ label, sortKey, sort, onSort }: { label: React.ReactNode; sortKey: K; sort: { key: K; dir: 'asc' | 'desc' }; onSort: (key: K) => void }) {
+  const active = sort.key === sortKey
+  return (
+    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(sortKey)}>
+      {label} <span style={{ opacity: active ? 1 : 0.3 }}>{active ? (sort.dir === 'asc' ? '▲' : '▼') : '▲'}</span>
+    </th>
+  )
 }
 
 function ProductivityBadge({ picker }: { picker: PickerRow }) {
@@ -45,12 +84,23 @@ function ProductivityBadge({ picker }: { picker: PickerRow }) {
 export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: PickerRow[]; warehouseCode: string }) {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState(pickers[0]?.picker_id ?? '')
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'picker_id', dir: 'asc' })
+  const [page, setPage] = useState(1)
   const [showAdd, setShowAdd] = useState(false)
   const [editing, setEditing] = useState(false)
   const [auditTrail, setAuditTrail] = useState<{ id: string; action: string; created_at: string }[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const selected = pickers.find((p) => p.picker_id === selectedId)
+
+  function toggleSort(key: SortKey) {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'active' ? 'desc' : 'asc' }))
+    setPage(1)
+  }
+
+  const sorted = useMemo(() => sortRows(pickers, sort.key, sort.dir), [pickers, sort])
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const pageRows = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   useEffect(() => {
     setEditing(false)
@@ -111,23 +161,23 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '26%' }} />
-            <col style={{ width: '26%' }} />
-            <col style={{ width: '18%' }} />
-            <col style={{ width: '18%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '25%' }} />
+            <col style={{ width: '32%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '17%' }} />
           </colgroup>
           <thead>
             <tr>
-              <th>PICKER ID</th>
-              <th>NAME</th>
-              <th>SCOPE</th>
-              <th>PRODUCTIVITY</th>
-              <th>STATUS</th>
+              <SortHeader label="PICKER ID" sortKey="picker_id" sort={sort} onSort={toggleSort} />
+              <SortHeader label="NAME" sortKey="name_en" sort={sort} onSort={toggleSort} />
+              <SortHeader label="SCOPE" sortKey="zone_scope" sort={sort} onSort={toggleSort} />
+              <SortHeader label="PRODUCTIVITY" sortKey="productivity_pcs_per_hour" sort={sort} onSort={toggleSort} />
+              <SortHeader label="STATUS" sortKey="active" sort={sort} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody>
-            {pickers.map((p) => (
+            {pageRows.map((p) => (
               <tr key={p.picker_id} className={p.picker_id === selectedId ? 'row-muted' : undefined} onClick={() => setSelectedId(p.picker_id)} style={{ cursor: 'pointer' }}>
                 <td style={{ fontWeight: 700 }}>{p.picker_id}</td>
                 <td style={{ overflowWrap: 'break-word' }}>
@@ -141,7 +191,7 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
                 <td>{p.active ? <span style={{ color: '#16A34A' }}>● Active</span> : <span style={{ color: '#9CA3AF' }}>● Inactive</span>}</td>
               </tr>
             ))}
-            {pickers.length === 0 && (
+            {pageRows.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
                   No pickers yet — add one to get started.
@@ -150,6 +200,7 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
             )}
           </tbody>
         </table>
+        {pickers.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
       </div>
 
       <div className="card" style={{ minHeight: 0 }}>

@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Pagination } from '@/components/Pagination'
 import { Avatar } from '@/components/Avatar'
-import { ROLE_LABELS, canManageUserRole } from '../../lib/roles'
+import { ROLE_LABELS, canManageUserRole, canAccessMenuItem } from '../../lib/roles'
+import { NAV_GROUPS } from '../../data/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
 import { formatDateTime } from '../../lib/formatDate'
@@ -26,11 +27,94 @@ interface WorkerRow {
 // 'planner_admin' retired (migration 0032), merged into 'supervisor'.
 const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'zone_controller', 'viewer']
 
+// One-line summary of each role's actual action-level permissions (requireRole([...]) across the
+// API routes) -- kept here as a human-readable cross-check next to the menu-access list below, so
+// it has to be manually kept in sync if a role's permissions change, same judgment call already
+// flagged in src/lib/roles.ts's own comments.
+const ROLE_SUMMARY: Record<string, string> = {
+  system_admin: 'สิทธิ์เต็มทุกอย่าง — role เดียวที่จัดการ User Management, Location Master, Configuration ได้ และแก้ไข/ปิดใช้งาน System Admin คนอื่นได้',
+  warehouse_manager: 'กำกับดูแลภาพรวม จัดการ Picker Management ได้ แต่ไม่มีสิทธิ์ Run Matching, Approve/Reject Verification, Work Assignment, หรือ Cancel/Unassign Order',
+  supervisor: 'คุมงานปฏิบัติการเต็มรูปแบบ — Matching, Admin Verification, Work Assignment, Cancel/Unassign Order, Picker Management, Reason Master — ยกเว้น User Management และ Location Master',
+  zone_controller: 'จำกัดเฉพาะโซนที่รับผิดชอบ (ดู Scope) ทำ action ได้แค่บันทึก Pick Completion แทนพนักงาน ที่เหลือดูได้อย่างเดียว',
+  viewer: 'ดูรายงาน/dashboard ได้เท่านั้น ทำ action ใดๆ ในระบบไม่ได้เลย',
+}
+
+function screensForRole(role: string): string {
+  const names: string[] = []
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (canAccessMenuItem(role, item.id)) names.push(item.en)
+    }
+  }
+  return names.join(', ')
+}
+
+function RoleScopeReference() {
+  return (
+    <div className="card">
+      <div className="card-title">Role &amp; Scope</div>
+      <div className="card-subtitle" style={{ marginBottom: 12 }}>คำอธิบายสิทธิ์การใช้งานของแต่ละ Role และความหมายของ Scope</div>
+      <div style={{ fontSize: 12.5, color: '#374151', background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
+        <b>Scope</b> (ขอบเขตโซน) จำกัดว่าผู้ใช้คนนั้นทำงานกับออเดอร์ในโซนไหนได้บ้าง — เป็นคนละเรื่องกับ Role: Role กำหนดว่าเข้าเมนู/ทำ action อะไรได้ ส่วน Scope กำหนดว่า &ldquo;ในโซนไหน&rdquo;
+        หากไม่ได้ระบุ Scope จะแสดงเป็น &ldquo;All zones&rdquo; คือทำงานได้ทุกโซนในคลังนี้
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {ROLES.map((r, i) => (
+          <div key={r} style={{ paddingBottom: 14, borderBottom: i < ROLES.length - 1 ? '1px solid var(--color-border-light)' : undefined }}>
+            <span className="badge badge-info" style={{ marginBottom: 6 }}>
+              {ROLE_LABELS[r]}
+            </span>
+            <div style={{ fontSize: 12.5, color: '#374151', marginTop: 6, marginBottom: 4 }}>{ROLE_SUMMARY[r]}</div>
+            <div style={{ fontSize: 11.5, color: '#6B7280' }}>เข้าหน้าได้: {screensForRole(r)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+type SortKey = 'user_id' | 'name_en' | 'role' | 'zone_scope' | 'active'
+
+function sortRows(rows: WorkerRow[], key: SortKey, dir: 'asc' | 'desc'): WorkerRow[] {
+  function value(r: WorkerRow): string | number {
+    switch (key) {
+      case 'user_id':
+        return r.user_id
+      case 'name_en':
+        return r.name_en
+      case 'role':
+        return ROLE_LABELS[r.role] ?? r.role
+      case 'zone_scope':
+        return r.zone_scope.length > 0 ? r.zone_scope.join(',') : ''
+      case 'active':
+        return r.active ? 1 : 0
+    }
+  }
+  const copy = [...rows]
+  copy.sort((a, b) => {
+    const av = value(a)
+    const bv = value(b)
+    const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number)
+    return dir === 'asc' ? cmp : -cmp
+  })
+  return copy
+}
+
+function SortHeader<K extends string>({ label, sortKey, sort, onSort }: { label: React.ReactNode; sortKey: K; sort: { key: K; dir: 'asc' | 'desc' }; onSort: (key: K) => void }) {
+  const active = sort.key === sortKey
+  return (
+    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(sortKey)}>
+      {label} <span style={{ opacity: active ? 1 : 0.3 }}>{active ? (sort.dir === 'asc' ? '▲' : '▼') : '▲'}</span>
+    </th>
+  )
+}
+
 const PAGE_SIZE = 20
 
 export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }: { users: WorkerRow[]; warehouseCode: string; currentUserRole: string }) {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState(users[0]?.user_id ?? '')
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'user_id', dir: 'asc' })
   const [page, setPage] = useState(1)
   const [showAdd, setShowAdd] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -39,8 +123,14 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
   const [error, setError] = useState<string | null>(null)
   const selected = users.find((u) => u.user_id === selectedId)
 
-  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE))
-  const pageRows = users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  function toggleSort(key: SortKey) {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'active' ? 'desc' : 'asc' }))
+    setPage(1)
+  }
+
+  const sorted = useMemo(() => sortRows(users, sort.key, sort.dir), [users, sort])
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const pageRows = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   useEffect(() => {
     setEditing(false)
@@ -75,7 +165,8 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
   }
 
   return (
-    <div className="page-body" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
+    <div className="page-body">
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
       <div className="card" style={{ minHeight: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span className="card-title">User List</span>
@@ -86,19 +177,19 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '26%' }} />
-            <col style={{ width: '16%' }} />
-            <col style={{ width: '28%' }} />
-            <col style={{ width: '18%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '25%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '32%' }} />
+            <col style={{ width: '17%' }} />
           </colgroup>
           <thead>
             <tr>
-              <th>USER ID</th>
-              <th>NAME</th>
-              <th>ROLE</th>
-              <th>SCOPE</th>
-              <th>STATUS</th>
+              <SortHeader label="USER ID" sortKey="user_id" sort={sort} onSort={toggleSort} />
+              <SortHeader label="NAME" sortKey="name_en" sort={sort} onSort={toggleSort} />
+              <SortHeader label="ROLE" sortKey="role" sort={sort} onSort={toggleSort} />
+              <SortHeader label="SCOPE" sortKey="zone_scope" sort={sort} onSort={toggleSort} />
+              <SortHeader label="STATUS" sortKey="active" sort={sort} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody>
@@ -175,6 +266,9 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
           <span style={{ color: '#6B7280' }}>No users yet — add one to get started.</span>
         )}
       </div>
+    </div>
+
+      <RoleScopeReference />
 
       {showAdd && <UserModal warehouseCode={warehouseCode} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); router.refresh() }} />}
       {editing && selected && canManageSelected && (

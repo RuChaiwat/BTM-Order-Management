@@ -39,3 +39,13 @@ export const ROLE_MENU_ACCESS: Record<string, number[]> = {
 export function canAccessMenuItem(role: string, navItemId: number): boolean {
   return ROLE_MENU_ACCESS[role]?.includes(navItemId) ?? false
 }
+
+/** A System Admin account can only be edited or deactivated by another System Admin -- every
+ * other role can be edited/deactivated by whoever already has write access to User Management
+ * (enforced separately, e.g. via requireRole in the API route). Check this both in the UI (to
+ * hide/disable Edit/Deactivate) and in the API (the actual enforcement -- never trust the client
+ * for this). */
+export function canManageUserRole(actorRole: string, targetRole: string): boolean {
+  if (targetRole === 'system_admin') return actorRole === 'system_admin'
+  return true
+}

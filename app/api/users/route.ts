@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
 import { toAuthEmail, isValidUserId, USER_ID_MAX_LENGTH } from '@/lib/authEmail'
+import { canManageUserRole } from '@/lib/roles'
 
 // 'picker' is deliberately excluded -- Pickers are managed in their own `pickers` table (see
 // /api/pickers) with no login capability at all, not as an employees_users role.
@@ -97,6 +98,12 @@ export async function PATCH(request: Request) {
 
   const admin = createAdminClient()
   const { data: before } = await admin.from('employees_users').select('*').eq('user_id', user_id).single()
+  if (!before) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  }
+  if (!canManageUserRole(caller.role, before.role)) {
+    return NextResponse.json({ error: 'Only a System Admin can edit another System Admin account' }, { status: 403 })
+  }
 
   const { data: after, error } = await admin.from('employees_users').update(patch).eq('user_id', user_id).select().single()
   if (error) {

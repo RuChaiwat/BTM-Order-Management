@@ -31,7 +31,7 @@ export default async function WorkerManagementPage() {
           <KpiCard label="ACTIVE" labelTh="ใช้งานอยู่" value={active} valueColor="#16A34A" />
           <KpiCard label="ROLES IN USE" labelTh="บทบาทที่ใช้งาน" value={roles} />
         </div>
-        <WorkerManagementBoard users={users} warehouseCode={warehouseCode} />
+        <WorkerManagementBoard users={users} warehouseCode={warehouseCode} currentUserRole={user.role} />
       </div>
     </>
   )

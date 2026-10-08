@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { apiFetch } from '@/lib/apiFetch'
 import { formatDate } from '@/lib/formatDate'
 import { batchStatusLabel, batchStatusTone } from '@/lib/matching/batchStatus'
+import { Pagination } from '@/components/Pagination'
 
 interface OpenOrder {
   orderId: string
@@ -36,6 +37,42 @@ const STATUS_LABEL: Record<string, string> = {
 
 type DocType = 'pick_slip' | 'pick_sheet'
 
+const PAGE_SIZE = 20
+
+type OrderSortKey = 'orderNo' | 'storeCode' | 'pickerName' | 'status'
+type BatchSortKey = 'batch_no' | 'order_date' | 'orders_count' | 'total_pieces' | 'status'
+
+function sortOrders(rows: OpenOrder[], key: OrderSortKey, dir: 'asc' | 'desc'): OpenOrder[] {
+  const copy = [...rows]
+  copy.sort((a, b) => {
+    const av = key === 'pickerName' ? a.pickerName ?? '' : a[key]
+    const bv = key === 'pickerName' ? b.pickerName ?? '' : b[key]
+    const cmp = av.localeCompare(bv)
+    return dir === 'asc' ? cmp : -cmp
+  })
+  return copy
+}
+
+function sortBatches(rows: ConsolidationBatch[], key: BatchSortKey, dir: 'asc' | 'desc'): ConsolidationBatch[] {
+  const copy = [...rows]
+  copy.sort((a, b) => {
+    const av = a[key]
+    const bv = b[key]
+    const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number)
+    return dir === 'asc' ? cmp : -cmp
+  })
+  return copy
+}
+
+function SortHeader<K extends string>({ label, sortKey, sort, onSort }: { label: React.ReactNode; sortKey: K; sort: { key: K; dir: 'asc' | 'desc' }; onSort: (key: K) => void }) {
+  const active = sort.key === sortKey
+  return (
+    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(sortKey)}>
+      {label} <span style={{ opacity: active ? 1 : 0.3 }}>{active ? (sort.dir === 'asc' ? '▲' : '▼') : '▲'}</span>
+    </th>
+  )
+}
+
 /** §Print & Reprint: a standalone place to (re)print Pick Slip/Pick Sheet/Order Consolidation
  * Report without needing to be on the screen that originally produced them. Opens the normal
  * browser print dialog (AutoPrint's window.print(), same as every other print route in this app) --
@@ -46,14 +83,18 @@ type DocType = 'pick_slip' | 'pick_sheet'
  * printer" dialog comes up -- exactly what's needed when Pick Sheet (a regular A5 printer) and Pick
  * Slip (the thermal one) are different physical machines. */
 export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pickers: Picker[] }) {
-  const [docType, setDocType] = useState<DocType | 'consolidation'>('pick_slip')
+  const [docType, setDocType] = useState<DocType | 'consolidation'>('pick_sheet')
   const [pickerIdInput, setPickerIdInput] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [orderSort, setOrderSort] = useState<{ key: OrderSortKey; dir: 'asc' | 'desc' }>({ key: 'orderNo', dir: 'asc' })
+  const [orderPage, setOrderPage] = useState(1)
 
   const [batchQuery, setBatchQuery] = useState('')
   const [batchResults, setBatchResults] = useState<ConsolidationBatch[]>([])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [batchSort, setBatchSort] = useState<{ key: BatchSortKey; dir: 'asc' | 'desc' }>({ key: 'batch_no', dir: 'asc' })
+  const [batchPage, setBatchPage] = useState(1)
 
   // Scan/type a Picker ID directly rather than picking from a dropdown -- same "scan ID" pattern
   // as Work Assignment/Pick Completion, chosen because this warehouse has too many pickers for a
@@ -61,6 +102,23 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
   const pickerQuery = pickerIdInput.trim().toUpperCase()
   const matchedPicker = pickerQuery ? pickers.find((p) => p.picker_id === pickerQuery) : null
   const filteredOrders = useMemo(() => (pickerQuery ? orders.filter((o) => o.pickerId === pickerQuery) : orders), [orders, pickerQuery])
+  const sortedOrders = useMemo(() => sortOrders(filteredOrders, orderSort.key, orderSort.dir), [filteredOrders, orderSort])
+  const orderTotalPages = Math.max(1, Math.ceil(sortedOrders.length / PAGE_SIZE))
+  const orderPageRows = sortedOrders.slice((orderPage - 1) * PAGE_SIZE, orderPage * PAGE_SIZE)
+
+  function toggleOrderSort(key: OrderSortKey) {
+    setOrderSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
+    setOrderPage(1)
+  }
+
+  const sortedBatches = useMemo(() => sortBatches(batchResults, batchSort.key, batchSort.dir), [batchResults, batchSort])
+  const batchTotalPages = Math.max(1, Math.ceil(sortedBatches.length / PAGE_SIZE))
+  const batchPageRows = sortedBatches.slice((batchPage - 1) * PAGE_SIZE, batchPage * PAGE_SIZE)
+
+  function toggleBatchSort(key: BatchSortKey) {
+    setBatchSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'batch_no' || key === 'status' ? 'asc' : 'desc' }))
+    setBatchPage(1)
+  }
 
   function toggleSelected(orderId: string) {
     setSelected((prev) => {
@@ -94,6 +152,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
       return
     }
     setBatchResults(body.batches)
+    setBatchPage(1)
   }
 
   function printBatch(batchId: string) {
@@ -108,11 +167,11 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        <button className={`btn btn-sm ${docType === 'pick_slip' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setDocType('pick_slip')}>
-          Pick Slip
-        </button>
         <button className={`btn btn-sm ${docType === 'pick_sheet' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setDocType('pick_sheet')}>
           Pick Sheet
+        </button>
+        <button className={`btn btn-sm ${docType === 'pick_slip' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setDocType('pick_slip')}>
+          Pick Slip
         </button>
         <button className={`btn btn-sm ${docType === 'consolidation' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setDocType('consolidation')}>
           Order Consolidation Report
@@ -131,6 +190,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
                 onChange={(e) => {
                   setPickerIdInput(e.target.value)
                   setSelected(new Set())
+                  setOrderPage(1)
                 }}
                 style={{ width: 220 }}
               />
@@ -153,14 +213,14 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
                 <th>
                   <input type="checkbox" checked={filteredOrders.length > 0 && selected.size === filteredOrders.length} onChange={toggleAll} />
                 </th>
-                <th>ORDER NO</th>
-                <th>STORE</th>
-                <th>PICKER</th>
-                <th>STATUS</th>
+                <SortHeader label="ORDER NO" sortKey="orderNo" sort={orderSort} onSort={toggleOrderSort} />
+                <SortHeader label="STORE" sortKey="storeCode" sort={orderSort} onSort={toggleOrderSort} />
+                <SortHeader label="PICKER" sortKey="pickerName" sort={orderSort} onSort={toggleOrderSort} />
+                <SortHeader label="STATUS" sortKey="status" sort={orderSort} onSort={toggleOrderSort} />
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((o) => (
+              {orderPageRows.map((o) => (
                 <tr key={o.orderId} style={{ cursor: 'pointer' }} onClick={() => toggleSelected(o.orderId)}>
                   <td onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={selected.has(o.orderId)} onChange={() => toggleSelected(o.orderId)} />
@@ -173,7 +233,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
                   </td>
                 </tr>
               ))}
-              {filteredOrders.length === 0 && (
+              {orderPageRows.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
                     No open orders{pickerQuery ? ' for this picker' : ''} right now.
@@ -182,6 +242,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
               )}
             </tbody>
           </table>
+          {sortedOrders.length > 0 && <Pagination page={orderPage} totalPages={orderTotalPages} onChange={setOrderPage} />}
         </>
       ) : (
         <>
@@ -210,20 +271,27 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
             </colgroup>
             <thead>
               <tr>
-                <th>BATCH</th>
-                <th>
-                  ORDER
-                  <br />
-                  DATE
-                </th>
-                <th>ORDERS</th>
-                <th>PIECES</th>
-                <th>STATUS</th>
+                <SortHeader label="BATCH" sortKey="batch_no" sort={batchSort} onSort={toggleBatchSort} />
+                <SortHeader
+                  label={
+                    <>
+                      ORDER
+                      <br />
+                      DATE
+                    </>
+                  }
+                  sortKey="order_date"
+                  sort={batchSort}
+                  onSort={toggleBatchSort}
+                />
+                <SortHeader label="ORDERS" sortKey="orders_count" sort={batchSort} onSort={toggleBatchSort} />
+                <SortHeader label="PIECES" sortKey="total_pieces" sort={batchSort} onSort={toggleBatchSort} />
+                <SortHeader label="STATUS" sortKey="status" sort={batchSort} onSort={toggleBatchSort} />
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {batchResults.map((b) => (
+              {batchPageRows.map((b) => (
                 <tr key={b.consol_batch_id}>
                   <td style={{ fontWeight: 700 }}>{b.batch_no}</td>
                   <td>{formatDate(b.order_date)}</td>
@@ -239,7 +307,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
                   </td>
                 </tr>
               ))}
-              {batchResults.length === 0 && (
+              {batchPageRows.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
                     Search for a Batch No to find its report.
@@ -248,6 +316,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
               )}
             </tbody>
           </table>
+          {sortedBatches.length > 0 && <Pagination page={batchPage} totalPages={batchTotalPages} onChange={setBatchPage} />}
         </>
       )}
     </div>

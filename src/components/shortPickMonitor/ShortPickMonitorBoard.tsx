@@ -70,7 +70,7 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
   const exportHref = `/api/short-pick-monitor/export?date=${encodeURIComponent(date)}${zoneFilter === 'ALL' ? '' : `&zone=${encodeURIComponent(zoneFilter)}`}`
 
   return (
-    <div className="card" style={{ flex: 1, minHeight: 0 }}>
+    <div className="card" style={{ flex: 1 }}>
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Product Issue List</span>
         <span className="card-subtitle">รายการสินค้ามีปัญหา · click a column to sort</span>

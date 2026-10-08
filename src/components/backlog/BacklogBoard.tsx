@@ -104,7 +104,7 @@ export function BacklogBoard({ rows }: { rows: BacklogRow[] }) {
   const pageRows = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
-    <div className="card" style={{ flex: 1, minHeight: 0 }}>
+    <div className="card" style={{ flex: 1 }}>
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Pending Action</span>
         <span className="card-subtitle">รายการที่ต้องดำเนินการ · click a column to sort</span>

@@ -101,7 +101,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
   }
 
   return (
-    <div className="card" style={{ flex: 1, minHeight: 0 }}>
+    <div className="card" style={{ flex: 1 }}>
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Print & Reprint</span>
         <span className="card-subtitle">พิมพ์ / พิมพ์ซ้ำเอกสาร · เปิดจากเครื่องที่ไม่ใช่ Kiosk เพื่อเลือกเครื่องพิมพ์เอง</span>

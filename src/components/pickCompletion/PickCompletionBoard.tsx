@@ -290,10 +290,13 @@ export function PickCompletionBoard({
         )}
 
         {/* Card-per-order, not a <table> -- flex rows wrap naturally on a narrow Handheld screen
-            instead of forcing horizontal scroll, so this same page works on PC and Handheld.
-            flex:1/minHeight:0 so an unbounded-length order list scrolls within the page instead of
-            squeezing/spilling past the other cards above it -- same fix as BacklogBoard/
-            ConsolidationHistoryBoard. */}
+            instead of forcing horizontal scroll, so this same page works on PC and Handheld. This
+            wrapper itself has no .card border/background -- each order is its own separately
+            bordered .card below -- so minHeight:0 here is safe (nothing can "spill past" an
+            invisible box). Do NOT copy flex:1/minHeight:0 onto a .card that directly wraps a
+            <table>: that shrinks the VISIBLE box below the table's content height with nothing to
+            clip the overflow, which is the bug CLAUDE.md's Table column widths section warns
+            about (see BacklogBoard/ConsolidationHistoryBoard, both fixed from this exact mistake). */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }}>
           {orders.map((o) => (
             <div

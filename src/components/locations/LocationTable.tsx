@@ -45,7 +45,19 @@ export function LocationTable({ locations }: { locations: Location[] }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 320px' : '1fr', gap: 14 }}>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '13%' }} />
+          <col style={{ width: '18%' }} />
+        </colgroup>
         <thead>
           <tr>
             <th>BIN CODE</th>
@@ -56,7 +68,11 @@ export function LocationTable({ locations }: { locations: Location[] }) {
             <th>BAY</th>
             <th>LEVEL</th>
             <th>BLOCK</th>
-            <th>PICK SEQ</th>
+            <th>
+              PICK
+              <br />
+              SEQ
+            </th>
             <th>ACTIVE</th>
           </tr>
         </thead>

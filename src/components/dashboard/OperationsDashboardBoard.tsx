@@ -96,13 +96,35 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
             <span className="card-title">Backlog by Order Date</span>
             <span className="card-subtitle">งานค้างแยกตามวันที่ออเดอร์ · ยังไม่ปิดงาน (Admin Verified) · เก่าสุดก่อน</span>
           </div>
-          <table className="table">
+          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              <col style={{ width: '25%' }} />
+              <col style={{ width: '25%' }} />
+              <col style={{ width: '25%' }} />
+              <col style={{ width: '25%' }} />
+            </colgroup>
             <thead>
               <tr>
-                <th>ORDER DATE</th>
-                <th>DAYS OLD</th>
-                <th>ORDERS PENDING</th>
-                <th>PIECES PENDING</th>
+                <th>
+                  ORDER
+                  <br />
+                  DATE
+                </th>
+                <th>
+                  DAYS
+                  <br />
+                  OLD
+                </th>
+                <th>
+                  ORDERS
+                  <br />
+                  PENDING
+                </th>
+                <th>
+                  PIECES
+                  <br />
+                  PENDING
+                </th>
               </tr>
             </thead>
             <tbody>

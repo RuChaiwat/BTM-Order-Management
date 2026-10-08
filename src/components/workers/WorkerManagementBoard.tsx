@@ -53,7 +53,14 @@ export function WorkerManagementBoard({ users, warehouseCode }: { users: WorkerR
             + Add user
           </button>
         </div>
-        <table className="table">
+        <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '26%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '28%' }} />
+            <col style={{ width: '18%' }} />
+          </colgroup>
           <thead>
             <tr>
               <th>USER ID</th>
@@ -67,14 +74,14 @@ export function WorkerManagementBoard({ users, warehouseCode }: { users: WorkerR
             {users.map((u) => (
               <tr key={u.user_id} className={u.user_id === selectedId ? 'row-muted' : undefined} onClick={() => setSelectedId(u.user_id)} style={{ cursor: 'pointer' }}>
                 <td style={{ fontWeight: 700 }}>{u.user_id}</td>
-                <td>
+                <td style={{ overflowWrap: 'break-word' }}>
                   {u.name_en}
                   {u.name_th && <div style={{ fontSize: 11, color: '#6B7280' }}>{u.name_th}</div>}
                 </td>
                 <td>
                   <span className="badge badge-info">{ROLE_LABELS[u.role] ?? u.role}</span>
                 </td>
-                <td>{u.zone_scope.length > 0 ? `Zones ${u.zone_scope.join(', ')}` : 'All zones'}</td>
+                <td style={{ overflowWrap: 'break-word' }}>{u.zone_scope.length > 0 ? `Zones ${u.zone_scope.join(', ')}` : 'All zones'}</td>
                 <td>{u.active ? <span style={{ color: '#16A34A' }}>● Active</span> : <span style={{ color: '#9CA3AF' }}>● Inactive</span>}</td>
               </tr>
             ))}

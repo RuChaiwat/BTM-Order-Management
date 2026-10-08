@@ -141,13 +141,26 @@ export default async function ControlTowerPage() {
               <span className="card-title">Zone Overview</span>
               <span className="card-subtitle">ภาพรวมโซน · Orders/Pieces Touching Zone — do not sum across zones · row highlighted if the zone has a Warning, Overdue, or Critical order</span>
             </div>
-            <table className="table">
+            <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '17%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '19%' }} />
+                <col style={{ width: '12%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>ZONE</th>
                   <th>ORDERS</th>
                   <th>PIECES</th>
-                  <th>PENDING P/V</th>
+                  <th>
+                    PENDING
+                    <br />
+                    P/V
+                  </th>
                   <th>ACTIVE</th>
                   <th>COMPLETED</th>
                   <th>SLA</th>
@@ -174,12 +187,23 @@ export default async function ControlTowerPage() {
               <span className="card-title">Top Overdue Picks</span>
               <span className="card-subtitle">ออเดอร์ที่กำลังหยิบล่าช้าที่สุด · Picking only, not Admin Verification · top 20 by elapsed time, longest first</span>
             </div>
-            <table className="table">
+            <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '26%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '24%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>ORDER NO.</th>
                   <th>PICKER</th>
-                  <th>ZONE TOUCHED</th>
+                  <th>
+                    ZONE
+                    <br />
+                    TOUCHED
+                  </th>
                   <th>ELAPSED</th>
                   <th>STATUS</th>
                 </tr>
@@ -188,8 +212,8 @@ export default async function ControlTowerPage() {
                 {data.topOverdueOrders.map((o) => (
                   <tr key={o.order_id}>
                     <td className="link">{o.order_no}</td>
-                    <td>{o.pickerName}</td>
-                    <td>{o.zones.join(', ') || '—'}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>{o.pickerName}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>{o.zones.join(', ') || '—'}</td>
                     <td>{Math.round(o.alert?.elapsed_minutes ?? 0)} min</td>
                     <td>
                       <span className={`badge badge-${o.alert?.time_alert === 'critical' ? 'danger' : 'warning'}`}>{o.alert?.time_alert}</span>
@@ -212,7 +236,14 @@ export default async function ControlTowerPage() {
               <span className="card-title">Top Pending Confirmations</span>
               <span className="card-subtitle">รายการรอ Admin ยืนยันสูงสุด · top 20, most critical first</span>
             </div>
-            <table className="table">
+            <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '28%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '24%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>ORDER NO.</th>
@@ -226,7 +257,7 @@ export default async function ControlTowerPage() {
                 {data.pendingVerification.map((o) => (
                   <tr key={o.orderId}>
                     <td className="link">{o.orderNo}</td>
-                    <td>{o.pickerName}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>{o.pickerName}</td>
                     <td>{o.pieces.toLocaleString()}</td>
                     <td>{o.waitMinutes} min</td>
                     <td>

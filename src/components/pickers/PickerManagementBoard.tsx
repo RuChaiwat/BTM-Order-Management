@@ -108,7 +108,14 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
             + Add picker
           </button>
         </div>
-        <table className="table">
+        <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '26%' }} />
+            <col style={{ width: '26%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+          </colgroup>
           <thead>
             <tr>
               <th>PICKER ID</th>
@@ -122,11 +129,11 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
             {pickers.map((p) => (
               <tr key={p.picker_id} className={p.picker_id === selectedId ? 'row-muted' : undefined} onClick={() => setSelectedId(p.picker_id)} style={{ cursor: 'pointer' }}>
                 <td style={{ fontWeight: 700 }}>{p.picker_id}</td>
-                <td>
+                <td style={{ overflowWrap: 'break-word' }}>
                   {p.name_en}
                   {p.name_th && <div style={{ fontSize: 11, color: '#6B7280' }}>{p.name_th}</div>}
                 </td>
-                <td>{p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'All zones'}</td>
+                <td style={{ overflowWrap: 'break-word' }}>{p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'All zones'}</td>
                 <td>
                   <ProductivityBadge picker={p} />
                 </td>

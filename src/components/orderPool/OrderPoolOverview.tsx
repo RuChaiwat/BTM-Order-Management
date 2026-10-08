@@ -26,12 +26,22 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
           <span className="card-title">Order Density by Zone</span>
           <span className="card-subtitle">ความหนาแน่นของออเดอร์แต่ละโซน · {totalOrders} orders in pool</span>
         </div>
-        <table className="table">
+        <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            <col style={{ width: '22%' }} />
+            <col style={{ width: '22%' }} />
+            <col style={{ width: '22%' }} />
+            <col style={{ width: 120 }} />
+          </colgroup>
           <thead>
             <tr>
               <th>ZONE</th>
               <th>ORDERS</th>
-              <th>SUM QTY</th>
+              <th>
+                SUM
+                <br />
+                QTY
+              </th>
               <th />
             </tr>
           </thead>

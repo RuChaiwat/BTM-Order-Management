@@ -306,7 +306,18 @@ export function MatchingBoard({
           </div>
         </div>
         {bulkError && <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--color-danger)' }}>{bulkError}</div>}
-        <table className="table">
+        <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            <col style={{ width: 28 }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '27%' }} />
+          </colgroup>
           <thead>
             <tr>
               <th style={{ width: 28 }}>

@@ -85,7 +85,7 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const pageRows = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  function SortHeader({ label, sortKey }: { label: string; sortKey: SortKey }) {
+  function SortHeader({ label, sortKey }: { label: React.ReactNode; sortKey: SortKey }) {
     const active = sort.key === sortKey
     return (
       <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort(sortKey)}>
@@ -109,11 +109,31 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
         <span className="card-subtitle">รายการที่กำลังหยิบ/จัดเรียง · click a column to sort</span>
       </div>
       {error && <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '13%' }} />
+          <col style={{ width: '20%' }} />
+          <col style={{ width: '13%' }} />
+        </colgroup>
         <thead>
           <tr>
             <SortHeader label="BATCH" sortKey="batch_no" />
-            <SortHeader label="ORDER DATE" sortKey="order_date" />
+            <SortHeader
+              label={
+                <>
+                  ORDER
+                  <br />
+                  DATE
+                </>
+              }
+              sortKey="order_date"
+            />
             <SortHeader label="PRIORITY" sortKey="priority" />
             <SortHeader label="STORES" sortKey="stores_count" />
             <SortHeader label="ORDERS" sortKey="orders_count" />

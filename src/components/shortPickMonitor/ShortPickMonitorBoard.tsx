@@ -36,7 +36,7 @@ function sortRows(rows: DetailRow[], key: SortKey, dir: 'asc' | 'desc'): DetailR
   return copy
 }
 
-function SortHeader({ label, sortKey, sort, onSort }: { label: string; sortKey: SortKey; sort: { key: SortKey; dir: 'asc' | 'desc' }; onSort: (key: SortKey) => void }) {
+function SortHeader({ label, sortKey, sort, onSort }: { label: React.ReactNode; sortKey: SortKey; sort: { key: SortKey; dir: 'asc' | 'desc' }; onSort: (key: SortKey) => void }) {
   const active = sort.key === sortKey
   return (
     <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(sortKey)}>
@@ -92,10 +92,34 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
         </div>
         <ExportExcelButton href={exportHref} />
       </div>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '18%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '17%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '8%' }} />
+        </colgroup>
         <thead>
           <tr>
-            <SortHeader label="ORDER NO" sortKey="orderNo" sort={sort} onSort={toggleSort} />
+            <SortHeader
+              label={
+                <>
+                  ORDER
+                  <br />
+                  NO
+                </>
+              }
+              sortKey="orderNo"
+              sort={sort}
+              onSort={toggleSort}
+            />
             <th>STORE</th>
             <SortHeader label="ZONE" sortKey="zoneCode" sort={sort} onSort={toggleSort} />
             <SortHeader label="SKU" sortKey="sku" sort={sort} onSort={toggleSort} />
@@ -115,9 +139,9 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
               <td>{r.storeCode}</td>
               <td>{r.zoneCode}</td>
               <td>{r.sku}</td>
-              <td>{r.itemDescription ?? '—'}</td>
+              <td style={{ overflowWrap: 'break-word' }}>{r.itemDescription ?? '—'}</td>
               <td>{formatLocationDisplay(r.binCode)}</td>
-              <td>
+              <td style={{ overflowWrap: 'break-word' }}>
                 {r.reasonLabelEn} <span style={{ color: '#6B7280' }}>({r.reasonLabelTh})</span>
               </td>
               <td>{r.orderedQty}</td>

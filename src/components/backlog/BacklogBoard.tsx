@@ -61,7 +61,7 @@ function sortRows(rows: BacklogRow[], key: SortKey, dir: 'asc' | 'desc'): Backlo
   return copy
 }
 
-function SortHeader({ label, sortKey, sort, onSort }: { label: string; sortKey: SortKey; sort: { key: SortKey; dir: 'asc' | 'desc' }; onSort: (key: SortKey) => void }) {
+function SortHeader({ label, sortKey, sort, onSort }: { label: React.ReactNode; sortKey: SortKey; sort: { key: SortKey; dir: 'asc' | 'desc' }; onSort: (key: SortKey) => void }) {
   const active = sort.key === sortKey
   return (
     <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(sortKey)}>
@@ -116,15 +116,47 @@ export function BacklogBoard({ rows }: { rows: BacklogRow[] }) {
           ))}
         </div>
       </div>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '13%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '20%' }} />
+          <col style={{ width: '16%' }} />
+          <col style={{ width: '11%' }} />
+          <col style={{ width: '12%' }} />
+        </colgroup>
         <thead>
           <tr>
             <SortHeader label="ORDER NO." sortKey="order_no" sort={sort} onSort={toggleSort} />
             <SortHeader label="STORE" sortKey="store_code" sort={sort} onSort={toggleSort} />
-            <SortHeader label="ORDER DATE" sortKey="original_order_date" sort={sort} onSort={toggleSort} />
+            <SortHeader
+              label={
+                <>
+                  ORDER
+                  <br />
+                  DATE
+                </>
+              }
+              sortKey="original_order_date"
+              sort={sort}
+              onSort={toggleSort}
+            />
             <SortHeader label="ZONES" sortKey="zones" sort={sort} onSort={toggleSort} />
             <SortHeader label="PICKER" sortKey="pickerName" sort={sort} onSort={toggleSort} />
-            <SortHeader label="PENDING TYPE" sortKey="backlogType" sort={sort} onSort={toggleSort} />
+            <SortHeader
+              label={
+                <>
+                  PENDING
+                  <br />
+                  TYPE
+                </>
+              }
+              sortKey="backlogType"
+              sort={sort}
+              onSort={toggleSort}
+            />
             <SortHeader label="ELAPSED" sortKey="elapsed" sort={sort} onSort={toggleSort} />
             <SortHeader label="ALERT" sortKey="alert" sort={sort} onSort={toggleSort} />
           </tr>
@@ -137,8 +169,8 @@ export function BacklogBoard({ rows }: { rows: BacklogRow[] }) {
                 <td className="link">{href ? <Link href={href}>{r.order_no}</Link> : r.order_no}</td>
                 <td>{r.store_code}</td>
                 <td>{formatDate(r.original_order_date)}</td>
-                <td>{r.zones.join(', ') || '—'}</td>
-                <td>{r.pickerName}</td>
+                <td style={{ overflowWrap: 'break-word' }}>{r.zones.join(', ') || '—'}</td>
+                <td style={{ overflowWrap: 'break-word' }}>{r.pickerName}</td>
                 <td>
                   {r.backlogType === 'both' ? (
                     <>

@@ -25,7 +25,7 @@ function sortRows(rows: ConsolidationHistoryRow[], key: SortKey, dir: 'asc' | 'd
   return copy
 }
 
-function SortHeader({ label, sortKey, sort, onSort }: { label: string; sortKey: SortKey; sort: { key: SortKey; dir: 'asc' | 'desc' }; onSort: (key: SortKey) => void }) {
+function SortHeader({ label, sortKey, sort, onSort }: { label: React.ReactNode; sortKey: SortKey; sort: { key: SortKey; dir: 'asc' | 'desc' }; onSort: (key: SortKey) => void }) {
   const active = sort.key === sortKey
   return (
     <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(sortKey)}>
@@ -55,11 +55,32 @@ export function ConsolidationHistoryBoard({ rows }: { rows: ConsolidationHistory
           ประวัติการรวมออเดอร์ · {rows.length.toLocaleString()} batch(es) · click a column to sort
         </span>
       </div>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '15%' }} />
+          <col style={{ width: '11%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '26%' }} />
+        </colgroup>
         <thead>
           <tr>
             <SortHeader label="BATCH" sortKey="batch_no" sort={sort} onSort={toggleSort} />
-            <SortHeader label="ORDER DATE" sortKey="order_date" sort={sort} onSort={toggleSort} />
+            <SortHeader
+              label={
+                <>
+                  ORDER
+                  <br />
+                  DATE
+                </>
+              }
+              sortKey="order_date"
+              sort={sort}
+              onSort={toggleSort}
+            />
             <SortHeader label="PRIORITY" sortKey="priority" sort={sort} onSort={toggleSort} />
             <SortHeader label="STORES" sortKey="stores_count" sort={sort} onSort={toggleSort} />
             <SortHeader label="ORDERS" sortKey="orders_count" sort={sort} onSort={toggleSort} />

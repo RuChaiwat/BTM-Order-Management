@@ -47,7 +47,11 @@ export function PickerProductivityTable({ pickers, targetPcsPerHour }: { pickers
 
   return (
     <>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '40%' }} />
+          <col style={{ width: '60%' }} />
+        </colgroup>
         <thead>
           <tr>
             <SortHeader label="PICKER" sortKey="name" sort={sort} onSort={toggleSort} />

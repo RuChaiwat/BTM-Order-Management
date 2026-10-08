@@ -96,7 +96,7 @@ function useSortedPage<T, K extends string>(rows: T[], initialSort: K, getters: 
   return { sortColumn, sortDir, changeSort, page: clampedPage, setPage, totalPages, pageRows, total: sorted.length }
 }
 
-function SortHeader<K extends string>({ label, column, active, dir, onSort }: { label: string; column: K; active: K; dir: 'asc' | 'desc'; onSort: (c: K) => void }) {
+function SortHeader<K extends string>({ label, column, active, dir, onSort }: { label: React.ReactNode; column: K; active: K; dir: 'asc' | 'desc'; onSort: (c: K) => void }) {
   return (
     <th onClick={() => onSort(column)} style={{ cursor: 'pointer', userSelect: 'none' }}>
       {label} {active === column ? (dir === 'asc' ? '▲' : '▼') : ''}
@@ -227,7 +227,14 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
               <span className="card-title">Zone {selected.zone} — Active Picker Orders</span>
               <span className="card-subtitle">ออเดอร์ที่กำลังหยิบอยู่ในโซนนี้ · {orderTable.total} orders currently being picked · click a column to sort</span>
             </div>
-            <table className="table">
+            <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '28%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '22%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <SortHeader label="ORDER NO." column="orderNo" active={orderTable.sortColumn} dir={orderTable.sortDir} onSort={orderTable.changeSort} />
@@ -241,7 +248,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
                 {orderTable.pageRows.map((o) => (
                   <tr key={o.orderId}>
                     <td className="link">{o.orderNo}</td>
-                    <td>{o.pickerName}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>{o.pickerName}</td>
                     <td>{STATUS_LABEL[o.status] ?? o.status}</td>
                     <td>{o.elapsedMinutes} min</td>
                     <td>
@@ -270,14 +277,46 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
               <span className="card-title">Zone {selected.zone} — Confirmed Short Picks</span>
               <span className="card-subtitle">รายการที่ยืนยันว่าหยิบขาดในโซนนี้ · {shortTable.total} short-picked line(s) · click a column to sort</span>
             </div>
-            <table className="table">
+            <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '28%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <SortHeader label="ORDER" column="orderNo" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
                   <SortHeader label="SKU" column="sku" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
                   <SortHeader label="PICKER" column="pickerName" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
-                  <SortHeader label="ORDER QTY" column="orderedQty" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
-                  <SortHeader label="QTY SHORT" column="shortQty" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
+                  <SortHeader
+                    label={
+                      <>
+                        ORDER
+                        <br />
+                        QTY
+                      </>
+                    }
+                    column="orderedQty"
+                    active={shortTable.sortColumn}
+                    dir={shortTable.sortDir}
+                    onSort={shortTable.changeSort}
+                  />
+                  <SortHeader
+                    label={
+                      <>
+                        QTY
+                        <br />
+                        SHORT
+                      </>
+                    }
+                    column="shortQty"
+                    active={shortTable.sortColumn}
+                    dir={shortTable.sortDir}
+                    onSort={shortTable.changeSort}
+                  />
                   <SortHeader label="REASON" column="reason" active={shortTable.sortColumn} dir={shortTable.sortDir} onSort={shortTable.changeSort} />
                 </tr>
               </thead>
@@ -286,10 +325,10 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
                   <tr key={`${r.orderId}-${r.sku}-${i}`}>
                     <td className="link">{r.orderNo}</td>
                     <td>{r.sku}</td>
-                    <td>{r.pickerName}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>{r.pickerName}</td>
                     <td>{r.orderedQty}</td>
                     <td style={{ fontWeight: 700, color: '#DC2626' }}>{r.shortQty}</td>
-                    <td>{r.reason}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>{r.reason}</td>
                   </tr>
                 ))}
                 {shortTable.pageRows.length === 0 && (

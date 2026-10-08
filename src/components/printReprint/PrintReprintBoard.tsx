@@ -140,7 +140,14 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
               Print {docType === 'pick_sheet' ? 'Pick Sheet' : 'Pick Slip'} ({selected.size})
             </button>
           </div>
-          <table className="table">
+          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '32%' }} />
+              <col style={{ width: '28%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>
@@ -160,7 +167,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
                   </td>
                   <td style={{ fontWeight: 700 }}>{o.orderNo}</td>
                   <td>{o.storeCode}</td>
-                  <td>{o.pickerName ?? '—'}</td>
+                  <td style={{ overflowWrap: 'break-word' }}>{o.pickerName ?? '—'}</td>
                   <td>
                     <span className={`badge badge-${o.status === 'correction_in_progress' ? 'warning' : 'info'}`}>{STATUS_LABEL[o.status] ?? o.status}</span>
                   </td>
@@ -192,11 +199,23 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
             </button>
           </div>
           {searchError && <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--color-danger)' }}>{searchError}</div>}
-          <table className="table">
+          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '24%' }} />
+              <col style={{ width: '18%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>BATCH</th>
-                <th>ORDER DATE</th>
+                <th>
+                  ORDER
+                  <br />
+                  DATE
+                </th>
                 <th>ORDERS</th>
                 <th>PIECES</th>
                 <th>STATUS</th>

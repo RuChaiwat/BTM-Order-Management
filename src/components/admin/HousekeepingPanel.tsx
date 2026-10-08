@@ -44,7 +44,7 @@ function sortRows<T, K extends string>(rows: T[], key: K, dir: 'asc' | 'desc', g
   return copy
 }
 
-function SortHeader<K extends string>({ label, sortKey, sort, onSort }: { label: string; sortKey: K; sort: { key: K; dir: 'asc' | 'desc' }; onSort: (key: K) => void }) {
+function SortHeader<K extends string>({ label, sortKey, sort, onSort }: { label: React.ReactNode; sortKey: K; sort: { key: K; dir: 'asc' | 'desc' }; onSort: (key: K) => void }) {
   const active = sort.key === sortKey
   return (
     <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(sortKey)}>
@@ -123,7 +123,14 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
       </div>
 
       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Recent export jobs · click a column to sort</div>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '26%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '16%' }} />
+          <col style={{ width: '34%' }} />
+        </colgroup>
         <thead>
           <tr>
             <SortHeader label="PERIOD" sortKey="period_start" sort={exportSort} onSort={toggleExportSort} />
@@ -161,12 +168,30 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
       {sortedExportJobs.length > 0 && <Pagination page={exportPage} totalPages={exportTotalPages} onChange={setExportPage} />}
 
       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Recent purge log · click a column to sort</div>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '16%' }} />
+          <col style={{ width: '28%' }} />
+          <col style={{ width: '16%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '26%' }} />
+        </colgroup>
         <thead>
           <tr>
             <SortHeader label="CUTOFF" sortKey="covered_period_start" sort={purgeSort} onSort={togglePurgeSort} />
             <SortHeader label="TABLE" sortKey="table_name" sort={purgeSort} onSort={togglePurgeSort} />
-            <SortHeader label="ROWS PURGED" sortKey="rows_purged" sort={purgeSort} onSort={togglePurgeSort} />
+            <SortHeader
+              label={
+                <>
+                  ROWS
+                  <br />
+                  PURGED
+                </>
+              }
+              sortKey="rows_purged"
+              sort={purgeSort}
+              onSort={togglePurgeSort}
+            />
             <SortHeader label="RESULT" sortKey="result" sort={purgeSort} onSort={togglePurgeSort} />
             <SortHeader label="WHEN" sortKey="created_at" sort={purgeSort} onSort={togglePurgeSort} />
           </tr>
@@ -175,7 +200,7 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
           {purgePageRows.map((p) => (
             <tr key={p.id}>
               <td>{formatDate(p.covered_period_start)}</td>
-              <td>{p.table_name}</td>
+              <td style={{ overflowWrap: 'break-word' }}>{p.table_name}</td>
               <td>{p.rows_purged}</td>
               <td>
                 <span className={`badge badge-${p.result === 'success' ? 'success' : 'danger'}`}>{p.result}</span>

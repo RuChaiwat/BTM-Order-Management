@@ -67,8 +67,8 @@ const BAND_META: Record<Band, { label: string; color: string; bg: string }> = {
 const SORT_LABELS: { key: SortColumn; label: string }[] = [
   { key: 'order_no', label: 'ORDER NO.' },
   { key: 'store_code', label: 'STORE' },
-  { key: 'unique_sku_count', label: 'UNIQUE SKU' },
-  { key: 'planned_pieces', label: 'PLANNED PCS' },
+  { key: 'unique_sku_count', label: 'UNIQUE\nSKU' },
+  { key: 'planned_pieces', label: 'PLANNED\nPCS' },
 ]
 
 function workloadBandFor(pieces: number) {
@@ -502,12 +502,19 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
             </span>
           </div>
           {poolSelectError && <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--color-danger)' }}>{poolSelectError}</div>}
-          <table className="table">
+          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              <col style={{ width: 28 }} />
+              <col style={{ width: '28%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '27%' }} />
+              <col style={{ width: '27%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th style={{ width: 28 }} />
                 {SORT_LABELS.map((col) => (
-                  <th key={col.key} onClick={() => changeSort(col.key)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <th key={col.key} onClick={() => changeSort(col.key)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'pre-line' }}>
                     {col.label} {sortColumn === col.key ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
                 ))}

@@ -40,14 +40,38 @@ export function ConfigHistoryPanel({ versions }: { versions: ConfigVersionRow[] 
           <div style={{ fontSize: 13, fontWeight: 700 }}>
             {cat.labelEn} <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>· {cat.labelTh}</span>
           </div>
-          <table className="table" style={{ marginTop: 6 }}>
+          <table className="table" style={{ marginTop: 6, tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '22%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>SETTING</th>
-                <th>PREVIOUS VALUE</th>
-                <th>CURRENT VALUE</th>
-                <th>CHANGED BY</th>
-                <th>CHANGED AT</th>
+                <th>
+                  PREVIOUS
+                  <br />
+                  VALUE
+                </th>
+                <th>
+                  CURRENT
+                  <br />
+                  VALUE
+                </th>
+                <th>
+                  CHANGED
+                  <br />
+                  BY
+                </th>
+                <th>
+                  CHANGED
+                  <br />
+                  AT
+                </th>
                 <th>REASON</th>
               </tr>
             </thead>
@@ -60,15 +84,15 @@ export function ConfigHistoryPanel({ versions }: { versions: ConfigVersionRow[] 
                       <div style={{ fontWeight: 600 }}>{field.labelEn}</div>
                       <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)' }}>{field.labelTh}</div>
                     </td>
-                    <td style={{ color: 'var(--color-text-secondary)' }}>
+                    <td style={{ color: 'var(--color-text-secondary)', overflowWrap: 'break-word' }}>
                       {toDisplayValue(field.kind, previous.value)} {field.unit}
                     </td>
-                    <td style={{ fontWeight: 700 }}>
+                    <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
                       {toDisplayValue(field.kind, current.value)} {field.unit}
                     </td>
                     <td>{current.changed_by ?? '—'}</td>
                     <td>{formatDateTime(current.changed_at)}</td>
-                    <td>{current.change_reason ?? '—'}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>{current.change_reason ?? '—'}</td>
                   </tr>
                 )
               })}

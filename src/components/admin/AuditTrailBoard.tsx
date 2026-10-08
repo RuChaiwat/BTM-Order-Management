@@ -49,7 +49,13 @@ export function AuditTrailBoard({ rows }: { rows: AuditTrailRow[] }) {
           {filtered.length.toLocaleString()} of {rows.length.toLocaleString()} action(s)
         </span>
       </div>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '13%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '22%' }} />
+          <col style={{ width: '55%' }} />
+        </colgroup>
         <thead>
           <tr>
             <th>TIME</th>
@@ -61,13 +67,13 @@ export function AuditTrailBoard({ rows }: { rows: AuditTrailRow[] }) {
         <tbody>
           {pageRows.map((a) => (
             <tr key={a.id}>
-              <td style={{ whiteSpace: 'nowrap' }}>{formatDateTime(a.created_at)}</td>
+              <td>{formatDateTime(a.created_at)}</td>
               <td>{a.user_id ?? 'system'}</td>
               <td>
                 <div style={{ fontWeight: 600 }}>{a.actionLabelEn}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)' }}>{a.actionLabelTh}</div>
               </td>
-              <td>{a.detail}</td>
+              <td style={{ overflowWrap: 'break-word' }}>{a.detail}</td>
             </tr>
           ))}
           {pageRows.length === 0 && (

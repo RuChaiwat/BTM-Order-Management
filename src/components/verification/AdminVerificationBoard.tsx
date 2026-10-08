@@ -260,7 +260,15 @@ export function AdminVerificationBoard({
               <div className="card-subtitle" style={{ marginBottom: 12 }}>
                 ทำเครื่องหมายรายการที่หยิบขาด แล้วระบุเหตุผลและจำนวนจริง · ตรวจสอบกับระบบ WMS
               </div>
-              <table className="table">
+              <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                <colgroup>
+                  <col style={{ width: 28 }} />
+                  <col style={{ width: '32%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '23%' }} />
+                  <col style={{ width: '15%' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th style={{ width: 28 }} />
@@ -268,7 +276,11 @@ export function AdminVerificationBoard({
                     <th>BIN</th>
                     <th>ORDERED</th>
                     <th>REASON</th>
-                    <th>ACTUAL QTY</th>
+                    <th>
+                      ACTUAL
+                      <br />
+                      QTY
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -287,7 +299,7 @@ export function AdminVerificationBoard({
                             {st.isShort ? '✓' : ''}
                           </button>
                         </td>
-                        <td>
+                        <td style={{ overflowWrap: 'break-word' }}>
                           {l.sku}
                           {l.sku_barcode && <div style={{ fontSize: 11, color: '#6B7280' }}>Barcode: {l.sku_barcode}</div>}
                           {l.item_description && <div style={{ fontSize: 11, color: '#6B7280' }}>{l.item_description}</div>}

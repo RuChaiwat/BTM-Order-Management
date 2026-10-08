@@ -198,7 +198,16 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
               View all →
             </Link>
           </div>
-          <table className="table">
+          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '26%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>BATCH</th>

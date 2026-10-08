@@ -58,7 +58,15 @@ export function RecentImportsTable({ rows }: { rows: ImportBatch[] }) {
 
   return (
     <>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '32%' }} />
+          <col style={{ width: '16%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '12%' }} />
+          <col style={{ width: '12%' }} />
+          <col style={{ width: '14%' }} />
+        </colgroup>
         <thead>
           <tr>
             <SortHeader label="FILE" sortKey="file_name" sort={sort} onSort={toggleSort} />
@@ -72,7 +80,7 @@ export function RecentImportsTable({ rows }: { rows: ImportBatch[] }) {
         <tbody>
           {pageRows.map((b) => (
             <tr key={b.import_id}>
-              <td>{b.file_name}</td>
+              <td style={{ overflowWrap: 'break-word' }}>{b.file_name}</td>
               <td>{formatDateTime(b.uploaded_at)}</td>
               <td>
                 <span className={`badge badge-${b.status === 'completed' ? 'success' : b.status === 'failed' ? 'danger' : 'warning'}`}>{b.status}</span>

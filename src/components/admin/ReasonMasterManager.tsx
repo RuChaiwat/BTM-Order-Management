@@ -52,7 +52,14 @@ export function ReasonMasterManager({ reasons }: { reasons: ReasonRow[] }) {
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
         สาเหตุการหยิบขาด + ยกเลิกออเดอร์ · Short Pick + Cancel reasons — maintainable without a code change (§17.1)
       </div>
-      <table className="table">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '36%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '22%' }} />
+        </colgroup>
         <thead>
           <tr>
             <th>CODE</th>
@@ -67,7 +74,7 @@ export function ReasonMasterManager({ reasons }: { reasons: ReasonRow[] }) {
             <tr key={r.reason_code}>
               <td style={{ fontWeight: 700 }}>{r.reason_code}</td>
               <td>{r.reason_type}</td>
-              <td>
+              <td style={{ overflowWrap: 'break-word' }}>
                 {r.label_en}
                 {r.label_th && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{r.label_th}</div>}
               </td>

@@ -321,8 +321,18 @@ function UserModal({
   const [error, setError] = useState<string | null>(null)
 
   async function submit() {
-    setBusy(true)
     setError(null)
+    const missing: string[] = []
+    if (!form.user_id) missing.push('User ID')
+    if (!form.name_en) missing.push('Name (EN)')
+    if (!form.role) missing.push('Role')
+    if (!isEdit && !form.password) missing.push('Temporary password')
+    if (missing.length > 0) {
+      setError(`กรุณากรอกข้อมูลที่จำเป็น — Required: ${missing.join(', ')}`)
+      return
+    }
+
+    setBusy(true)
     const res = await fetch('/api/users', {
       method: isEdit ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -343,7 +353,7 @@ function UserModal({
       <div style={{ padding: '16px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="field">
           <label className="field-label">
-            User ID {!isEdit && <span className="field-hint">used to sign in — max {USER_ID_MAX_LENGTH} characters</span>}
+            User ID <span className="field-label-required">*</span> {!isEdit && <span className="field-hint">used to sign in — max {USER_ID_MAX_LENGTH} characters</span>}
           </label>
           <input
             className="field-input"
@@ -357,7 +367,9 @@ function UserModal({
           />
         </div>
         <div className="field">
-          <label className="field-label">Name (EN)</label>
+          <label className="field-label">
+            Name (EN) <span className="field-label-required">*</span>
+          </label>
           <input
             className="field-input"
             value={form.name_en}
@@ -380,12 +392,16 @@ function UserModal({
         </div>
         {!isEdit && (
           <div className="field">
-            <label className="field-label">Temporary password</label>
+            <label className="field-label">
+              Temporary password <span className="field-label-required">*</span>
+            </label>
             <input className="field-input" type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
           </div>
         )}
         <div className="field">
-          <label className="field-label">Role</label>
+          <label className="field-label">
+            Role <span className="field-label-required">*</span>
+          </label>
           <select className="field-input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} style={{ border: '1px solid var(--color-border)' }}>
             {assignableRoles.map((r) => (
               <option key={r} value={r}>
@@ -400,12 +416,7 @@ function UserModal({
         <button type="button" className="modal-footer-btn btn-secondary" onClick={onClose}>
           Cancel
         </button>
-        <button
-          type="submit"
-          className="modal-footer-btn btn-primary"
-          style={{ minWidth: 140, border: 0 }}
-          disabled={busy || !form.user_id || !form.name_en || (!isEdit && !form.password)}
-        >
+        <button type="submit" className="modal-footer-btn btn-primary" style={{ minWidth: 140, border: 0 }} disabled={busy}>
           {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Create user'}
         </button>
       </ModalFooter>

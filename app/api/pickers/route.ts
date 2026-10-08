@@ -7,6 +7,22 @@ import { isValidUserId, USER_ID_MAX_LENGTH } from '@/lib/authEmail'
 // Same admin-role set as /api/users -- Pickers are master data, not self-service.
 const ADMIN_ROLES = ['system_admin', 'warehouse_manager', 'supervisor']
 
+// Every order_status except these three means the order is still somewhere in the Picking ->
+// Admin Verification pipeline -- not yet confirmed one way or the other.
+const TERMINAL_ORDER_STATUSES = ['final_closed_100', 'final_closed_short', 'cancelled']
+
+/** Count of orders currently assigned to this picker (via their own assignment_batches rows) that
+ * haven't reached a terminal status yet -- i.e. genuinely in-flight work, not just "this picker has
+ * ever picked something" (that's the separate, broader check DELETE already does below). Blocks
+ * Deactivate/Delete so a picker's open work doesn't silently lose its assignee mid-task. */
+async function countPendingWork(admin: ReturnType<typeof createAdminClient>, pickerId: string): Promise<number> {
+  const { data: batches } = await admin.from('assignment_batches').select('assignment_batch_id').eq('picker_id', pickerId)
+  const batchIds = (batches ?? []).map((b) => b.assignment_batch_id)
+  if (batchIds.length === 0) return 0
+  const { data: orders } = await admin.from('orders').select('status').in('assignment_batch_id', batchIds)
+  return (orders ?? []).filter((o) => !TERMINAL_ORDER_STATUSES.includes(o.status)).length
+}
+
 /** Create a Picker: no Supabase Auth account, no login -- just a roster row identified by
  * Picker ID, which Work Assignment scans directly (from the employee's own ID card) to resolve a
  * name (see /api/assignments and WorkAssignmentBoard). A separate "Badge Code" was tried first
@@ -76,6 +92,14 @@ export async function PATCH(request: Request) {
   const patch = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)))
 
   const admin = createAdminClient()
+
+  if (patch.active === false) {
+    const pending = await countPendingWork(admin, picker_id)
+    if (pending > 0) {
+      return NextResponse.json({ error: `This picker has ${pending} order(s) still in progress / awaiting Admin Verification — deactivate once they're confirmed` }, { status: 400 })
+    }
+  }
+
   const { data: before } = await admin.from('pickers').select('*').eq('picker_id', picker_id).single()
 
   const { data: after, error } = await admin.from('pickers').update(patch).eq('picker_id', picker_id).select().single()
@@ -104,6 +128,12 @@ export async function DELETE(request: Request) {
   }
 
   const admin = createAdminClient()
+
+  const pending = await countPendingWork(admin, picker_id)
+  if (pending > 0) {
+    return NextResponse.json({ error: `This picker has ${pending} order(s) still in progress / awaiting Admin Verification — can't delete (or deactivate) until they're confirmed` }, { status: 400 })
+  }
+
   const { count } = await admin.from('assignment_batches').select('assignment_batch_id', { count: 'exact', head: true }).eq('picker_id', picker_id)
   if (count && count > 0) {
     return NextResponse.json({ error: `This Picker has ${count} assignment(s) on record — deactivate instead of deleting so that history stays attributable` }, { status: 400 })

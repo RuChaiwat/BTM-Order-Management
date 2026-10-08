@@ -184,7 +184,9 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
                   {p.name_en}
                   {p.name_th && <div style={{ fontSize: 11, color: '#6B7280' }}>{p.name_th}</div>}
                 </td>
-                <td style={{ overflowWrap: 'break-word' }}>{p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'All zones'}</td>
+                <td style={{ overflowWrap: 'break-word' }}>
+                  {p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'All zones (for picking assignment only — pickers have no system login)'}
+                </td>
                 <td>
                   <ProductivityBadge picker={p} />
                 </td>
@@ -293,8 +295,16 @@ function PickerModal({
   const [error, setError] = useState<string | null>(null)
 
   async function submit() {
-    setBusy(true)
     setError(null)
+    const missing: string[] = []
+    if (!form.picker_id) missing.push('Picker ID')
+    if (!form.name_en) missing.push('Name (EN)')
+    if (missing.length > 0) {
+      setError(`กรุณากรอกข้อมูลที่จำเป็น — Required: ${missing.join(', ')}`)
+      return
+    }
+
+    setBusy(true)
     const res = await fetch('/api/pickers', {
       method: isEdit ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -315,7 +325,8 @@ function PickerModal({
       <div style={{ padding: '16px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="field">
           <label className="field-label">
-            Picker ID <span className="field-hint">max {USER_ID_MAX_LENGTH} characters — same ID printed on the picker's employee card, scanned directly at Assignment time — cannot be changed later</span>
+            Picker ID <span className="field-label-required">*</span>{' '}
+            <span className="field-hint">max {USER_ID_MAX_LENGTH} characters — same ID printed on the picker's employee card, scanned directly at Assignment time — cannot be changed later</span>
           </label>
           <input
             className="field-input"
@@ -329,7 +340,9 @@ function PickerModal({
           />
         </div>
         <div className="field">
-          <label className="field-label">Name (EN)</label>
+          <label className="field-label">
+            Name (EN) <span className="field-label-required">*</span>
+          </label>
           <input
             className="field-input"
             value={form.name_en}
@@ -362,12 +375,7 @@ function PickerModal({
         <button type="button" className="modal-footer-btn btn-secondary" onClick={onClose}>
           Cancel
         </button>
-        <button
-          type="submit"
-          className="modal-footer-btn btn-primary"
-          style={{ minWidth: 140, border: 0 }}
-          disabled={busy || !form.picker_id || !form.name_en}
-        >
+        <button type="submit" className="modal-footer-btn btn-primary" style={{ minWidth: 140, border: 0 }} disabled={busy}>
           {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Create picker'}
         </button>
       </ModalFooter>

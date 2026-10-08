@@ -185,7 +185,7 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
                   {p.name_th && <div style={{ fontSize: 11, color: '#6B7280' }}>{p.name_th}</div>}
                 </td>
                 <td style={{ overflowWrap: 'break-word' }}>
-                  {p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'All zones (for picking assignment only — pickers have no system login)'}
+                  {p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'For picking assignment only — pickers have no system login'}
                 </td>
                 <td>
                   <ProductivityBadge picker={p} />

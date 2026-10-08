@@ -96,7 +96,7 @@ export async function PATCH(request: Request) {
   if (patch.active === false) {
     const pending = await countPendingWork(admin, picker_id)
     if (pending > 0) {
-      return NextResponse.json({ error: `This picker has ${pending} order(s) still in progress / awaiting Admin Verification — deactivate once they're confirmed` }, { status: 400 })
+      return NextResponse.json({ error: `ยังมีงานค้างอยู่ ${pending} ออเดอร์ที่ยังไม่ยืนยัน — ไม่สามารถ Deactivate ได้` }, { status: 400 })
     }
   }
 
@@ -131,7 +131,7 @@ export async function DELETE(request: Request) {
 
   const pending = await countPendingWork(admin, picker_id)
   if (pending > 0) {
-    return NextResponse.json({ error: `This picker has ${pending} order(s) still in progress / awaiting Admin Verification — can't delete (or deactivate) until they're confirmed` }, { status: 400 })
+    return NextResponse.json({ error: `ยังมีงานค้างอยู่ ${pending} ออเดอร์ที่ยังไม่ยืนยัน — ไม่สามารถลบหรือ Deactivate ได้` }, { status: 400 })
   }
 
   const { count } = await admin.from('assignment_batches').select('assignment_batch_id', { count: 'exact', head: true }).eq('picker_id', picker_id)

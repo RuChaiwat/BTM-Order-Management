@@ -3,7 +3,7 @@ import { unwrap } from './unwrap'
 import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds } from './scopedFetch'
 import { getActiveConfig } from './config'
-import { bangkokDateKey } from '../formatDate'
+import { bangkokDateKey, bangkokDayRange } from '../formatDate'
 
 /** Cycle time (Assigned → Picker Completed) at or under this is "on time" for the SLA KPI here.
  * Matches Control Tower's "overdue" threshold (§13); a dedicated configuration key is a
@@ -41,14 +41,23 @@ export const MIN_CYCLE_MINUTES_FOR_RATE = 5
  * Completed/Total Pieces/SLA/Short Pick Rate (all picker-reported), just not yet toward the
  * reason breakdown. */
 export async function getProductivityData(db: SupabaseClient, warehouseCode: string, date: string) {
-  const [orders, pickers, cfg] = await Promise.all([
+  const { sinceIso, untilIso } = bangkokDayRange(date)
+  const [orders, pickers, cfg, roundBatches] = await Promise.all([
     fetchAllRows((from, to) => db.from('orders').select('order_id, assigned_time, assignment_batch_id, consolidation_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).range(from, to)),
     db.from('pickers').select('picker_id, name_en').eq('warehouse_code', warehouseCode).eq('active', true).then(unwrap),
     // Same target used by the weekly Picker Productivity rating (migration 0020) -- configurable
     // rather than a second hardcoded number baked into this page.
     getActiveConfig(db, ['picker_productivity.target_pcs_per_hour']),
+    // "Round" = how many times a picker was handed a fresh batch of work today (Admin confirmed
+    // the assignment, i.e. assigned_time is set) -- independent of whether they've completed any
+    // of it yet, unlike the completedRows-driven stats below.
+    db.from('assignment_batches').select('picker_id').eq('warehouse_code', warehouseCode).not('picker_id', 'is', null).gte('assigned_time', sinceIso).lt('assigned_time', untilIso).then(unwrap),
   ])
   const targetPcsPerHour = Number(cfg.value('picker_productivity.target_pcs_per_hour') ?? 4500)
+  const roundsByPicker = new Map<string, number>()
+  for (const b of roundBatches) {
+    roundsByPicker.set(b.picker_id as string, (roundsByPicker.get(b.picker_id as string) ?? 0) + 1)
+  }
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
   const orderIds = orders.map((o) => o.order_id)
 
@@ -123,6 +132,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     return {
       user_id: p.picker_id,
       name: p.name_en,
+      rounds: roundsByPicker.get(p.picker_id) ?? 0,
       pcsPerHour: e && e.minutes > 0 ? Math.round((e.pieces / e.minutes) * 60) : null,
       completed: e?.completed ?? 0,
       piecesCompleted: e?.piecesCompleted ?? 0,

@@ -8,6 +8,7 @@ import { ExportExcelButton } from '@/components/ExportExcelButton'
 interface PickerRow {
   user_id: string
   name: string
+  rounds: number
   pcsPerHour: number | null
   completed: number
   piecesCompleted: number
@@ -21,6 +22,7 @@ const PAGE_SIZE = 20
 interface LeaderboardRow {
   user_id: string
   name: string
+  rounds: number
   pcsPerHour: number
   completed: number
   piecesCompleted: number
@@ -34,7 +36,7 @@ interface ReasonRow {
   shortPieces: number
 }
 
-type PickerSortKey = 'name' | 'pcsPerHour' | 'completed' | 'piecesCompleted' | 'slaPct' | 'shortRate'
+type PickerSortKey = 'name' | 'pcsPerHour' | 'completed' | 'rounds' | 'piecesCompleted' | 'slaPct' | 'shortRate'
 type ReasonSortKey = 'label' | 'zone' | 'count' | 'shortPieces'
 
 function sortRows<T, K extends string>(rows: T[], key: K, dir: 'asc' | 'desc', pick: (row: T, key: K) => string | number | null): T[] {
@@ -69,11 +71,12 @@ function Leaderboard({ title, subtitle, rows, valueColor, emptyText }: { title: 
       </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '45%' }} />
-          <col style={{ width: '16%' }} />
-          <col style={{ width: '16%' }} />
-          <col style={{ width: '16%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '38%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '14%' }} />
         </colgroup>
         <thead>
           <tr>
@@ -81,6 +84,7 @@ function Leaderboard({ title, subtitle, rows, valueColor, emptyText }: { title: 
             <th>PICKER</th>
             <th>PCS / HR</th>
             <th>ORDERS</th>
+            <th>ROUND</th>
             <th>PIECES</th>
           </tr>
         </thead>
@@ -93,12 +97,13 @@ function Leaderboard({ title, subtitle, rows, valueColor, emptyText }: { title: 
               </td>
               <td style={{ fontWeight: 700, color: valueColor }}>{p.pcsPerHour.toLocaleString()}</td>
               <td>{p.completed}</td>
+              <td>{p.rounds}</td>
               <td>{p.piecesCompleted.toLocaleString()}</td>
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
+              <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
                 {emptyText}
               </td>
             </tr>
@@ -192,12 +197,13 @@ export function ProductivityBoard({
           <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               <col style={{ width: '4%' }} />
-              <col style={{ width: '32%' }} />
+              <col style={{ width: '27%' }} />
+              <col style={{ width: '10%' }} />
               <col style={{ width: '11%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '14%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '15%' }} />
             </colgroup>
             <thead>
               <tr>
@@ -216,6 +222,7 @@ export function ProductivityBoard({
                   sort={pickerSort}
                   onSort={togglePickerSort}
                 />
+                <SortHeader label="ROUND" sortKey="rounds" sort={pickerSort} onSort={togglePickerSort} />
                 <SortHeader
                   label={
                     <>
@@ -252,6 +259,7 @@ export function ProductivityBoard({
                   </td>
                   <td style={{ fontWeight: p.pcsPerHour ? 700 : 400, color: p.pcsPerHour ? undefined : '#6B7280' }}>{p.pcsPerHour ?? '—'}</td>
                   <td>{p.completed}</td>
+                  <td>{p.rounds}</td>
                   <td>{p.piecesCompleted.toLocaleString()}</td>
                   <td>{p.slaPct !== null ? `${p.slaPct}%` : '—'}</td>
                   <td>{p.shortRate !== null ? `${p.shortRate}%` : '—'}</td>
@@ -259,7 +267,7 @@ export function ProductivityBoard({
               ))}
               {pickerPageRows.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ color: 'var(--color-text-secondary)' }}>
+                  <td colSpan={8} style={{ color: 'var(--color-text-secondary)' }}>
                     No active pickers found for {warehouseCode}.
                   </td>
                 </tr>

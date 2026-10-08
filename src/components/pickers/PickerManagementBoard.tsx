@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
+import { Avatar } from '@/components/Avatar'
 import { createClient } from '../../lib/supabase/client'
 import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
 import { formatDateTime } from '../../lib/formatDate'
@@ -155,7 +156,7 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
         {selected ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#F3F4F6', flex: 'none' }} />
+              <Avatar name={selected.name_en} seed={selected.picker_id} />
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{selected.name_en}</div>
                 <div style={{ fontSize: 11.5, color: '#6B7280' }}>

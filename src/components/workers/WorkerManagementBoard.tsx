@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Pagination } from '@/components/Pagination'
+import { Avatar } from '@/components/Avatar'
 import { ROLE_LABELS, canManageUserRole } from '../../lib/roles'
 import { createClient } from '../../lib/supabase/client'
 import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
@@ -131,7 +132,7 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
         {selected ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#F3F4F6', flex: 'none' }} />
+              <Avatar name={selected.name_en} seed={selected.user_id} />
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{selected.name_en}</div>
                 <div style={{ fontSize: 11.5, color: '#6B7280' }}>

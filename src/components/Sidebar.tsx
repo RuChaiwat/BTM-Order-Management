@@ -1,10 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { NAV_GROUPS } from '../data/navigation'
 import type { AppUser } from '../lib/auth'
 import { canAccessMenuItem, ROLE_LABELS } from '../lib/roles'
+import { createClient } from '../lib/supabase/client'
+import { Avatar } from './Avatar'
 
 interface SidebarProps {
   user: AppUser
@@ -14,6 +16,15 @@ interface SidebarProps {
 
 export function Sidebar({ user, badges }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function logout() {
+    if (!confirm('ต้องการออกจากระบบใช่หรือไม่?\n\nLog out of this session?')) return
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   // Menu item ids are stable keys (used for role access / badges / activeNavId) but aren't
   // sequential — new items got ids appended out of visual order (e.g. Admin Verification = 16,
@@ -73,16 +84,16 @@ export function Sidebar({ user, badges }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="sidebar-footer">
-        <div className="sidebar-avatar" />
-        <div style={{ flex: 1 }}>
+      <button type="button" className="sidebar-footer" onClick={logout} title="Log out">
+        <Avatar name={user.name_en} seed={user.user_id} size={30} />
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="sidebar-footer-name">{user.name_en}</div>
           <div className="sidebar-footer-role">
             {ROLE_LABELS[user.role] ?? user.role} · {user.warehouse_code ?? '—'}
           </div>
         </div>
         <span className="sidebar-status-dot" />
-      </div>
+      </button>
     </div>
   )
 }

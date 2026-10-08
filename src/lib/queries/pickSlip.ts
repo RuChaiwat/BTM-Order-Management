@@ -7,6 +7,7 @@ export interface PickSlipRow {
   storeCode: string
   orderDate: string
   zones: string[]
+  uniqueSkuCount: number
   warehouseCode: string
   pickerName: string
 }
@@ -30,15 +31,19 @@ export async function getPickSlipData(db: SupabaseClient, orderIds: string[]): P
 
   const [ordersRes, linesRes] = await Promise.all([
     db.from('orders').select('order_id, order_no, store_code, original_order_date, warehouse_code, assignment_batch_id').in('order_id', orderIds),
-    db.from('order_lines').select('order_id, zone_code').in('order_id', orderIds),
+    db.from('order_lines').select('order_id, zone_code, sku').in('order_id', orderIds),
   ])
   const orders = unwrap(ordersRes)
 
   const zonesByOrder = new Map<string, Set<string>>()
+  const skusByOrder = new Map<string, Set<string>>()
   for (const l of unwrap(linesRes)) {
-    if (!l.zone_code) continue
-    if (!zonesByOrder.has(l.order_id)) zonesByOrder.set(l.order_id, new Set())
-    zonesByOrder.get(l.order_id)!.add(l.zone_code)
+    if (l.zone_code) {
+      if (!zonesByOrder.has(l.order_id)) zonesByOrder.set(l.order_id, new Set())
+      zonesByOrder.get(l.order_id)!.add(l.zone_code)
+    }
+    if (!skusByOrder.has(l.order_id)) skusByOrder.set(l.order_id, new Set())
+    skusByOrder.get(l.order_id)!.add(l.sku)
   }
 
   const batchIds = [...new Set(orders.map((o) => o.assignment_batch_id).filter(Boolean))] as string[]
@@ -65,6 +70,7 @@ export async function getPickSlipData(db: SupabaseClient, orderIds: string[]): P
         storeCode: o.store_code,
         orderDate: o.original_order_date,
         zones: [...(zonesByOrder.get(orderId) ?? new Set())].sort(),
+        uniqueSkuCount: (skusByOrder.get(orderId) ?? new Set()).size,
         warehouseCode: o.warehouse_code,
         pickerName: (pickerId && nameByPicker.get(pickerId)) ?? pickerId ?? '—',
       }

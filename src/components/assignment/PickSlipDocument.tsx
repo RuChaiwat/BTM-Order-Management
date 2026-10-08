@@ -54,16 +54,20 @@ export function PickSlipDocument({ slips }: { slips: PickSlipRow[] }) {
             <span className="pick-slip-value">{s.orderNo}</span>
           </div>
           <div className="pick-slip-row">
-            <span className="pick-slip-label">Order Date&nbsp;:</span>
-            <span className="pick-slip-value">{formatDateWithWeekday(s.orderDate)}</span>
-          </div>
-          <div className="pick-slip-row">
             <span className="pick-slip-label">Zone&nbsp;:</span>
             <span className="pick-slip-value">{s.zones.join(', ') || '—'}</span>
           </div>
           <div className="pick-slip-row">
+            <span className="pick-slip-label">SKU&nbsp;:</span>
+            <span className="pick-slip-value">{s.uniqueSkuCount}</span>
+          </div>
+          <div className="pick-slip-row">
             <span className="pick-slip-label">Picker&nbsp;:</span>
             <span className="pick-slip-value">{s.pickerName}</span>
+          </div>
+          <div className="pick-slip-row">
+            <span className="pick-slip-label">Order Date&nbsp;:</span>
+            <span className="pick-slip-value">{formatDateWithWeekday(s.orderDate)}</span>
           </div>
 
           <div style={{ marginTop: 10, marginBottom: 20, display: 'flex', justifyContent: 'center' }}>

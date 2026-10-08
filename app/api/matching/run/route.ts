@@ -11,7 +11,7 @@ import { fetchScopedByOrderIds } from '@/lib/queries/scopedFetch'
 export async function POST(request: Request) {
   let caller
   try {
-    caller = await requireRole(['system_admin', 'supervisor', 'planner_admin'])
+    caller = await requireRole(['system_admin', 'supervisor'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

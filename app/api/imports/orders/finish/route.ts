@@ -11,7 +11,7 @@ import { writeAudit } from '@/lib/audit'
 export async function POST(request: Request) {
   let caller
   try {
-    caller = await requireRole(['system_admin', 'planner_admin', 'supervisor'])
+    caller = await requireRole(['system_admin', 'supervisor'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

@@ -13,7 +13,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
  */
 export async function POST(request: Request, { params }: { params: { importId: string } }) {
   try {
-    await requireRole(['system_admin', 'planner_admin', 'supervisor'])
+    await requireRole(['system_admin', 'supervisor'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

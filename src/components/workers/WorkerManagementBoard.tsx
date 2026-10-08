@@ -22,7 +22,8 @@ interface WorkerRow {
 }
 
 // 'picker' deliberately excluded -- see /api/pickers and app/pickers for Picker management.
-const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'planner_admin', 'zone_controller', 'viewer']
+// 'planner_admin' retired (migration 0032), merged into 'supervisor'.
+const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'zone_controller', 'viewer']
 
 const PAGE_SIZE = 20
 

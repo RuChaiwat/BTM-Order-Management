@@ -9,7 +9,7 @@ import { writeAudit, writeStatusHistory } from '@/lib/audit'
 export async function POST(request: Request, { params }: { params: { orderId: string } }) {
   let caller
   try {
-    caller = await requireRole(['system_admin', 'planner_admin'])
+    caller = await requireRole(['system_admin', 'supervisor'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

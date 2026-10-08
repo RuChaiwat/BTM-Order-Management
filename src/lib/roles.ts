@@ -8,14 +8,17 @@
 // is enforced separately, per screen, via `requireRole` in the relevant Route Handler.
 
 // 'picker' is intentionally not a key here any more -- Pickers no longer have a login (see
-// migration 0015), so no employees_users row can ever have this role again. Left out of both maps
-// rather than kept as permanently-dead entries; the label may still appear in old audit_logs/
-// status_history snapshots, which display the raw string regardless of this map.
+// migration 0015), so no employees_users row can ever have this role again. 'planner_admin' is
+// likewise retired (migration 0032) -- its permission set was nearly identical to 'supervisor'
+// (every action-level requireRole() grouped them together except Cancel Order, which supervisor
+// gained in the merge, and Reason Master/Picker Management/Configuration/Audit Trail, which
+// planner_admin never had) and existing rows were migrated to 'supervisor'. Both are left out of
+// these maps rather than kept as permanently-dead entries; the label may still appear in old
+// audit_logs/status_history snapshots, which display the raw string regardless of this map.
 export const ROLE_LABELS: Record<string, string> = {
   system_admin: 'System Admin',
   warehouse_manager: 'Warehouse Manager',
   supervisor: 'Supervisor',
-  planner_admin: 'Planner / Admin',
   zone_controller: 'Zone Controller',
   viewer: 'Viewer',
 }
@@ -31,7 +34,6 @@ export const ROLE_MENU_ACCESS: Record<string, number[]> = {
   system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
   warehouse_manager: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20],
   supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20],
-  planner_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 19, 20],
   zone_controller: [1, 3, 8, 9, 10, 11, 12, 19, 20],
   viewer: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 16, 19],
 }

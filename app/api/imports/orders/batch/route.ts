@@ -16,7 +16,7 @@ export const maxDuration = 60
 
 export async function POST(request: Request) {
   try {
-    await requireRole(['system_admin', 'planner_admin', 'supervisor'])
+    await requireRole(['system_admin', 'supervisor'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

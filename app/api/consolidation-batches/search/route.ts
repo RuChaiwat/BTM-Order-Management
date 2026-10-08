@@ -8,7 +8,7 @@ import { getConsolidationHistory } from '@/lib/queries/consolidationHistory'
  * can be found again to reprint its report, without navigating through that page's date filters. */
 export async function GET(request: Request) {
   try {
-    await requireRole(['system_admin', 'warehouse_manager', 'supervisor', 'planner_admin', 'zone_controller'])
+    await requireRole(['system_admin', 'warehouse_manager', 'supervisor', 'zone_controller'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

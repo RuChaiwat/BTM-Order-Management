@@ -6,7 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
  * the error count — needed however long after the upload the user comes back to look. */
 export async function GET(_request: Request, { params }: { params: { importId: string } }) {
   try {
-    await requireRole(['system_admin', 'planner_admin', 'supervisor', 'warehouse_manager'])
+    await requireRole(['system_admin', 'supervisor', 'warehouse_manager'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

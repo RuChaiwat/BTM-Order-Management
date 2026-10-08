@@ -20,7 +20,7 @@ const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in
 export async function PATCH(request: Request, { params }: { params: { batchId: string } }) {
   let caller
   try {
-    caller = await requireRole(['system_admin', 'supervisor', 'planner_admin'])
+    caller = await requireRole(['system_admin', 'supervisor'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

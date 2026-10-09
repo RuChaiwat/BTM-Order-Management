@@ -54,6 +54,7 @@ interface Picker {
   name_en: string
   zone_scope: string[]
   active: boolean
+  employment_type: string | null
   productivity_level: string | null
   productivity_pcs_per_hour: number | null
 }
@@ -599,6 +600,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
                 </div>
                 <div style={{ fontSize: 11, color: '#6B7280', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <span>{scannedPicker.picker_id}</span>
+                  {scannedPicker.employment_type && <span>{scannedPicker.employment_type}</span>}
                   {pickerTodayRounds !== null && <span style={{ color: '#166534', fontWeight: 600 }}>{pickerTodayRounds} รอบ</span>}
                 </div>
               </div>

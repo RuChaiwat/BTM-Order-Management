@@ -10,6 +10,7 @@ interface ZoneActiveOrderRow {
   orderNo: string
   status: string
   pickerName: string
+  pickerEmploymentType: string | null
   elapsedMinutes: number
   timeAlert: string | null
 }
@@ -19,6 +20,7 @@ interface ZoneShortPickRow {
   orderNo: string
   sku: string
   pickerName: string
+  pickerEmploymentType: string | null
   orderedQty: number
   shortQty: number
   reason: string
@@ -248,7 +250,10 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
                 {orderTable.pageRows.map((o) => (
                   <tr key={o.orderId}>
                     <td className="link">{o.orderNo}</td>
-                    <td style={{ overflowWrap: 'break-word' }}>{o.pickerName}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>
+                      {o.pickerName}
+                      {o.pickerEmploymentType && <div style={{ fontSize: 11, color: '#6B7280' }}>{o.pickerEmploymentType}</div>}
+                    </td>
                     <td>{STATUS_LABEL[o.status] ?? o.status}</td>
                     <td>{o.elapsedMinutes} min</td>
                     <td>
@@ -325,7 +330,10 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
                   <tr key={`${r.orderId}-${r.sku}-${i}`}>
                     <td className="link">{r.orderNo}</td>
                     <td>{r.sku}</td>
-                    <td style={{ overflowWrap: 'break-word' }}>{r.pickerName}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>
+                      {r.pickerName}
+                      {r.pickerEmploymentType && <div style={{ fontSize: 11, color: '#6B7280' }}>{r.pickerEmploymentType}</div>}
+                    </td>
                     <td>{r.orderedQty}</td>
                     <td style={{ fontWeight: 700, color: '#DC2626' }}>{r.shortQty}</td>
                     <td style={{ overflowWrap: 'break-word' }}>{r.reason}</td>

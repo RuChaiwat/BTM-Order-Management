@@ -7,6 +7,7 @@ import { Pagination } from '@/components/Pagination'
 interface PickerProductivity {
   pickerId: string
   name: string
+  employmentType: string | null
   pcsPerHour: number
   level: string
 }
@@ -63,7 +64,10 @@ export function PickerProductivityTable({ pickers, targetPcsPerHour }: { pickers
             const meta = productivityMeta(p.level)
             return (
               <tr key={p.pickerId}>
-                <td style={{ fontWeight: 700 }}>{p.name}</td>
+                <td style={{ fontWeight: 700 }}>
+                  {p.name}
+                  {p.employmentType && <div style={{ fontSize: 11, fontWeight: 400, color: '#6B7280' }}>{p.employmentType}</div>}
+                </td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span

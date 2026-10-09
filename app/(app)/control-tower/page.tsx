@@ -212,7 +212,10 @@ export default async function ControlTowerPage() {
                 {data.topOverdueOrders.map((o) => (
                   <tr key={o.order_id}>
                     <td className="link">{o.order_no}</td>
-                    <td style={{ overflowWrap: 'break-word' }}>{o.pickerName}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>
+                      {o.pickerName}
+                      {o.pickerEmploymentType && <div style={{ fontSize: 11, color: '#6B7280' }}>{o.pickerEmploymentType}</div>}
+                    </td>
                     <td style={{ overflowWrap: 'break-word' }}>{o.zones.join(', ') || '—'}</td>
                     <td>{Math.round(o.alert?.elapsed_minutes ?? 0)} min</td>
                     <td>
@@ -257,7 +260,10 @@ export default async function ControlTowerPage() {
                 {data.pendingVerification.map((o) => (
                   <tr key={o.orderId}>
                     <td className="link">{o.orderNo}</td>
-                    <td style={{ overflowWrap: 'break-word' }}>{o.pickerName}</td>
+                    <td style={{ overflowWrap: 'break-word' }}>
+                      {o.pickerName}
+                      {o.pickerEmploymentType && <div style={{ fontSize: 11, color: '#6B7280' }}>{o.pickerEmploymentType}</div>}
+                    </td>
                     <td>{o.pieces.toLocaleString()}</td>
                     <td>{o.waitMinutes} min</td>
                     <td>

@@ -20,6 +20,7 @@ export interface ZoneActiveOrderRow {
   orderNo: string
   status: string
   pickerName: string
+  pickerEmploymentType: string | null
   elapsedMinutes: number
   timeAlert: string | null
 }
@@ -29,6 +30,7 @@ export interface ZoneShortPickRow {
   orderNo: string
   sku: string
   pickerName: string
+  pickerEmploymentType: string | null
   orderedQty: number
   shortQty: number
   reason: string
@@ -84,11 +86,24 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   const lineById = new Map(unwrap(lineDetailRes).map((l) => [l.line_id, l]))
 
   const pickerIds = [...new Set(batches.map((b) => b.picker_id).filter(Boolean))] as string[]
-  const pickersRes = pickerIds.length ? await db.from('pickers').select('picker_id, name_en').in('picker_id', pickerIds) : { data: [] as { picker_id: string; name_en: string }[] }
+  const [pickersRes, employmentTypeRows] = await Promise.all([
+    pickerIds.length ? db.from('pickers').select('picker_id, name_en, employment_type').in('picker_id', pickerIds) : Promise.resolve({ data: [] as { picker_id: string; name_en: string; employment_type: string | null }[] }),
+    db.from('picker_employment_types').select('type_code, label_en'),
+  ])
   const nameByPicker = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.name_en]))
+  const employmentTypeByPicker = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.employment_type]))
+  const employmentTypeLabel = new Map(unwrap(employmentTypeRows).map((t) => [t.type_code, t.label_en]))
   const pickerNameForOrder = (o: (typeof orders)[number]) => {
     const pickerId = o.assignment_batch_id ? pickerIdByBatch.get(o.assignment_batch_id) : null
     return pickerId ? nameByPicker.get(pickerId) ?? pickerId : '—'
+  }
+  const employmentTypeLabelForPicker = (pickerId: string | null | undefined): string | null => {
+    const code = pickerId ? employmentTypeByPicker.get(pickerId) : null
+    return code ? employmentTypeLabel.get(code) ?? code : null
+  }
+  const pickerEmploymentTypeForOrder = (o: (typeof orders)[number]): string | null => {
+    const pickerId = o.assignment_batch_id ? pickerIdByBatch.get(o.assignment_batch_id) : null
+    return employmentTypeLabelForPicker(pickerId)
   }
 
   const zoneOrderIds = new Map<string, Set<string>>()
@@ -113,6 +128,7 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
       orderNo: order.order_no,
       sku: line.sku,
       pickerName: pickerNameForOrder(order),
+      pickerEmploymentType: pickerEmploymentTypeForOrder(order),
       orderedQty: sl.ordered_qty,
       shortQty: Math.max(0, sl.ordered_qty - sl.picked_qty),
       reason: sl.short_reason_code ? reasonLabelByCode.get(sl.short_reason_code) ?? sl.short_reason_code : '—',
@@ -158,6 +174,7 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
         orderNo: o.order_no,
         status: o.status,
         pickerName: nameByPicker.get(pickerId) ?? pickerId,
+        pickerEmploymentType: employmentTypeLabelForPicker(pickerId),
         elapsedMinutes: Math.round(alert?.elapsed_minutes ?? 0),
         timeAlert: alert?.time_alert ?? null,
       })

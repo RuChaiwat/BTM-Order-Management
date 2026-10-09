@@ -7,6 +7,7 @@ import { Pagination } from '@/components/Pagination'
 interface ActivePicker {
   pickerId: string
   name: string
+  employmentType: string | null
   orders: number
   pieces: number
   elapsedMinutes: number
@@ -100,7 +101,7 @@ export function ActivePickerRosterTable({ pickers }: { pickers: ActivePicker[] }
           {pageRows.map((p) => (
             <tr key={p.pickerId}>
               <td style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.pickerId})</span>
+                {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.pickerId}){p.employmentType ? ` · ${p.employmentType}` : ''}</span>
               </td>
               <td style={{ textAlign: 'right' }}>{p.orders}</td>
               <td style={{ fontWeight: 700, textAlign: 'right' }}>{p.pieces.toLocaleString()}</td>

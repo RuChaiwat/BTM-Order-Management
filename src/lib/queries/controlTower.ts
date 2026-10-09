@@ -146,21 +146,32 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     : { data: [] as { assignment_batch_id: string; picker_id: string | null }[] }
   const pickerIdByBatch = new Map(unwrap(batchesRes).map((b) => [b.assignment_batch_id, b.picker_id]))
   const pickerIds = [...new Set([...pickerIdByBatch.values()].filter(Boolean))] as string[]
-  const pickersRes = pickerIds.length
-    ? await db.from('pickers').select('picker_id, name_en').in('picker_id', pickerIds)
-    : { data: [] as { picker_id: string; name_en: string }[] }
+  const [pickersRes, employmentTypeRows] = await Promise.all([
+    pickerIds.length
+      ? db.from('pickers').select('picker_id, name_en, employment_type').in('picker_id', pickerIds)
+      : Promise.resolve({ data: [] as { picker_id: string; name_en: string; employment_type: string | null }[] }),
+    db.from('picker_employment_types').select('type_code, label_en'),
+  ])
   const nameByPickerId = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.name_en]))
+  const employmentTypeByPickerId = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.employment_type]))
+  const employmentTypeLabel = new Map(unwrap(employmentTypeRows).map((t) => [t.type_code, t.label_en]))
   const pickerNameFor = (batchId: string | null) => {
     const pickerId = batchId ? pickerIdByBatch.get(batchId) : null
     return pickerId ? nameByPickerId.get(pickerId) ?? pickerId : '—'
   }
+  const pickerEmploymentTypeFor = (batchId: string | null): string | null => {
+    const pickerId = batchId ? pickerIdByBatch.get(batchId) : null
+    const code = pickerId ? employmentTypeByPickerId.get(pickerId) : null
+    return code ? employmentTypeLabel.get(code) ?? code : null
+  }
 
-  const overdueOrders = overdueOrdersRaw.map((o) => ({ ...o, pickerName: pickerNameFor(o.assignment_batch_id) }))
+  const overdueOrders = overdueOrdersRaw.map((o) => ({ ...o, pickerName: pickerNameFor(o.assignment_batch_id), pickerEmploymentType: pickerEmploymentTypeFor(o.assignment_batch_id) }))
 
   const pendingVerification = pendingVerificationRaw.map((o) => ({
     orderId: o.order_id,
     orderNo: o.order_no,
     pickerName: pickerNameFor(o.assignment_batch_id),
+    pickerEmploymentType: pickerEmploymentTypeFor(o.assignment_batch_id),
     pieces: o.completion?.actual_pieces ?? 0,
     waitMinutes: o.completion ? Math.round((Date.now() - new Date(o.completion.picker_completed_time).getTime()) / 60000) : 0,
     timeAlert: o.alert,

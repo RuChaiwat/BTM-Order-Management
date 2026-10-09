@@ -4,7 +4,7 @@ import { WorkAssignmentBoard } from '@/components/assignment/WorkAssignmentBoard
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAssignmentBacklogByDate } from '@/lib/queries/assignmentPool'
-import { getActivePickers } from '@/lib/queries/pickers'
+import { getActivePickers, getActiveEmploymentTypes } from '@/lib/queries/pickers'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -18,12 +18,18 @@ export default async function WorkAssignmentPage() {
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
 
-  const [backlogByDate, pickers] = await Promise.all([getAssignmentBacklogByDate(admin, warehouseCode), getActivePickers(admin, warehouseCode)])
+  const [backlogByDate, pickers, employmentTypes] = await Promise.all([
+    getAssignmentBacklogByDate(admin, warehouseCode),
+    getActivePickers(admin, warehouseCode),
+    getActiveEmploymentTypes(admin),
+  ])
+  const labelByType = new Map(employmentTypes.map((t) => [t.type_code, t.label_en]))
+  const pickersWithLabel = pickers.map((p) => ({ ...p, employment_type: p.employment_type ? labelByType.get(p.employment_type) ?? p.employment_type : null }))
 
   return (
     <>
       <TopBar title="Work Assignment" subtitle={`มอบหมายงาน · ${warehouseCode}`} />
-      <WorkAssignmentBoard warehouseCode={warehouseCode} initialBacklogByDate={backlogByDate} pickers={pickers} />
+      <WorkAssignmentBoard warehouseCode={warehouseCode} initialBacklogByDate={backlogByDate} pickers={pickersWithLabel} />
     </>
   )
 }

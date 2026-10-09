@@ -248,10 +248,19 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const activePickerTotalOrders = [...activePickerWork.values()].reduce((s, w) => s + w.orders, 0)
 
   const pickerIds = [...new Set([...pickerTotals.keys(), ...activePickerWork.keys()])]
-  const pickerNamesRes = pickerIds.length
-    ? await db.from('pickers').select('picker_id, name_en').in('picker_id', pickerIds)
-    : { data: [] as { picker_id: string; name_en: string }[] }
+  const [pickerNamesRes, employmentTypeRows] = await Promise.all([
+    pickerIds.length
+      ? db.from('pickers').select('picker_id, name_en, employment_type').in('picker_id', pickerIds)
+      : Promise.resolve({ data: [] as { picker_id: string; name_en: string; employment_type: string | null }[] }),
+    db.from('picker_employment_types').select('type_code, label_en'),
+  ])
   const nameByPickerId = new Map(unwrap(pickerNamesRes).map((p) => [p.picker_id, p.name_en]))
+  const employmentTypeByPickerId = new Map(unwrap(pickerNamesRes).map((p) => [p.picker_id, p.employment_type]))
+  const employmentTypeLabel = new Map(unwrap(employmentTypeRows).map((t) => [t.type_code, t.label_en]))
+  const employmentTypeLabelFor = (pickerId: string): string | null => {
+    const code = employmentTypeByPickerId.get(pickerId)
+    return code ? employmentTypeLabel.get(code) ?? code : null
+  }
 
   // Same target used by the weekly Picker Productivity rating (migration 0020) -- configurable
   // rather than a hardcoded number baked into the dashboard component.
@@ -263,7 +272,13 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const pickerProductivity = [...pickerTotals.entries()]
     .map(([pickerId, t]) => {
       const pcsPerHour = Math.round((t.pieces / t.minutes) * 60)
-      return { pickerId, name: nameByPickerId.get(pickerId) ?? pickerId, pcsPerHour, level: bandForPct((pcsPerHour / targetPcsPerHour) * 100) }
+      return {
+        pickerId,
+        name: nameByPickerId.get(pickerId) ?? pickerId,
+        employmentType: employmentTypeLabelFor(pickerId),
+        pcsPerHour,
+        level: bandForPct((pcsPerHour / targetPcsPerHour) * 100),
+      }
     })
     .sort((a, b) => b.pcsPerHour - a.pcsPerHour)
 
@@ -271,6 +286,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     .map(([pickerId, w]) => ({
       pickerId,
       name: nameByPickerId.get(pickerId) ?? pickerId,
+      employmentType: employmentTypeLabelFor(pickerId),
       orders: w.orders,
       pieces: w.pieces,
       elapsedMinutes: Math.round(w.worstElapsedMinutes),

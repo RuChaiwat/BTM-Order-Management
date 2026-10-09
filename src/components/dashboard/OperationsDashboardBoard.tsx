@@ -27,6 +27,7 @@ interface ZoneStatus {
 interface PickerProductivity {
   pickerId: string
   name: string
+  employmentType: string | null
   pcsPerHour: number
   level: string
 }
@@ -34,6 +35,7 @@ interface PickerProductivity {
 interface ActivePickerRow {
   pickerId: string
   name: string
+  employmentType: string | null
   orders: number
   pieces: number
   elapsedMinutes: number

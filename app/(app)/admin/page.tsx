@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
 import { ReasonMasterManager } from '@/components/admin/ReasonMasterManager'
+import { PickerEmploymentTypeManager } from '@/components/admin/PickerEmploymentTypeManager'
 import { ConfigEditor } from '@/components/admin/ConfigEditor'
 import { ConfigHistoryPanel } from '@/components/admin/ConfigHistoryPanel'
 import { HousekeepingPanel } from '@/components/admin/HousekeepingPanel'
@@ -23,12 +24,14 @@ export default async function AdminPage() {
 
   const [
     { data: reasons, error: reasonsError },
+    { data: employmentTypes, error: employmentTypesError },
     { data: configs, error: configsError },
     { data: configVersions, error: configVersionsError },
     { data: exportJobs, error: exportError },
     { data: purgeLog, error: purgeError },
   ] = await Promise.all([
     admin.from('reason_master').select('reason_code, reason_type, label_en, label_th, active').order('reason_type').order('reason_code'),
+    admin.from('picker_employment_types').select('type_code, label_en, label_th, active').order('type_code'),
     admin.from('configuration').select('key, value, version').eq('active', true).order('key'),
     // Configuration History (below) only needs the two most recent versions per known key --
     // ordering by version desc here lets it just take the first two per key in JS instead of a
@@ -41,6 +44,7 @@ export default async function AdminPage() {
   ])
   for (const [label, err] of [
     ['reason_master', reasonsError],
+    ['picker_employment_types', employmentTypesError],
     ['configuration', configsError],
     ['configuration_versions', configVersionsError],
     ['export_jobs', exportError],
@@ -54,6 +58,7 @@ export default async function AdminPage() {
       <TopBar title="Configuration" subtitle="ตั้งค่าระบบ · Reason Master, thresholds — see Audit Trail (sidebar) for the change log" />
       <div className="page-body">
         <ReasonMasterManager reasons={reasons ?? []} />
+        <PickerEmploymentTypeManager types={employmentTypes ?? []} />
         <ConfigEditor configs={configs ?? []} />
         <ConfigHistoryPanel versions={configVersions ?? []} />
         <HousekeepingPanel exportJobs={exportJobs ?? []} purgeLog={purgeLog ?? []} />

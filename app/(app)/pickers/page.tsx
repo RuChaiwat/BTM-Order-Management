@@ -4,7 +4,7 @@ import { KpiCard } from '@/components/KpiCard'
 import { PickerManagementBoard } from '@/components/pickers/PickerManagementBoard'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getPickers } from '@/lib/queries/pickers'
+import { getPickers, getActiveEmploymentTypes } from '@/lib/queries/pickers'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -17,7 +17,7 @@ export default async function PickerManagementPage() {
   if (!user) redirect('/login')
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
-  const pickers = await getPickers(admin, warehouseCode)
+  const [pickers, employmentTypes] = await Promise.all([getPickers(admin, warehouseCode), getActiveEmploymentTypes(admin)])
 
   const active = pickers.filter((p) => p.active).length
 
@@ -29,7 +29,7 @@ export default async function PickerManagementPage() {
           <KpiCard label="TOTAL PICKERS" labelTh="พนักงานหยิบสินค้าทั้งหมด" value={pickers.length} />
           <KpiCard label="ACTIVE" labelTh="ใช้งานอยู่" value={active} valueColor="#16A34A" />
         </div>
-        <PickerManagementBoard pickers={pickers} warehouseCode={warehouseCode} />
+        <PickerManagementBoard pickers={pickers} warehouseCode={warehouseCode} employmentTypes={employmentTypes} />
       </div>
     </>
   )

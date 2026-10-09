@@ -19,15 +19,22 @@ interface PickerRow {
   active: boolean
   shift_label: string | null
   note: string | null
+  employment_type: string | null
   productivity_level: string | null
   productivity_pcs_per_hour: number | null
   productivity_updated_at: string | null
   created_at: string
 }
 
+interface EmploymentType {
+  type_code: string
+  label_en: string
+  label_th: string | null
+}
+
 const PAGE_SIZE = 20
 
-type SortKey = 'picker_id' | 'name_en' | 'zone_scope' | 'productivity_pcs_per_hour' | 'active'
+type SortKey = 'picker_id' | 'name_en' | 'zone_scope' | 'employment_type' | 'productivity_pcs_per_hour' | 'active'
 
 function sortRows(rows: PickerRow[], key: SortKey, dir: 'asc' | 'desc'): PickerRow[] {
   function value(r: PickerRow): string | number {
@@ -38,6 +45,8 @@ function sortRows(rows: PickerRow[], key: SortKey, dir: 'asc' | 'desc'): PickerR
         return r.name_en
       case 'zone_scope':
         return r.zone_scope.length > 0 ? r.zone_scope.join(',') : ''
+      case 'employment_type':
+        return r.employment_type ?? ''
       case 'productivity_pcs_per_hour':
         return r.productivity_pcs_per_hour ?? -1
       case 'active':
@@ -81,8 +90,9 @@ function ProductivityBadge({ picker }: { picker: PickerRow }) {
  * same ID printed on the picker's employee card) and a name -- Work Assignment scans that same ID
  * directly to resolve a name when assigning work (migration 0018 dropped a separate "Badge Code"
  * after UAT feedback that it read like an achievement badge, not an ID card number). */
-export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: PickerRow[]; warehouseCode: string }) {
+export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes }: { pickers: PickerRow[]; warehouseCode: string; employmentTypes: EmploymentType[] }) {
   const router = useRouter()
+  const labelByType = useMemo(() => new Map(employmentTypes.map((t) => [t.type_code, t.label_en])), [employmentTypes])
   const [selectedId, setSelectedId] = useState(pickers[0]?.picker_id ?? '')
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'picker_id', dir: 'asc' })
   const [page, setPage] = useState(1)
@@ -161,17 +171,19 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
-            <col style={{ width: '11%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '20%' }} />
             <col style={{ width: '25%' }} />
-            <col style={{ width: '32%' }} />
-            <col style={{ width: '15%' }} />
-            <col style={{ width: '17%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '14%' }} />
           </colgroup>
           <thead>
             <tr>
               <SortHeader label="PICKER ID" sortKey="picker_id" sort={sort} onSort={toggleSort} />
               <SortHeader label="NAME" sortKey="name_en" sort={sort} onSort={toggleSort} />
               <SortHeader label="SCOPE" sortKey="zone_scope" sort={sort} onSort={toggleSort} />
+              <SortHeader label="TYPE" sortKey="employment_type" sort={sort} onSort={toggleSort} />
               <SortHeader label="PRODUCTIVITY" sortKey="productivity_pcs_per_hour" sort={sort} onSort={toggleSort} />
               <SortHeader label="STATUS" sortKey="active" sort={sort} onSort={toggleSort} />
             </tr>
@@ -187,6 +199,7 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
                 <td style={{ overflowWrap: 'break-word' }}>
                   {p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'For picking assignment only — pickers have no system login'}
                 </td>
+                <td style={{ overflowWrap: 'break-word' }}>{p.employment_type ? labelByType.get(p.employment_type) ?? p.employment_type : <span style={{ color: '#9CA3AF' }}>—</span>}</td>
                 <td>
                   <ProductivityBadge picker={p} />
                 </td>
@@ -195,7 +208,7 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
+                <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
                   No pickers yet — add one to get started.
                 </td>
               </tr>
@@ -215,6 +228,11 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
                 <div style={{ fontSize: 11.5, color: '#6B7280' }}>
                   {selected.name_th ?? ''} · {selected.picker_id}
                 </div>
+                {selected.employment_type && (
+                  <span className="badge badge-info" style={{ marginTop: 4 }}>
+                    {labelByType.get(selected.employment_type) ?? selected.employment_type}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -265,9 +283,9 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
         )}
       </div>
 
-      {showAdd && <PickerModal warehouseCode={warehouseCode} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); router.refresh() }} />}
+      {showAdd && <PickerModal warehouseCode={warehouseCode} employmentTypes={employmentTypes} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); router.refresh() }} />}
       {editing && selected && (
-        <PickerModal warehouseCode={warehouseCode} picker={selected} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); router.refresh() }} />
+        <PickerModal warehouseCode={warehouseCode} employmentTypes={employmentTypes} picker={selected} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); router.refresh() }} />
       )}
     </div>
   )
@@ -275,11 +293,13 @@ export function PickerManagementBoard({ pickers, warehouseCode }: { pickers: Pic
 
 function PickerModal({
   warehouseCode,
+  employmentTypes,
   picker,
   onClose,
   onSaved,
 }: {
   warehouseCode: string
+  employmentTypes: EmploymentType[]
   picker?: PickerRow
   onClose: () => void
   onSaved: () => void
@@ -290,7 +310,14 @@ function PickerModal({
     name_en: picker?.name_en ?? '',
     name_th: picker?.name_th ?? '',
     note: picker?.note ?? '',
+    employment_type: picker?.employment_type ?? '',
   })
+  // Edit might be opened on a picker whose type was since deactivated in Configuration -- keep
+  // showing it as an option so saving doesn't silently wipe it out from an option list that no
+  // longer includes it.
+  const typeOptions = picker?.employment_type && !employmentTypes.some((t) => t.type_code === picker.employment_type)
+    ? [...employmentTypes, { type_code: picker.employment_type, label_en: picker.employment_type, label_th: null }]
+    : employmentTypes
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -310,8 +337,8 @@ function PickerModal({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
         isEdit
-          ? { picker_id: form.picker_id, name_en: form.name_en, name_th: form.name_th || null, note: form.note || null }
-          : { ...form, note: form.note || null, warehouse_code: warehouseCode },
+          ? { picker_id: form.picker_id, name_en: form.name_en, name_th: form.name_th || null, note: form.note || null, employment_type: form.employment_type || null }
+          : { ...form, note: form.note || null, employment_type: form.employment_type || null, warehouse_code: warehouseCode },
       ),
     })
     const body = await res.json()
@@ -359,7 +386,25 @@ function PickerModal({
         </div>
         <div className="field">
           <label className="field-label">
-            Note <span className="field-hint">optional — e.g. employee type, distinction, certification. Informational only, not used to look the picker up</span>
+            Employment Type <span className="field-hint">optional — ประเภทการจ้างงาน, configurable in Configuration</span>
+          </label>
+          <select
+            className="field-input"
+            value={form.employment_type}
+            onChange={(e) => setForm({ ...form, employment_type: e.target.value })}
+            style={{ border: '1px solid var(--color-border)' }}
+          >
+            <option value="">— Not set —</option>
+            {typeOptions.map((t) => (
+              <option key={t.type_code} value={t.type_code}>
+                {t.label_en}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label className="field-label">
+            Note <span className="field-hint">optional — distinction, certification. Informational only, not used to look the picker up</span>
           </label>
           <textarea
             className="field-input"

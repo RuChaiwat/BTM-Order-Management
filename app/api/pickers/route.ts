@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { picker_id, name_en, name_th, warehouse_code, zone_scope, shift_label, note } = body
+  const { picker_id, name_en, name_th, warehouse_code, zone_scope, shift_label, note, employment_type } = body
 
   if (!picker_id || !name_en) {
     return NextResponse.json({ error: 'picker_id and name_en are required' }, { status: 400 })
@@ -59,6 +59,7 @@ export async function POST(request: Request) {
       zone_scope: zone_scope ?? [],
       shift_label: shift_label ?? null,
       note: note || null,
+      employment_type: employment_type || null,
     })
     .select()
     .single()
@@ -88,7 +89,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'picker_id is required' }, { status: 400 })
   }
 
-  const allowed = ['name_en', 'name_th', 'warehouse_code', 'zone_scope', 'active', 'shift_label', 'note']
+  const allowed = ['name_en', 'name_th', 'warehouse_code', 'zone_scope', 'active', 'shift_label', 'note', 'employment_type']
   const patch = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)))
 
   const admin = createAdminClient()

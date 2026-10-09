@@ -42,9 +42,10 @@ export const MIN_CYCLE_MINUTES_FOR_RATE = 5
  * reason breakdown. */
 export async function getProductivityData(db: SupabaseClient, warehouseCode: string, date: string) {
   const { sinceIso, untilIso } = bangkokDayRange(date)
-  const [orders, pickers, cfg, roundBatches] = await Promise.all([
+  const [orders, pickers, employmentTypeRows, cfg, roundBatches] = await Promise.all([
     fetchAllRows((from, to) => db.from('orders').select('order_id, assigned_time, assignment_batch_id, consolidation_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).range(from, to)),
-    db.from('pickers').select('picker_id, name_en').eq('warehouse_code', warehouseCode).eq('active', true).then(unwrap),
+    db.from('pickers').select('picker_id, name_en, employment_type').eq('warehouse_code', warehouseCode).eq('active', true).then(unwrap),
+    db.from('picker_employment_types').select('type_code, label_en').then(unwrap),
     // Same target used by the weekly Picker Productivity rating (migration 0020) -- configurable
     // rather than a second hardcoded number baked into this page.
     getActiveConfig(db, ['picker_productivity.target_pcs_per_hour']),
@@ -54,6 +55,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     db.from('assignment_batches').select('picker_id').eq('warehouse_code', warehouseCode).not('picker_id', 'is', null).gte('assigned_time', sinceIso).lt('assigned_time', untilIso).then(unwrap),
   ])
   const targetPcsPerHour = Number(cfg.value('picker_productivity.target_pcs_per_hour') ?? 4500)
+  const employmentTypeLabel = new Map(employmentTypeRows.map((t) => [t.type_code, t.label_en]))
   const roundsByPicker = new Map<string, number>()
   for (const b of roundBatches) {
     roundsByPicker.set(b.picker_id as string, (roundsByPicker.get(b.picker_id as string) ?? 0) + 1)
@@ -132,6 +134,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     return {
       user_id: p.picker_id,
       name: p.name_en,
+      employmentType: p.employment_type ? employmentTypeLabel.get(p.employment_type) ?? p.employment_type : null,
       rounds: roundsByPicker.get(p.picker_id) ?? 0,
       pcsPerHour: e && e.minutes > 0 ? Math.round((e.pieces / e.minutes) * 60) : null,
       completed: e?.completed ?? 0,

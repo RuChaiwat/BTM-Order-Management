@@ -20,8 +20,8 @@ export async function GET(request: Request) {
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const data = await getProductivityData(admin, warehouseCode, date)
 
-  const header = ['Picker ID', 'Picker Name', 'Orders Completed', 'Pieces Completed', 'Pieces Short', 'Round', 'PCS/HR', 'SLA %', 'Short Pick %']
-  const sheetRows = data.pickerRows.map((p) => [p.user_id, p.name, p.completed, p.piecesCompleted, p.piecesShort, p.rounds, p.pcsPerHour ?? '', p.slaPct ?? '', p.shortRate ?? ''])
+  const header = ['Picker ID', 'Picker Name', 'Employment Type', 'Orders Completed', 'Pieces Completed', 'Pieces Short', 'Round', 'PCS/HR', 'SLA %', 'Short Pick %']
+  const sheetRows = data.pickerRows.map((p) => [p.user_id, p.name, p.employmentType ?? '', p.completed, p.piecesCompleted, p.piecesShort, p.rounds, p.pcsPerHour ?? '', p.slaPct ?? '', p.shortRate ?? ''])
   const buffer = buildXlsxBuffer([{ name: 'Picker Productivity', rows: [header, ...sheetRows] }])
 
   const fileName = `BTM_PickerProductivity_${date}.xlsx`

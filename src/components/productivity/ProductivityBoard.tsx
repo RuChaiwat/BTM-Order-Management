@@ -8,6 +8,7 @@ import { ExportExcelButton } from '@/components/ExportExcelButton'
 interface PickerRow {
   user_id: string
   name: string
+  employmentType: string | null
   rounds: number
   pcsPerHour: number | null
   completed: number
@@ -22,6 +23,7 @@ const PAGE_SIZE = 20
 interface LeaderboardRow {
   user_id: string
   name: string
+  employmentType: string | null
   rounds: number
   pcsPerHour: number
   completed: number
@@ -94,6 +96,7 @@ function Leaderboard({ title, subtitle, rows, valueColor, emptyText }: { title: 
               <td>{i + 1}</td>
               <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
                 {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.user_id})</span>
+                {p.employmentType && <div style={{ fontSize: 11, fontWeight: 400, color: '#6B7280' }}>{p.employmentType}</div>}
               </td>
               <td style={{ fontWeight: 700, color: valueColor }}>{p.pcsPerHour.toLocaleString()}</td>
               <td>{p.completed}</td>
@@ -256,6 +259,7 @@ export function ProductivityBoard({
                   <td>{(pickerPage - 1) * PAGE_SIZE + i + 1}</td>
                   <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
                     {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.user_id})</span>
+                    {p.employmentType && <div style={{ fontSize: 11, fontWeight: 400, color: '#6B7280' }}>{p.employmentType}</div>}
                   </td>
                   <td style={{ fontWeight: p.pcsPerHour ? 700 : 400, color: p.pcsPerHour ? undefined : '#6B7280' }}>{p.pcsPerHour ?? '—'}</td>
                   <td>{p.completed}</td>

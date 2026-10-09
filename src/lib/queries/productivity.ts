@@ -146,7 +146,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
       shortRate: e && e.completed > 0 ? Math.round((e.short / e.completed) * 1000) / 10 : null,
       slaPct: e && e.completed > 0 ? Math.round((e.onTime / e.completed) * 1000) / 10 : null,
     }
-  })
+  }).filter((p) => p.rounds > 0) // a picker with no round assigned that day has nothing to show -- not "0 pcs/hr", just absent from the day's work entirely.
 
   // Leaderboards only make sense for pickers who actually worked this date -- a picker who didn't
   // work isn't "below target," they're simply absent from the day's productivity entirely.

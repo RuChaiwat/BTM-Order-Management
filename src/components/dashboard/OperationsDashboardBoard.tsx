@@ -246,7 +246,7 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
         <div className="card">
           <div className="card-title">Today&apos;s Picker Productivity</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            ผลิตภาพผู้หยิบสินค้า · pieces per hour · click a column to sort
+            ประสิทธิผลผู้หยิบสินค้า · pieces per hour · click a column to sort
           </div>
           <PickerProductivityTable pickers={data.pickerProductivity} targetPcsPerHour={data.targetPcsPerHour} />
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed var(--color-border)', fontSize: 11.5, color: 'var(--color-text-secondary)' }}>

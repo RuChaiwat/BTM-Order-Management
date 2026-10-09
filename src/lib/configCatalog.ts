@@ -49,7 +49,7 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
   { id: 'order_complexity', labelEn: 'Order Complexity', labelTh: 'ความซับซ้อนของออเดอร์' },
   { id: 'order_sla', labelEn: 'Picking SLA & Alerts', labelTh: 'เกณฑ์เวลาแจ้งเตือน (ขั้น Picking)' },
   { id: 'admin_verification', labelEn: 'Verification SLA & Alerts', labelTh: 'เกณฑ์เวลาแจ้งเตือน (ขั้น Verification)' },
-  { id: 'picker_productivity', labelEn: 'Picker Productivity', labelTh: 'ผลิตภาพพนักงานหยิบสินค้า' },
+  { id: 'picker_productivity', labelEn: 'Picker Productivity', labelTh: 'ประสิทธิผลพนักงานหยิบสินค้า' },
   { id: 'housekeeping', labelEn: 'Data Retention', labelTh: 'ระยะเวลาเก็บข้อมูล' },
 ]
 
@@ -283,7 +283,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     labelEn: 'Target picking speed',
     labelTh: 'เป้าหมายความเร็วในการหยิบ',
     descriptionEn: 'Target picking speed used to rate picker productivity (Picker Management) and to rank Top/Bottom pickers on the Productivity page.',
-    descriptionTh: 'เป้าหมายความเร็วในการหยิบสินค้า ใช้ให้คะแนนผลิตภาพพนักงาน (หน้าจัดการพนักงานหยิบสินค้า) และจัดอันดับ Top/Bottom Pickers ในหน้า Productivity',
+    descriptionTh: 'เป้าหมายความเร็วในการหยิบสินค้า ใช้ให้คะแนนประสิทธิผลพนักงาน (หน้าจัดการพนักงานหยิบสินค้า) และจัดอันดับ Top/Bottom Pickers ในหน้า Productivity',
     kind: 'integer',
     unit: 'pcs/hr',
     min: 0,

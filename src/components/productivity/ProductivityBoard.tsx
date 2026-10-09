@@ -11,6 +11,7 @@ interface PickerRow {
   employmentType: string | null
   rounds: number
   pcsPerHour: number | null
+  avgIdleMinutes: number | null
   completed: number
   piecesCompleted: number
   piecesShort: number
@@ -30,16 +31,7 @@ interface LeaderboardRow {
   piecesCompleted: number
 }
 
-interface ReasonRow {
-  code: string
-  label: string
-  zone: string
-  count: number
-  shortPieces: number
-}
-
-type PickerSortKey = 'name' | 'pcsPerHour' | 'completed' | 'rounds' | 'piecesCompleted' | 'slaPct' | 'shortRate'
-type ReasonSortKey = 'label' | 'zone' | 'count' | 'shortPieces'
+type PickerSortKey = 'name' | 'employmentType' | 'pcsPerHour' | 'completed' | 'rounds' | 'avgIdleMinutes' | 'piecesCompleted' | 'slaPct' | 'shortRate'
 
 function sortRows<T, K extends string>(rows: T[], key: K, dir: 'asc' | 'desc', pick: (row: T, key: K) => string | number | null): T[] {
   const copy = [...rows]
@@ -119,7 +111,6 @@ function Leaderboard({ title, subtitle, rows, valueColor, emptyText }: { title: 
 
 export function ProductivityBoard({
   pickerRows,
-  reasonBreakdown,
   topAboveTarget,
   bottomPerformers,
   targetPcsPerHour,
@@ -127,7 +118,6 @@ export function ProductivityBoard({
   warehouseCode,
 }: {
   pickerRows: PickerRow[]
-  reasonBreakdown: ReasonRow[]
   topAboveTarget: LeaderboardRow[]
   bottomPerformers: LeaderboardRow[]
   targetPcsPerHour: number
@@ -135,23 +125,18 @@ export function ProductivityBoard({
   warehouseCode: string
 }) {
   const [pickerSort, setPickerSort] = useState<{ key: PickerSortKey; dir: 'asc' | 'desc' }>({ key: 'pcsPerHour', dir: 'desc' })
-  const [reasonSort, setReasonSort] = useState<{ key: ReasonSortKey; dir: 'asc' | 'desc' }>({ key: 'shortPieces', dir: 'desc' })
   const [pickerPage, setPickerPage] = useState(1)
-  const [reasonPage, setReasonPage] = useState(1)
 
   function togglePickerSort(key: PickerSortKey) {
-    setPickerSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' ? 'asc' : 'desc' }))
+    setPickerSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' || key === 'employmentType' ? 'asc' : 'desc' }))
     setPickerPage(1)
-  }
-  function toggleReasonSort(key: ReasonSortKey) {
-    setReasonSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'label' || key === 'zone' ? 'asc' : 'desc' }))
-    setReasonPage(1)
   }
 
   const sortedPickers = useMemo(
     () =>
       sortRows(pickerRows, pickerSort.key, pickerSort.dir, (row, key) => {
         if (key === 'name') return row.name
+        if (key === 'employmentType') return row.employmentType
         return row[key]
       }),
     [pickerRows, pickerSort],
@@ -159,17 +144,6 @@ export function ProductivityBoard({
   const pickerTotalPages = Math.max(1, Math.ceil(sortedPickers.length / PAGE_SIZE))
   const pickerPageRows = sortedPickers.slice((pickerPage - 1) * PAGE_SIZE, pickerPage * PAGE_SIZE)
   const productivityExportHref = `/api/productivity/export?date=${date}`
-  const sortedReasons = useMemo(
-    () =>
-      sortRows(reasonBreakdown, reasonSort.key, reasonSort.dir, (row, key) => {
-        if (key === 'label') return row.label
-        if (key === 'zone') return row.zone
-        return row[key]
-      }),
-    [reasonBreakdown, reasonSort],
-  )
-  const reasonTotalPages = Math.max(1, Math.ceil(sortedReasons.length / PAGE_SIZE))
-  const reasonPageRows = sortedReasons.slice((reasonPage - 1) * PAGE_SIZE, reasonPage * PAGE_SIZE)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
@@ -190,148 +164,110 @@ export function ProductivityBoard({
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 14, flex: 1 }}>
-        <div className="card">
-          <div className="card-header" style={{ marginBottom: 10 }}>
-            <span className="card-title">Picker Productivity</span>
-            <span className="card-subtitle">ผลิตภาพผู้หยิบสินค้า · {formatDate(date)} · click a column to sort</span>
-            <ExportExcelButton href={productivityExportHref} style={{ marginLeft: 'auto' }} />
-          </div>
-          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
-            <colgroup>
-              <col style={{ width: '4%' }} />
-              <col style={{ width: '27%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '11%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '15%' }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>#</th>
-                <SortHeader label="PICKER" sortKey="name" sort={pickerSort} onSort={togglePickerSort} />
-                <SortHeader label="PCS / HR" sortKey="pcsPerHour" sort={pickerSort} onSort={togglePickerSort} />
-                <SortHeader
-                  label={
-                    <>
-                      ORDERS
-                      <br />
-                      COMPLETED
-                    </>
-                  }
-                  sortKey="completed"
-                  sort={pickerSort}
-                  onSort={togglePickerSort}
-                />
-                <SortHeader label="ROUND" sortKey="rounds" sort={pickerSort} onSort={togglePickerSort} />
-                <SortHeader
-                  label={
-                    <>
-                      PIECES
-                      <br />
-                      COMPLETED
-                    </>
-                  }
-                  sortKey="piecesCompleted"
-                  sort={pickerSort}
-                  onSort={togglePickerSort}
-                />
-                <SortHeader label="SLA %" sortKey="slaPct" sort={pickerSort} onSort={togglePickerSort} />
-                <SortHeader
-                  label={
-                    <>
-                      SHORT
-                      <br />
-                      PICK %
-                    </>
-                  }
-                  sortKey="shortRate"
-                  sort={pickerSort}
-                  onSort={togglePickerSort}
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {pickerPageRows.map((p, i) => (
-                <tr key={p.user_id}>
-                  <td>{(pickerPage - 1) * PAGE_SIZE + i + 1}</td>
-                  <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
-                    {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.user_id})</span>
-                    {p.employmentType && <div style={{ fontSize: 11, fontWeight: 400, color: '#6B7280' }}>{p.employmentType}</div>}
-                  </td>
-                  <td style={{ fontWeight: p.pcsPerHour ? 700 : 400, color: p.pcsPerHour ? undefined : '#6B7280' }}>{p.pcsPerHour ?? '—'}</td>
-                  <td>{p.completed}</td>
-                  <td>{p.rounds}</td>
-                  <td>{p.piecesCompleted.toLocaleString()}</td>
-                  <td>{p.slaPct !== null ? `${p.slaPct}%` : '—'}</td>
-                  <td>{p.shortRate !== null ? `${p.shortRate}%` : '—'}</td>
-                </tr>
-              ))}
-              {pickerPageRows.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={{ color: 'var(--color-text-secondary)' }}>
-                    No active pickers found for {warehouseCode}.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          {sortedPickers.length > 0 && <Pagination page={pickerPage} totalPages={pickerTotalPages} onChange={setPickerPage} />}
+      <div className="card" style={{ flex: 1 }}>
+        <div className="card-header" style={{ marginBottom: 10 }}>
+          <span className="card-title">Picker Productivity</span>
+          <span className="card-subtitle">ประสิทธิผลผู้หยิบสินค้า · {formatDate(date)} · click a column to sort</span>
+          <ExportExcelButton href={productivityExportHref} style={{ marginLeft: 'auto' }} />
         </div>
-
-        <div className="card">
-          <div className="card-header" style={{ marginBottom: 10 }}>
-            <span className="card-title">Short Pick Reasons</span>
-            <span className="card-subtitle">สาเหตุการหยิบขาด · click a column to sort</span>
-          </div>
-          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
-            <colgroup>
-              <col style={{ width: '44%' }} />
-              <col style={{ width: '16%' }} />
-              <col style={{ width: '20%' }} />
-              <col style={{ width: '20%' }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <SortHeader label="REASON" sortKey="label" sort={reasonSort} onSort={toggleReasonSort} />
-                <SortHeader label="ZONE" sortKey="zone" sort={reasonSort} onSort={toggleReasonSort} />
-                <SortHeader label="OCCURRENCES" sortKey="count" sort={reasonSort} onSort={toggleReasonSort} />
-                <SortHeader
-                  label={
-                    <>
-                      PIECES
-                      <br />
-                      SHORT
-                    </>
-                  }
-                  sortKey="shortPieces"
-                  sort={reasonSort}
-                  onSort={toggleReasonSort}
-                />
+        <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            <col style={{ width: '3%' }} />
+            <col style={{ width: '19%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '11%' }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>#</th>
+              <SortHeader label="PICKER" sortKey="name" sort={pickerSort} onSort={togglePickerSort} />
+              <SortHeader label="TYPE" sortKey="employmentType" sort={pickerSort} onSort={togglePickerSort} />
+              <SortHeader label="PCS / HR" sortKey="pcsPerHour" sort={pickerSort} onSort={togglePickerSort} />
+              <SortHeader
+                label={
+                  <>
+                    ORDERS
+                    <br />
+                    COMPLETED
+                  </>
+                }
+                sortKey="completed"
+                sort={pickerSort}
+                onSort={togglePickerSort}
+              />
+              <SortHeader label="ROUND" sortKey="rounds" sort={pickerSort} onSort={togglePickerSort} />
+              <SortHeader
+                label={
+                  <>
+                    AVG IDLE
+                    <br />
+                    (MIN)
+                  </>
+                }
+                sortKey="avgIdleMinutes"
+                sort={pickerSort}
+                onSort={togglePickerSort}
+              />
+              <SortHeader
+                label={
+                  <>
+                    PIECES
+                    <br />
+                    COMPLETED
+                  </>
+                }
+                sortKey="piecesCompleted"
+                sort={pickerSort}
+                onSort={togglePickerSort}
+              />
+              <SortHeader label="SLA %" sortKey="slaPct" sort={pickerSort} onSort={togglePickerSort} />
+              <SortHeader
+                label={
+                  <>
+                    SHORT
+                    <br />
+                    PICK %
+                  </>
+                }
+                sortKey="shortRate"
+                sort={pickerSort}
+                onSort={togglePickerSort}
+              />
+            </tr>
+          </thead>
+          <tbody>
+            {pickerPageRows.map((p, i) => (
+              <tr key={p.user_id}>
+                <td>{(pickerPage - 1) * PAGE_SIZE + i + 1}</td>
+                <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
+                  {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.user_id})</span>
+                </td>
+                <td style={{ overflowWrap: 'break-word' }}>{p.employmentType ?? <span style={{ color: '#9CA3AF' }}>—</span>}</td>
+                <td style={{ fontWeight: p.pcsPerHour ? 700 : 400, color: p.pcsPerHour ? undefined : '#6B7280' }}>{p.pcsPerHour ?? '—'}</td>
+                <td>{p.completed}</td>
+                <td>{p.rounds}</td>
+                <td>{p.avgIdleMinutes !== null ? `${p.avgIdleMinutes} min` : '—'}</td>
+                <td>{p.piecesCompleted.toLocaleString()}</td>
+                <td>{p.slaPct !== null ? `${p.slaPct}%` : '—'}</td>
+                <td>{p.shortRate !== null ? `${p.shortRate}%` : '—'}</td>
               </tr>
-            </thead>
-            <tbody>
-              {reasonPageRows.map((r) => (
-                <tr key={`${r.code}__${r.zone}`}>
-                  <td style={{ overflowWrap: 'break-word' }}>{r.label}</td>
-                  <td>{r.zone}</td>
-                  <td>{r.count}</td>
-                  <td style={{ fontWeight: 700, color: '#F59E0B' }}>{r.shortPieces}</td>
-                </tr>
-              ))}
-              {reasonPageRows.length === 0 && (
-                <tr>
-                  <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
-                    No short picks on this date.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          {sortedReasons.length > 0 && <Pagination page={reasonPage} totalPages={reasonTotalPages} onChange={setReasonPage} />}
-        </div>
+            ))}
+            {pickerPageRows.length === 0 && (
+              <tr>
+                <td colSpan={10} style={{ color: 'var(--color-text-secondary)' }}>
+                  No active pickers found for {warehouseCode}.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        {sortedPickers.length > 0 && <Pagination page={pickerPage} totalPages={pickerTotalPages} onChange={setPickerPage} />}
       </div>
     </div>
   )

@@ -35,7 +35,7 @@ export const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
   'locations.activate': { labelEn: 'Bin location activated', labelTh: 'เปิดใช้งานตำแหน่งจัดเก็บ' },
   'locations.deactivate': { labelEn: 'Bin location deactivated', labelTh: 'ปิดใช้งานตำแหน่งจัดเก็บ' },
   'locations.import': { labelEn: 'Locations imported', labelTh: 'นำเข้าตำแหน่งจัดเก็บ' },
-  'picker.productivity_recalc': { labelEn: 'Weekly productivity recalculated', labelTh: 'คำนวณผลิตภาพพนักงานประจำสัปดาห์' },
+  'picker.productivity_recalc': { labelEn: 'Weekly productivity recalculated', labelTh: 'คำนวณประสิทธิผลพนักงานประจำสัปดาห์' },
   'consolidation_batch.approve': { labelEn: 'Consolidation batch approved', labelTh: 'อนุมัติ Batch การรวมออเดอร์' },
   'consolidation_batch.complete': { labelEn: 'Consolidation batch completed', labelTh: 'ปิดงาน Batch การรวมออเดอร์' },
   'consolidation_batch.cancel': { labelEn: 'Consolidation batch cancelled', labelTh: 'ยกเลิก Batch การรวมออเดอร์' },

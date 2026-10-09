@@ -4,9 +4,10 @@ import { AutoRefresh } from '@/components/AutoRefresh'
 import { KpiCard } from '@/components/KpiCard'
 import { ProductivityDateFilter } from '@/components/productivity/ProductivityDateFilter'
 import { ProductivityBoard } from '@/components/productivity/ProductivityBoard'
+import { DailyProductivityHistory } from '@/components/productivity/DailyProductivityHistory'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getProductivityData } from '@/lib/queries/productivity'
+import { getProductivityData, getMonthlyProductivityHistory } from '@/lib/queries/productivity'
 import { bangkokDateKey, formatDate } from '@/lib/formatDate'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
@@ -21,12 +22,12 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
   const date = searchParams.date || bangkokDateKey(new Date()) || new Date().toISOString().slice(0, 10)
-  const data = await getProductivityData(admin, warehouseCode, date)
+  const [data, monthlyHistory] = await Promise.all([getProductivityData(admin, warehouseCode, date), getMonthlyProductivityHistory(admin, warehouseCode)])
 
   return (
     <>
       <AutoRefresh />
-      <TopBar title="Productivity / SLA / Short Pick" subtitle={`ผลิตภาพ / SLA / หยิบขาด · ${formatDate(date)} · ${warehouseCode}`}>
+      <TopBar title="Productivity & SLA" subtitle={`ประสิทธิผล / คุณภาพการให้บริการ · ${formatDate(date)} · ${warehouseCode}`}>
         <ProductivityDateFilter date={date} />
       </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
@@ -50,7 +51,7 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
           />
           <KpiCard
             label="SLA COMPLIANCE"
-            labelTh="อัตราปฏิบัติตาม SLA"
+            labelTh="คุณภาพการให้บริการ"
             value={data.kpis.slaPct !== null ? `${data.kpis.slaPct}%` : '—'}
             valueColor={data.kpis.slaPct !== null && data.kpis.slaPct < 85 ? '#DC2626' : '#16A34A'}
             sub="cycle time ≤ 120 min"
@@ -70,13 +71,14 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
 
         <ProductivityBoard
           pickerRows={data.pickerRows}
-          reasonBreakdown={data.reasonBreakdown}
           topAboveTarget={data.topAboveTarget}
           bottomPerformers={data.bottomPerformers}
           targetPcsPerHour={data.targetPcsPerHour}
           date={date}
           warehouseCode={warehouseCode}
         />
+
+        <DailyProductivityHistory rows={monthlyHistory} selectedDate={date} />
       </div>
     </>
   )

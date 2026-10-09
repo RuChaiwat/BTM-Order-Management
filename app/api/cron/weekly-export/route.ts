@@ -4,7 +4,7 @@ import { buildXlsxBuffer } from '@/lib/xlsxExport'
 import { getSessionUser } from '@/lib/auth'
 import { bangkokDateKey, formatDate, formatDateTime } from '@/lib/formatDate'
 import { getShortPickDetailRows } from '@/lib/queries/shortPickMonitor'
-import { MIN_CYCLE_MINUTES_FOR_RATE } from '@/lib/queries/productivity'
+import { MIN_CYCLE_MINUTES_FOR_RATE, computeRoundBasedRate, type RoundCompletion } from '@/lib/pickerProductivity'
 import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
 
 /**
@@ -134,36 +134,41 @@ export async function GET(request: Request) {
       shortPickOrders: detailRows.filter((r) => r[11] === 'short').length,
     }
 
-    // Picker Daily Summary -- grouped by (picker, Bangkok-calendar day), same two rules as
+    // Picker Daily Summary -- grouped by (picker, Bangkok-calendar day), same rules as
     // Productivity's own per-day view (src/lib/queries/productivity.ts) so the two can never
     // disagree: (1) a Consolidation Batch order is excluded entirely -- its cycle time is
     // dominated by however long Sort takes, not the picker's own throughput; (2) an order not
     // assigned on the SAME day it was completed (picker went home without finishing it, or nobody
     // Unassigned it) still counts toward Orders/Total Pieces, but is excluded from Avg Cycle
     // Minutes/Avg Pieces/Hour -- a multi-day cycle time isn't a meaningful same-day rate. Avg Cycle
-    // Minutes is a plain per-order mean of the real elapsed time; Avg Pieces/Hour is total pieces
-    // over total RATE minutes (floored, see above) for the group (throughput), not a mean of each
-    // order's own rate, so one short order can't skew it disproportionately.
-    const summaryByKey = new Map<
-      string,
-      { pickerId: string; day: string; orders: number; totalPieces: number; totalCycleMinutes: number; totalRateMinutes: number; rateEligibleOrders: number; rateEligiblePieces: number }
-    >()
-    for (const { c, order, pickerId, cycleMinutes, rateMinutes } of enriched) {
+    // Minutes is a plain per-order mean of the real elapsed time -- unaffected by the ROUND
+    // grouping below, which only applies to Avg Pieces/Hour (see computeRoundBasedRate's comment).
+    const summaryByKey = new Map<string, { pickerId: string; day: string; orders: number; totalPieces: number; totalCycleMinutes: number; rateEligibleOrders: number }>()
+    const roundRowsByDay = new Map<string, RoundCompletion[]>()
+    for (const { c, order, pickerId, cycleMinutes } of enriched) {
       if (!pickerId || order?.consolidation_batch_id) continue
       const day = bangkokDateKey(c.picker_completed_time)
       if (!day) continue
       const key = `${pickerId}__${day}`
-      const entry = summaryByKey.get(key) ?? { pickerId, day, orders: 0, totalPieces: 0, totalCycleMinutes: 0, totalRateMinutes: 0, rateEligibleOrders: 0, rateEligiblePieces: 0 }
+      const entry = summaryByKey.get(key) ?? { pickerId, day, orders: 0, totalPieces: 0, totalCycleMinutes: 0, rateEligibleOrders: 0 }
       entry.orders += 1
       entry.totalPieces += c.actual_pieces ?? 0
       const sameDayAssigned = !!order?.assigned_time && bangkokDateKey(order.assigned_time) === day
       if (sameDayAssigned) {
         entry.totalCycleMinutes += cycleMinutes
-        entry.totalRateMinutes += rateMinutes
         entry.rateEligibleOrders += 1
-        entry.rateEligiblePieces += c.actual_pieces ?? 0
+        if (order?.assignment_batch_id) {
+          if (!roundRowsByDay.has(day)) roundRowsByDay.set(day, [])
+          roundRowsByDay.get(day)!.push({ pickerId, assignmentBatchId: order.assignment_batch_id, assignedTime: order.assigned_time as string, completedTime: c.picker_completed_time, pieces: c.actual_pieces ?? 0 })
+        }
       }
       summaryByKey.set(key, entry)
+    }
+    const rateByPickerDay = new Map<string, { pieces: number; minutes: number }>()
+    for (const [day, rows] of roundRowsByDay) {
+      for (const [pickerId, rate] of computeRoundBasedRate(rows)) {
+        rateByPickerDay.set(`${pickerId}__${day}`, rate)
+      }
     }
 
     const pickerIdsForSummary = [...new Set([...summaryByKey.values()].map((s) => s.pickerId))]
@@ -175,15 +180,18 @@ export async function GET(request: Request) {
     const summaryHeader = ['Picker ID', 'Picker Name', 'Date', 'Orders Completed', 'Total Pieces', 'Avg Cycle Minutes', 'Avg Pieces/Hour']
     const summaryRows = [...summaryByKey.values()]
       .sort((a, b) => a.day.localeCompare(b.day) || a.pickerId.localeCompare(b.pickerId))
-      .map((s) => [
-        s.pickerId,
-        nameByPicker.get(s.pickerId) ?? s.pickerId,
-        formatDate(s.day),
-        s.orders,
-        s.totalPieces,
-        s.rateEligibleOrders > 0 ? Math.round(s.totalCycleMinutes / s.rateEligibleOrders) : 0,
-        s.totalRateMinutes > 0 ? Math.round((s.rateEligiblePieces / s.totalRateMinutes) * 60) : 0,
-      ])
+      .map((s) => {
+        const rate = rateByPickerDay.get(`${s.pickerId}__${s.day}`)
+        return [
+          s.pickerId,
+          nameByPicker.get(s.pickerId) ?? s.pickerId,
+          formatDate(s.day),
+          s.orders,
+          s.totalPieces,
+          s.rateEligibleOrders > 0 ? Math.round(s.totalCycleMinutes / s.rateEligibleOrders) : 0,
+          rate && rate.minutes > 0 ? Math.round((rate.pieces / rate.minutes) * 60) : 0,
+        ]
+      })
 
     // Short / Damage / Expired sheet (Purge review follow-up, item 2) -- item-level detail, same
     // source and warehouse-agnostic scope as the rest of this export. Reason detail only exists

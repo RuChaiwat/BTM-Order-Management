@@ -4,20 +4,13 @@ import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds } from './scopedFetch'
 import { getActiveConfig } from './config'
 import { bangkokDateKey, bangkokDayRange } from '../formatDate'
+import { computeRoundBasedRate, type RoundCompletion } from '../pickerProductivity'
 
 /** Cycle time (Assigned → Picker Completed) at or under this is "on time" for the SLA KPI here.
  * Matches Control Tower's "overdue" threshold (§13); a dedicated configuration key is a
  * reasonable follow-up, not built here (same judgment call as order_alerts' thresholds). */
 const SLA_THRESHOLD_MINUTES = 120
 const LEADERBOARD_SIZE = 10
-
-/** Floor for the cycle-time minutes an order contributes to a Pcs/Hour calculation -- a real pick
- * confirmed in under this looks the same as one confirmed within seconds of being assigned (test
- * data, or a picker confirming in a rush), and either way divides pieces by an unrealistically tiny
- * number of minutes and produces a rate in the thousands/hour that isn't a meaningful throughput
- * figure. Only the RATE math is floored -- the real elapsed time still drives the SLA/on-time
- * check above, and the picker's own confirm action is never blocked or delayed by this. */
-export const MIN_CYCLE_MINUTES_FOR_RATE = 5
 
 /** §12.2/§13 Productivity / SLA / Short Pick analytics for a single (Bangkok-calendar) day, driven
  * entirely by the PICKER's own confirm date (picker_completions.picker_completed_time) --
@@ -85,9 +78,9 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     : { data: [] as { assignment_batch_id: string; picker_id: string | null }[] }
   const pickerIdByBatch = new Map(unwrap(batchesRes).map((b) => [b.assignment_batch_id, b.picker_id]))
 
-  const productivityByPicker = new Map<string, { pieces: number; minutes: number; completed: number; short: number; onTime: number; piecesCompleted: number; piecesShort: number }>()
+  const productivityByPicker = new Map<string, { completed: number; short: number; onTime: number; piecesCompleted: number; piecesShort: number }>()
+  const roundRows: RoundCompletion[] = []
   let totalPieces = 0
-  let totalMinutes = 0
   let onTimeCount = 0
   let cycleTimedCount = 0
   let shortCount = 0
@@ -98,7 +91,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     totalPieces += completion.actual_pieces ?? 0
     if (isShort) shortCount += 1
 
-    const entry = pickerId ? productivityByPicker.get(pickerId) ?? { pieces: 0, minutes: 0, completed: 0, short: 0, onTime: 0, piecesCompleted: 0, piecesShort: 0 } : null
+    const entry = pickerId ? productivityByPicker.get(pickerId) ?? { completed: 0, short: 0, onTime: 0, piecesCompleted: 0, piecesShort: 0 } : null
     if (entry) {
       entry.completed += 1
       if (isShort) entry.short += 1
@@ -106,37 +99,50 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
       entry.piecesShort += Math.max(0, (order.planned_pieces ?? 0) - (completion.actual_pieces ?? 0))
     }
 
-    // Rate/SLA math only counts an order assigned on this SAME (Bangkok) day -- one assigned
-    // yesterday but not confirmed until today (picker went home without finishing it, or nobody
-    // got around to Unassigning it) would otherwise show a multi-day cycle time that has nothing
-    // to do with today's actual work and would drag today's Pcs/Hour down for no real reason. It
-    // still counts toward Orders Completed/Total Pieces/Short Pick Rate above, just not the rate.
+    // SLA ("on time") stays a per-ORDER check -- whether THIS order was finished within the
+    // promised window from when it was handed to the picker -- regardless of how many other
+    // orders shared the same round. Only assigned-on-the-SAME-(Bangkok)-day orders count toward
+    // it: one assigned yesterday but not confirmed until today (picker went home without
+    // finishing it, or nobody got around to Unassigning it) would otherwise show a multi-day cycle
+    // time that has nothing to do with today's actual work. It still counts toward Orders
+    // Completed/Total Pieces/Short Pick Rate above, just not SLA/the Pcs/Hour rate below.
     const sameDayAssigned = !!order.assigned_time && bangkokDateKey(order.assigned_time) === date
     if (sameDayAssigned) {
       const rawMinutes = Math.max(1, (new Date(completion.picker_completed_time).getTime() - new Date(order.assigned_time as string).getTime()) / 60000)
-      const rateMinutes = Math.max(MIN_CYCLE_MINUTES_FOR_RATE, rawMinutes)
-      totalMinutes += rateMinutes
       cycleTimedCount += 1
       const onTime = rawMinutes <= SLA_THRESHOLD_MINUTES
       if (onTime) onTimeCount += 1
       if (entry) {
-        entry.pieces += completion.actual_pieces ?? 0
-        entry.minutes += rateMinutes
         if (onTime) entry.onTime += 1
+      }
+      // Pcs/Hour, unlike SLA, groups by ROUND (assignment_batch_id) rather than per order -- see
+      // computeRoundBasedRate's own comment for why summing each order's own elapsed time
+      // double-counts overlapping work the more orders share one round.
+      if (pickerId && order.assignment_batch_id) {
+        roundRows.push({ pickerId, assignmentBatchId: order.assignment_batch_id, assignedTime: order.assigned_time as string, completedTime: completion.picker_completed_time, pieces: completion.actual_pieces ?? 0 })
       }
     }
 
     if (entry && pickerId) productivityByPicker.set(pickerId, entry)
   }
 
+  const rateByPicker = computeRoundBasedRate(roundRows)
+  let totalRatePieces = 0
+  let totalRateMinutes = 0
+  for (const r of rateByPicker.values()) {
+    totalRatePieces += r.pieces
+    totalRateMinutes += r.minutes
+  }
+
   const pickerRows = pickers.map((p) => {
     const e = productivityByPicker.get(p.picker_id)
+    const rate = rateByPicker.get(p.picker_id)
     return {
       user_id: p.picker_id,
       name: p.name_en,
       employmentType: p.employment_type ? employmentTypeLabel.get(p.employment_type) ?? p.employment_type : null,
       rounds: roundsByPicker.get(p.picker_id) ?? 0,
-      pcsPerHour: e && e.minutes > 0 ? Math.round((e.pieces / e.minutes) * 60) : null,
+      pcsPerHour: rate && rate.minutes > 0 ? Math.round((rate.pieces / rate.minutes) * 60) : null,
       completed: e?.completed ?? 0,
       piecesCompleted: e?.piecesCompleted ?? 0,
       piecesShort: e?.piecesShort ?? 0,
@@ -194,7 +200,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     kpis: {
       completedOrders: completedRows.length,
       totalPieces,
-      avgPcsPerHour: totalMinutes > 0 ? Math.round((totalPieces / totalMinutes) * 60) : null,
+      avgPcsPerHour: totalRateMinutes > 0 ? Math.round((totalRatePieces / totalRateMinutes) * 60) : null,
       slaPct: cycleTimedCount > 0 ? Math.round((onTimeCount / cycleTimedCount) * 1000) / 10 : null,
       shortRatePct: completedRows.length > 0 ? Math.round((shortCount / completedRows.length) * 1000) / 10 : null,
     },

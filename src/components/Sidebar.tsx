@@ -50,7 +50,7 @@ export function Sidebar({ user, badges }: SidebarProps) {
 
       <nav className="sidebar-nav">
         {NAV_GROUPS.filter((group) => group.items.some((item) => canAccessMenuItem(user.role, item.id))).map((group) => (
-          <div key={group.label}>
+          <div key={group.label} className="nav-group">
             <div className="nav-group-label">{group.label}</div>
             {group.items.map((item) => {
               if (!canAccessMenuItem(user.role, item.id)) return null

@@ -137,6 +137,14 @@ table { border-collapse: collapse; width: 100%; }
   flex-direction: column;
 }
 
+.nav-group {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  padding: 2px 4px 6px;
+  margin-bottom: 8px;
+}
+
 .nav-group-label {
   padding: 9px 8px 3px;
   font-size: 10px;

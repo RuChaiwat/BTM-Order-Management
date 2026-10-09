@@ -49,6 +49,28 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
     getActiveZoneCodes(db, warehouseCode),
   ])
 
+  // How many of an order's pieces are REALLY in a given zone, not its whole planned_pieces
+  // repeated in every zone it merely touches -- an order split A1=8/R1=2 must contribute 8 to A1
+  // and 2 to R1 (sum = 10), not 10 to each (sum = 20, which is what zoneOrderIds + planned_pieces
+  // alone would give, and is why zone totals here used to add up to more than Backlog's own Total
+  // Pieces for the same orders). get_order_line_zone_pieces_by_ids (migration 0026) fixed the same
+  // bug for Matching Dashboard but only returns one row per zone (every given order summed
+  // together); this one (migration 0034) keeps order_id too, since pendingPieces below still needs
+  // to decide per ORDER whether its zone pieces count as pending or done.
+  const orderIds = orders.map((o) => o.order_id)
+  const zonePiecesRows = await fetchScopedByOrderIds<{ order_id: string; zone_code: string; pieces: number }>(
+    db,
+    'get_order_line_zone_pieces_by_order',
+    'order_id, zone_code, pieces',
+    orderIds,
+  )
+  const piecesByOrderZone = new Map<string, Map<string, number>>()
+  for (const r of zonePiecesRows) {
+    if (!piecesByOrderZone.has(r.order_id)) piecesByOrderZone.set(r.order_id, new Map())
+    piecesByOrderZone.get(r.order_id)!.set(r.zone_code, Number(r.pieces))
+  }
+  const piecesForOrderInZone = (orderId: string, zone: string): number => piecesByOrderZone.get(orderId)?.get(zone) ?? 0
+
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
   const pickerIdByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
 
@@ -58,7 +80,6 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   // whole (its own row count is bounded by how many lines were ever short-picked, not by total
   // order volume) and matched back to an order via completionById below, which is itself already
   // scoped to this warehouse.
-  const orderIds = orders.map((o) => o.order_id)
   const [alerts, completions, allShortLines, reasonRows, thresholds] = await Promise.all([
     fetchScopedByOrderIds<{ order_id: string; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
       db,
@@ -165,7 +186,7 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
       const perPicker = zonePickerWork.get(zone)!
       const entry = perPicker.get(pickerId) ?? { orders: 0, pieces: 0 }
       entry.orders += 1
-      entry.pieces += o.planned_pieces ?? 0
+      entry.pieces += piecesForOrderInZone(o.order_id, zone)
       perPicker.set(pickerId, entry)
 
       if (!activeOrdersByZone.has(zone)) activeOrdersByZone.set(zone, [])
@@ -188,9 +209,11 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
 
     const closed = touching.filter((o) => TERMINAL_CLOSED_STATUSES.has(o.status ?? ''))
     const pickingDone = touching.filter((o) => PICKING_DONE_STATUSES.has(o.status ?? ''))
-    const totalPieces = touching.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
+    // Real pieces THIS zone is responsible for, not an order's whole planned_pieces repeated in
+    // every zone it touches (see piecesForOrderInZone's own comment above).
+    const totalPieces = touching.reduce((s, o) => s + piecesForOrderInZone(o.order_id, zone), 0)
     // Drops once the picker submits, not only once Admin verifies -- see dashboard.ts.
-    const pendingPieces = totalPieces - pickingDone.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
+    const pendingPieces = totalPieces - pickingDone.reduce((s, o) => s + piecesForOrderInZone(o.order_id, zone), 0)
     const slaPct = touching.length > 0 ? Math.round((closed.length / touching.length) * 1000) / 10 : 100
 
     const activeOrders = (activeOrdersByZone.get(zone) ?? []).sort((a, b) => b.elapsedMinutes - a.elapsedMinutes)

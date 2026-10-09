@@ -39,7 +39,7 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
   // order_alerts/picker_completions have no warehouse_code column, so both are fetched via an RPC
   // scoped to exactly this warehouse's order_ids (migration 0022) instead of the whole table.
   const orderIds = orders.map((o) => o.order_id)
-  const [alerts, completions, thresholds] = await Promise.all([
+  const [alerts, completions, thresholds, zonePiecesRows] = await Promise.all([
     fetchScopedByOrderIds<{ order_id: string; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
       db,
       'get_order_alerts_by_ids',
@@ -53,11 +53,20 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
       orderIds,
     ),
     getSlaThresholds(db),
+    // Real per-(order, zone) piece quantities (migration 0034) -- see dashboard.ts's identical
+    // fetch for why: an order split across zones must contribute only its own line quantity to
+    // EACH zone, not its whole planned_pieces repeated in every zone it merely touches.
+    fetchScopedByOrderIds<{ order_id: string; zone_code: string; pieces: number }>(db, 'get_order_line_zone_pieces_by_order', 'order_id, zone_code, pieces', orderIds),
   ])
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, { ...a, time_alert: computeTimeAlert(orderStatusById.get(a.order_id) ?? '', a.elapsed_minutes, thresholds) }]))
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
-  const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
+  const piecesByOrderZone = new Map<string, Map<string, number>>()
+  for (const r of zonePiecesRows) {
+    if (!piecesByOrderZone.has(r.order_id)) piecesByOrderZone.set(r.order_id, new Map())
+    piecesByOrderZone.get(r.order_id)!.set(r.zone_code, Number(r.pieces))
+  }
+  const piecesForOrderInZone = (orderId: string, zone: string): number => piecesByOrderZone.get(orderId)?.get(zone) ?? 0
 
   const zoneOrders = new Map<string, Set<string>>()
   for (const l of lines) {
@@ -93,7 +102,7 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     const completed = touching.filter((id) => orderStatusById.get(id)?.startsWith('final_closed')).length
     const pickingBacklog = touching.filter((id) => alertByOrder.get(id)?.is_picking_backlog).length
     const verificationBacklog = touching.filter((id) => alertByOrder.get(id)?.is_verification_backlog).length
-    const totalPieces = touching.reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
+    const totalPieces = touching.reduce((s, id) => s + piecesForOrderInZone(id, zone), 0)
     const slaPct = touching.length > 0 ? Math.round((completed / touching.length) * 1000) / 10 : 100
     // Row highlight: does any order actively being picked IN this zone right now carry a
     // warning/overdue/critical time alert, worst-first -- lets Admin spot which zones need

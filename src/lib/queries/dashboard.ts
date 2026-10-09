@@ -56,7 +56,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   // URL, so it stays correct no matter how many orders this warehouse has, and only transfers rows
   // that are actually relevant instead of the whole table on every page load.
   const orderIds = orders.map((o) => o.order_id)
-  const [completions, alerts, thresholds] = await Promise.all([
+  const [completions, alerts, thresholds, zonePiecesRows] = await Promise.all([
     fetchScopedByOrderIds<{ order_id: string; actual_pieces: number | null; picker_completed_time: string; result: string }>(
       db,
       'get_picker_completions_by_ids',
@@ -70,9 +70,20 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
       orderIds,
     ),
     getSlaThresholds(db),
+    // Real per-(order, zone) piece quantities (migration 0034) -- an order split across A1/R1
+    // must contribute its own line quantity to EACH zone, not its whole planned_pieces repeated in
+    // every zone it merely touches (see Zone Status's zoneStatus map below, which used to do
+    // exactly that and made the zones' totals add up to more than this page's own Total Pieces).
+    fetchScopedByOrderIds<{ order_id: string; zone_code: string; pieces: number }>(db, 'get_order_line_zone_pieces_by_order', 'order_id, zone_code, pieces', orderIds),
   ])
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const statusByOrderId = new Map(orders.map((o) => [o.order_id, o.status]))
+  const piecesByOrderZone = new Map<string, Map<string, number>>()
+  for (const r of zonePiecesRows) {
+    if (!piecesByOrderZone.has(r.order_id)) piecesByOrderZone.set(r.order_id, new Map())
+    piecesByOrderZone.get(r.order_id)!.set(r.zone_code, Number(r.pieces))
+  }
+  const piecesForOrderInZone = (orderId: string, zone: string): number => piecesByOrderZone.get(orderId)?.get(zone) ?? 0
 
   // §management KPI funnel: Total Orders -> Assigned -> Completed (admin-verified only) -> %
   // Completed -> Total Backlog. Cancelled orders are excluded from every stage here -- they were
@@ -139,7 +150,6 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     zoneOrders.get(l.zone_code)!.add(l.order_id)
   }
   const orderStatusById = new Map(orders.map((o) => [o.order_id, o.status]))
-  const orderPiecesById = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
   // Risk level must key off the SAME "which zone(s) is this order really being picked in"
   // definition Zone Dashboard uses: every zone the order's OWN LINES actually touch, not just its
   // assignment batch's single declared zone_code. FR-030's trigger (enforce_assignment_zone_
@@ -165,11 +175,11 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     const touching = [...(zoneOrders.get(zone) ?? new Set())]
     const closedIds = touching.filter((id) => orderStatusById.get(id)?.startsWith('final_closed'))
     const pickingDoneIds = touching.filter((id) => PICKING_DONE_STATUSES.has(orderStatusById.get(id) ?? ''))
-    const totalPieces = touching.reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
+    const totalPieces = touching.reduce((s, id) => s + piecesForOrderInZone(id, zone), 0)
     // Pieces Pending drops as soon as the PICKER submits, not only once Admin verifies -- the
     // physical picking work in this zone is done either way, and waiting on Admin's confirmation
     // shouldn't make the zone still look like it has picking left to do.
-    const pendingPieces = touching.filter((id) => !pickingDoneIds.includes(id)).reduce((s, id) => s + (orderPiecesById.get(id) ?? 0), 0)
+    const pendingPieces = touching.filter((id) => !pickingDoneIds.includes(id)).reduce((s, id) => s + piecesForOrderInZone(id, zone), 0)
     const slaPct = touching.length > 0 ? Math.round((closedIds.length / touching.length) * 1000) / 10 : 100
     // Risk level: does this zone have any order still being actively picked THERE that's tripped
     // the 'overdue'/'critical' time alert -- i.e. which zone's pickers are running behind right

@@ -13,7 +13,13 @@ import { fetchAllRows } from './fetchAllRows'
  */
 export async function fetchScopedByOrderIds<T>(
   db: SupabaseClient,
-  rpcName: 'get_order_alerts_by_ids' | 'get_picker_completions_by_ids' | 'get_order_lines_by_ids' | 'get_order_line_zones_by_ids' | 'get_order_line_zone_pieces_by_ids',
+  rpcName:
+    | 'get_order_alerts_by_ids'
+    | 'get_picker_completions_by_ids'
+    | 'get_order_lines_by_ids'
+    | 'get_order_line_zones_by_ids'
+    | 'get_order_line_zone_pieces_by_ids'
+    | 'get_order_line_zone_pieces_by_order',
   columns: string,
   orderIds: string[],
 ): Promise<T[]> {

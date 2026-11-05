@@ -34,7 +34,7 @@ interface EmploymentType {
 
 const PAGE_SIZE = 20
 
-type SortKey = 'picker_id' | 'name_en' | 'zone_scope' | 'employment_type' | 'productivity_pcs_per_hour' | 'active'
+type SortKey = 'picker_id' | 'name_en' | 'employment_type' | 'productivity_pcs_per_hour' | 'active'
 
 function sortRows(rows: PickerRow[], key: SortKey, dir: 'asc' | 'desc'): PickerRow[] {
   function value(r: PickerRow): string | number {
@@ -42,9 +42,7 @@ function sortRows(rows: PickerRow[], key: SortKey, dir: 'asc' | 'desc'): PickerR
       case 'picker_id':
         return r.picker_id
       case 'name_en':
-        return r.name_en
-      case 'zone_scope':
-        return r.zone_scope.length > 0 ? r.zone_scope.join(',') : ''
+        return r.name_th || r.name_en
       case 'employment_type':
         return r.employment_type ?? ''
       case 'productivity_pcs_per_hour':
@@ -144,7 +142,7 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
 
   async function remove() {
     if (!selected) return
-    if (!confirm(`Remove ${selected.name_en} (${selected.picker_id})? This can't be undone.`)) return
+    if (!confirm(`Remove ${selected.name_th || selected.name_en} (${selected.picker_id})? This can't be undone.`)) return
     setBusy(true)
     setError(null)
     const res = await fetch('/api/pickers', {
@@ -171,18 +169,16 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
-            <col style={{ width: '10%' }} />
-            <col style={{ width: '20%' }} />
-            <col style={{ width: '25%' }} />
-            <col style={{ width: '13%' }} />
             <col style={{ width: '14%' }} />
-            <col style={{ width: '14%' }} />
+            <col style={{ width: '32%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
           </colgroup>
           <thead>
             <tr>
               <SortHeader label="PICKER ID" sortKey="picker_id" sort={sort} onSort={toggleSort} />
               <SortHeader label="NAME" sortKey="name_en" sort={sort} onSort={toggleSort} />
-              <SortHeader label="SCOPE" sortKey="zone_scope" sort={sort} onSort={toggleSort} />
               <SortHeader label="TYPE" sortKey="employment_type" sort={sort} onSort={toggleSort} />
               <SortHeader label="PRODUCTIVITY" sortKey="productivity_pcs_per_hour" sort={sort} onSort={toggleSort} />
               <SortHeader label="STATUS" sortKey="active" sort={sort} onSort={toggleSort} />
@@ -193,11 +189,8 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
               <tr key={p.picker_id} className={p.picker_id === selectedId ? 'row-muted' : undefined} onClick={() => setSelectedId(p.picker_id)} style={{ cursor: 'pointer' }}>
                 <td style={{ fontWeight: 700 }}>{p.picker_id}</td>
                 <td style={{ overflowWrap: 'break-word' }}>
-                  {p.name_en}
-                  {p.name_th && <div style={{ fontSize: 11, color: '#6B7280' }}>{p.name_th}</div>}
-                </td>
-                <td style={{ overflowWrap: 'break-word' }}>
-                  {p.zone_scope.length > 0 ? `Zones ${p.zone_scope.join(', ')}` : 'For picking assignment only — pickers have no system login'}
+                  {p.name_th || p.name_en}
+                  {p.name_th && p.name_en && <div style={{ fontSize: 11, color: '#6B7280' }}>{p.name_en}</div>}
                 </td>
                 <td style={{ overflowWrap: 'break-word' }}>{p.employment_type ? labelByType.get(p.employment_type) ?? p.employment_type : <span style={{ color: '#9CA3AF' }}>—</span>}</td>
                 <td>
@@ -208,7 +201,7 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
+                <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
                   No pickers yet — add one to get started.
                 </td>
               </tr>
@@ -222,11 +215,11 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
         {selected ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <Avatar name={selected.name_en} seed={selected.picker_id} />
+              <Avatar name={selected.name_th || selected.name_en} seed={selected.picker_id} />
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>{selected.name_en}</div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{selected.name_th || selected.name_en}</div>
                 <div style={{ fontSize: 11.5, color: '#6B7280' }}>
-                  {selected.name_th ?? ''} · {selected.picker_id}
+                  {selected.name_th && selected.name_en ? selected.name_en : ''} · {selected.picker_id}
                 </div>
                 {selected.employment_type && (
                   <span className="badge badge-info" style={{ marginTop: 4 }}>
@@ -325,7 +318,8 @@ function PickerModal({
     setError(null)
     const missing: string[] = []
     if (!form.picker_id) missing.push('Picker ID')
-    if (!form.name_en) missing.push('Name (EN)')
+    if (!form.name_th) missing.push('Name (TH)')
+    if (!form.employment_type) missing.push('Employment Type')
     if (missing.length > 0) {
       setError(`กรุณากรอกข้อมูลที่จำเป็น — Required: ${missing.join(', ')}`)
       return
@@ -368,25 +362,25 @@ function PickerModal({
         </div>
         <div className="field">
           <label className="field-label">
-            Name (EN) <span className="field-label-required">*</span>
+            Name (TH) <span className="field-label-required">*</span>
           </label>
           <input
             className="field-input"
-            value={form.name_en}
-            onChange={(e) => setForm({ ...form, name_en: e.target.value })}
+            value={form.name_th}
+            onChange={(e) => setForm({ ...form, name_th: e.target.value })}
             style={{ border: '1px solid var(--color-border)' }}
             autoFocus={isEdit}
           />
         </div>
         <div className="field">
           <label className="field-label">
-            Name (TH) <span className="field-hint">optional</span>
+            Name (EN) <span className="field-hint">optional</span>
           </label>
-          <input className="field-input" value={form.name_th} onChange={(e) => setForm({ ...form, name_th: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
+          <input className="field-input" value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <div className="field">
           <label className="field-label">
-            Employment Type <span className="field-hint">optional — ประเภทการจ้างงาน, configurable in Configuration</span>
+            Employment Type <span className="field-label-required">*</span> <span className="field-hint">ประเภทการจ้างงาน, configurable in Configuration</span>
           </label>
           <select
             className="field-input"
@@ -394,7 +388,7 @@ function PickerModal({
             onChange={(e) => setForm({ ...form, employment_type: e.target.value })}
             style={{ border: '1px solid var(--color-border)' }}
           >
-            <option value="">— Not set —</option>
+            <option value="">— Select —</option>
             {typeOptions.map((t) => (
               <option key={t.type_code} value={t.type_code}>
                 {t.label_en}

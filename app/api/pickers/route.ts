@@ -41,8 +41,8 @@ export async function POST(request: Request) {
   const body = await request.json()
   const { picker_id, name_en, name_th, warehouse_code, zone_scope, shift_label, note, employment_type } = body
 
-  if (!picker_id || !name_en) {
-    return NextResponse.json({ error: 'picker_id and name_en are required' }, { status: 400 })
+  if (!picker_id || !name_th || !employment_type) {
+    return NextResponse.json({ error: 'picker_id, name_th, and employment_type are required' }, { status: 400 })
   }
   if (!isValidUserId(picker_id)) {
     return NextResponse.json({ error: `picker_id must be 1-${USER_ID_MAX_LENGTH} characters (letters, numbers, - or _)` }, { status: 400 })
@@ -53,13 +53,17 @@ export async function POST(request: Request) {
     .from('pickers')
     .insert({
       picker_id,
-      name_en,
-      name_th: name_th ?? null,
+      // name_en stays the column every other screen in the app reads for display (dashboards,
+      // assignment, pick completion, audit log, ...) -- most outsource pickers only have a Thai
+      // name on file now that it's the required field, so mirror it into name_en rather than
+      // leaving that column blank everywhere else.
+      name_en: name_en || name_th,
+      name_th,
       warehouse_code: warehouse_code ?? null,
       zone_scope: zone_scope ?? [],
       shift_label: shift_label ?? null,
       note: note || null,
-      employment_type: employment_type || null,
+      employment_type,
     })
     .select()
     .single()
@@ -102,6 +106,12 @@ export async function PATCH(request: Request) {
   }
 
   const { data: before } = await admin.from('pickers').select('*').eq('picker_id', picker_id).single()
+
+  // Same name_en fallback as POST -- an edit that clears Name (EN) shouldn't leave the column
+  // blank for every other screen that reads it; mirror the (possibly also-just-edited) Thai name.
+  if ('name_en' in patch && !patch.name_en) {
+    patch.name_en = (patch.name_th as string | undefined) || before?.name_th || null
+  }
 
   const { data: after, error } = await admin.from('pickers').update(patch).eq('picker_id', picker_id).select().single()
   if (error) {

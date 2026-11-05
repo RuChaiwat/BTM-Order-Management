@@ -115,7 +115,7 @@ export function auditDetail(row: RawAuditRow, lookups: AuditLookups): string {
       return `${batchRef(row.entity_id, lookups)} closed automatically — last order confirmed via Pick Completion`
     case 'picker.create':
     case 'picker.delete':
-      return `${asString((after.name_en ?? before.name_en) ?? row.entity_id)} (${row.entity_id ?? '—'})`
+      return `${asString((after.name_th ?? before.name_th ?? after.name_en ?? before.name_en) ?? row.entity_id)} (${row.entity_id ?? '—'})`
     case 'picker.update': {
       const activeChanged = typeof after.active === 'boolean' && after.active !== before.active
       return `${row.entity_id ?? '—'}${activeChanged ? (after.active ? ' — activated' : ' — deactivated') : ''}`

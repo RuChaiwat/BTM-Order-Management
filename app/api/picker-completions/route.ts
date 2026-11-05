@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const warehouseCode = caller.warehouse_code ?? 'DC002'
   const { data: picker } = await admin.from('pickers').select('picker_id, name_en, name_th, active').eq('picker_id', pickerId).eq('warehouse_code', warehouseCode).maybeSingle()
   if (!picker) return NextResponse.json({ error: `No picker with ID '${pickerId}' in ${warehouseCode}` }, { status: 404 })
-  if (!picker.active) return NextResponse.json({ error: `${picker.name_en} (${picker.picker_id}) is inactive` }, { status: 409 })
+  if (!picker.active) return NextResponse.json({ error: `${picker.name_th || picker.name_en} (${picker.picker_id}) is inactive` }, { status: 409 })
 
   const orders = await getPickerActiveOrders(admin, warehouseCode, pickerId)
   return NextResponse.json({ picker, orders })

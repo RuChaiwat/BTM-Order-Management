@@ -27,8 +27,10 @@ export async function getOpenOrdersForPrint(db: SupabaseClient, warehouseCode: s
   const pickerIdByBatch = new Map((batches ?? []).map((b) => [b.assignment_batch_id, b.picker_id]))
 
   const pickerIds = [...new Set([...pickerIdByBatch.values()].filter(Boolean))] as string[]
-  const { data: pickers } = pickerIds.length ? await db.from('pickers').select('picker_id, name_en').in('picker_id', pickerIds) : { data: [] as { picker_id: string; name_en: string }[] }
-  const nameByPicker = new Map((pickers ?? []).map((p) => [p.picker_id, p.name_en]))
+  const { data: pickers } = pickerIds.length
+    ? await db.from('pickers').select('picker_id, name_en, name_th').in('picker_id', pickerIds)
+    : { data: [] as { picker_id: string; name_en: string; name_th: string | null }[] }
+  const nameByPicker = new Map((pickers ?? []).map((p) => [p.picker_id, p.name_th || p.name_en]))
 
   return orders.map((o) => {
     const pickerId = o.assignment_batch_id ? pickerIdByBatch.get(o.assignment_batch_id) ?? null : null

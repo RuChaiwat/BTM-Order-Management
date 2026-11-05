@@ -52,6 +52,7 @@ interface SelectedOrder extends PoolOrder {
 interface Picker {
   picker_id: string
   name_en: string
+  name_th: string | null
   zone_scope: string[]
   active: boolean
   employment_type: string | null
@@ -293,7 +294,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       return
     }
     if (effectiveZone && match.zone_scope.length > 0 && !match.zone_scope.includes(effectiveZone)) {
-      setPickerScanError(`${match.name_en} is not scoped to Zone ${effectiveZone}`)
+      setPickerScanError(`${match.name_th || match.name_en} is not scoped to Zone ${effectiveZone}`)
       return
     }
     setPickerScanBusy(true)
@@ -307,7 +308,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
     // A picker must clear every order still open from their last round (Pick Completion) before
     // taking on a new one -- otherwise they'd end up holding two rounds' worth of orders at once.
     if (body.activeOrderCount > 0) {
-      setPickerScanError(`${match.name_en} ยังเบิกงานก่อนหน้าไม่เสร็จ กรุณาจบงานในระบบก่อน`)
+      setPickerScanError(`${match.name_th || match.name_en} ยังเบิกงานก่อนหน้าไม่เสร็จ กรุณาจบงานในระบบก่อน`)
       return
     }
     setScannedPicker(match)
@@ -588,7 +589,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '10px 12px' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>{scannedPicker.name_en}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{scannedPicker.name_th || scannedPicker.name_en}</span>
                   {(() => {
                     const meta = productivityMeta(scannedPicker.productivity_level)
                     return (
@@ -667,7 +668,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       {showConfirm && scannedPicker && (
         <Modal title="Confirm assignment?" subtitle="ยืนยันการมอบหมายงาน" onSubmit={confirmAssignment}>
           <div className="modal-body">
-            {selectedOrders.length} orders · {plannedPieces} planned pieces to picker <strong>{scannedPicker.name_en}</strong> in Zone {effectiveZone}. The Order timer starts now.
+            {selectedOrders.length} orders · {plannedPieces} planned pieces to picker <strong>{scannedPicker.name_th || scannedPicker.name_en}</strong> in Zone {effectiveZone}. The Order timer starts now.
           </div>
           <div className="modal-grid">
             <div>

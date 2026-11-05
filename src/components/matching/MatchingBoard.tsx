@@ -393,7 +393,7 @@ export function MatchingBoard({
             {scannedPicker ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '10px 12px' }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{scannedPicker.name_en}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{scannedPicker.name_th || scannedPicker.name_en}</div>
                   <div style={{ fontSize: 11, color: '#6B7280' }}>{scannedPicker.picker_id}</div>
                 </div>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setScannedPicker(null)}>

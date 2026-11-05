@@ -173,9 +173,9 @@ export async function GET(request: Request) {
 
     const pickerIdsForSummary = [...new Set([...summaryByKey.values()].map((s) => s.pickerId))]
     const { data: summaryPickers } = pickerIdsForSummary.length
-      ? await admin.from('pickers').select('picker_id, name_en').in('picker_id', pickerIdsForSummary)
-      : { data: [] as { picker_id: string; name_en: string }[] }
-    const nameByPicker = new Map((summaryPickers ?? []).map((p) => [p.picker_id, p.name_en]))
+      ? await admin.from('pickers').select('picker_id, name_en, name_th').in('picker_id', pickerIdsForSummary)
+      : { data: [] as { picker_id: string; name_en: string; name_th: string | null }[] }
+    const nameByPicker = new Map((summaryPickers ?? []).map((p) => [p.picker_id, p.name_th || p.name_en]))
 
     const summaryHeader = ['Picker ID', 'Picker Name', 'Date', 'Orders Completed', 'Total Pieces', 'Avg Cycle Minutes', 'Avg Pieces/Hour']
     const summaryRows = [...summaryByKey.values()]

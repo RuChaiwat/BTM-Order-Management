@@ -18,6 +18,7 @@ interface OpenOrder {
 interface Picker {
   picker_id: string
   name_en: string
+  name_th: string | null
 }
 
 interface ConsolidationBatch {
@@ -194,7 +195,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
                 }}
                 style={{ width: 220 }}
               />
-              {pickerQuery && <span style={{ fontSize: 12, color: matchedPicker ? 'var(--color-text-secondary)' : 'var(--color-danger)' }}>{matchedPicker ? matchedPicker.name_en : 'No picker with this ID'}</span>}
+              {pickerQuery && <span style={{ fontSize: 12, color: matchedPicker ? 'var(--color-text-secondary)' : 'var(--color-danger)' }}>{matchedPicker ? matchedPicker.name_th || matchedPicker.name_en : 'No picker with this ID'}</span>}
             </div>
             <button className="btn btn-primary btn-sm" disabled={selected.size === 0} onClick={printSelected}>
               Print {docType === 'pick_sheet' ? 'Pick Sheet' : 'Pick Slip'} ({selected.size})

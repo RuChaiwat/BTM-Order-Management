@@ -20,7 +20,7 @@ export default async function PrintReprintPage() {
     <>
       <TopBar title="Print & Reprint" subtitle={`พิมพ์ / พิมพ์ซ้ำเอกสาร · ${warehouseCode}`} />
       <div className="page-body">
-        <PrintReprintBoard orders={orders} pickers={pickers.map((p) => ({ picker_id: p.picker_id, name_en: p.name_en }))} />
+        <PrintReprintBoard orders={orders} pickers={pickers.map((p) => ({ picker_id: p.picker_id, name_en: p.name_en, name_th: p.name_th }))} />
       </div>
     </>
   )

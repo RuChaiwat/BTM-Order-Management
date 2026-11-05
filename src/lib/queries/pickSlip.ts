@@ -53,8 +53,10 @@ export async function getPickSlipData(db: SupabaseClient, orderIds: string[]): P
   const pickerIdByBatch = new Map(unwrap(batchesRes).map((b) => [b.assignment_batch_id, b.picker_id]))
 
   const pickerIds = [...new Set([...pickerIdByBatch.values()].filter(Boolean))] as string[]
-  const pickersRes = pickerIds.length ? await db.from('pickers').select('picker_id, name_en').in('picker_id', pickerIds) : { data: [] as { picker_id: string; name_en: string }[] }
-  const nameByPicker = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.name_en]))
+  const pickersRes = pickerIds.length
+    ? await db.from('pickers').select('picker_id, name_en, name_th').in('picker_id', pickerIds)
+    : { data: [] as { picker_id: string; name_en: string; name_th: string | null }[] }
+  const nameByPicker = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.name_th || p.name_en]))
 
   // Preserve the caller's own order_ids ordering (e.g. Work Assignment's selection order) rather
   // than whatever order the orders table happened to return.

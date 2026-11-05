@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const admin = createAdminClient()
   const { data: picker } = await admin.from('pickers').select('picker_id, name_en, name_th, active, warehouse_code').eq('picker_id', pickerId).maybeSingle()
   if (!picker) return NextResponse.json({ error: `No picker with ID '${pickerId}'` }, { status: 404 })
-  if (!picker.active) return NextResponse.json({ error: `${picker.name_en} (${picker.picker_id}) is inactive` }, { status: 409 })
+  if (!picker.active) return NextResponse.json({ error: `${picker.name_th || picker.name_en} (${picker.picker_id}) is inactive` }, { status: 409 })
 
   const orders = await getPickerActiveOrders(admin, picker.warehouse_code, pickerId)
   return NextResponse.json({ picker, orders })

@@ -108,10 +108,12 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
 
   const pickerIds = [...new Set(batches.map((b) => b.picker_id).filter(Boolean))] as string[]
   const [pickersRes, employmentTypeRows] = await Promise.all([
-    pickerIds.length ? db.from('pickers').select('picker_id, name_en, employment_type').in('picker_id', pickerIds) : Promise.resolve({ data: [] as { picker_id: string; name_en: string; employment_type: string | null }[] }),
+    pickerIds.length
+      ? db.from('pickers').select('picker_id, name_en, name_th, employment_type').in('picker_id', pickerIds)
+      : Promise.resolve({ data: [] as { picker_id: string; name_en: string; name_th: string | null; employment_type: string | null }[] }),
     db.from('picker_employment_types').select('type_code, label_en'),
   ])
-  const nameByPicker = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.name_en]))
+  const nameByPicker = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.name_th || p.name_en]))
   const employmentTypeByPicker = new Map(unwrap(pickersRes).map((p) => [p.picker_id, p.employment_type]))
   const employmentTypeLabel = new Map(unwrap(employmentTypeRows).map((t) => [t.type_code, t.label_en]))
   const pickerNameForOrder = (o: (typeof orders)[number]) => {

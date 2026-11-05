@@ -255,9 +255,9 @@ export function PickCompletionBoard({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 17, fontWeight: 700 }}>
-                {picker.name_en} <span style={{ fontWeight: 400, color: '#6B7280', fontSize: 13 }}>({picker.picker_id})</span>
+                {picker.name_th || picker.name_en} <span style={{ fontWeight: 400, color: '#6B7280', fontSize: 13 }}>({picker.picker_id})</span>
               </div>
-              {picker.name_th && <div style={{ fontSize: 12, color: '#6B7280' }}>{picker.name_th}</div>}
+              {picker.name_th && picker.name_en && <div style={{ fontSize: 12, color: '#6B7280' }}>{picker.name_en}</div>}
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {showReprint && (
@@ -370,7 +370,7 @@ export function PickCompletionBoard({
               </div>
             </div>
           ))}
-          {orders.length === 0 && <div className="card" style={{ color: 'var(--color-text-secondary)' }}>Nothing assigned to {picker.name_en} right now.</div>}
+          {orders.length === 0 && <div className="card" style={{ color: 'var(--color-text-secondary)' }}>Nothing assigned to {picker.name_th || picker.name_en} right now.</div>}
         </div>
       </div>
 
@@ -409,7 +409,7 @@ export function PickCompletionBoard({
       {showCompletedAll && (
         <Modal title={`Mark all ${orders.length} orders Completed?`} subtitle="ยืนยันปิดงานทั้งหมด (100%)" onSubmit={completeAll}>
           <div className="modal-body">
-            Every order currently assigned to <strong>{picker.name_en}</strong> will be marked fully picked (100%) and sent to Admin Verification. Use this only when nothing was short-picked
+            Every order currently assigned to <strong>{picker.name_th || picker.name_en}</strong> will be marked fully picked (100%) and sent to Admin Verification. Use this only when nothing was short-picked
             today — a short-picked order should be confirmed individually with &quot;Completed with Short&quot; instead.
           </div>
           <ModalFooter>

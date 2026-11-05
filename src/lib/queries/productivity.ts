@@ -31,7 +31,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
   const { sinceIso, untilIso } = bangkokDayRange(date)
   const [orders, pickers, employmentTypeRows, cfg, roundBatches] = await Promise.all([
     fetchAllRows((from, to) => db.from('orders').select('order_id, assigned_time, assignment_batch_id, consolidation_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).range(from, to)),
-    db.from('pickers').select('picker_id, name_en, employment_type').eq('warehouse_code', warehouseCode).eq('active', true).then(unwrap),
+    db.from('pickers').select('picker_id, name_en, name_th, employment_type').eq('warehouse_code', warehouseCode).eq('active', true).then(unwrap),
     db.from('picker_employment_types').select('type_code, label_en').then(unwrap),
     // Same target used by the weekly Picker Productivity rating (migration 0020) -- configurable
     // rather than a second hardcoded number baked into this page.
@@ -135,7 +135,7 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
     const idleMinutes = idleByPicker.get(p.picker_id)
     return {
       user_id: p.picker_id,
-      name: p.name_en,
+      name: p.name_th || p.name_en,
       employmentType: p.employment_type ? employmentTypeLabel.get(p.employment_type) ?? p.employment_type : null,
       rounds: roundsByPicker.get(p.picker_id) ?? 0,
       pcsPerHour: rate && rate.minutes > 0 ? Math.round((rate.pieces / rate.minutes) * 60) : null,

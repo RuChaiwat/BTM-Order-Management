@@ -24,7 +24,7 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
       <div className="card" style={{ minHeight: 0 }}>
         <div className="card-header" style={{ marginBottom: 10 }}>
           <span className="card-title">Order Density by Zone</span>
-          <span className="card-subtitle">ความหนาแน่นของออเดอร์แต่ละโซน · {totalOrders} orders in pool</span>
+          <span className="card-subtitle">ความหนาแน่นของออเดอร์แต่ละโซน · {totalOrders.toLocaleString()} orders in pool</span>
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
@@ -49,8 +49,8 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
             {zoneDensity.map((z) => (
               <tr key={z.zone}>
                 <td style={{ fontWeight: 700 }}>Zone {z.zone}</td>
-                <td>{z.orderCount}</td>
-                <td>{z.sumQty}</td>
+                <td>{z.orderCount.toLocaleString()}</td>
+                <td>{z.sumQty.toLocaleString()}</td>
                 <td style={{ width: 120 }}>
                   <div style={{ height: 10, borderRadius: 5, background: '#F3F4F6', overflow: 'hidden' }}>
                     <span style={{ display: 'block', height: '100%', width: `${(z.sumQty / maxZoneQty) * 100}%`, background: '#2563EB' }} />
@@ -87,7 +87,7 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
                 </div>
                 <div style={{ textAlign: 'right', fontSize: 12 }}>
                   <div>
-                    <strong>{stat.count}</strong> orders
+                    <strong>{stat.count.toLocaleString()}</strong> orders
                   </div>
                   <div style={{ color: '#6B7280' }}>{stat.sumPieces.toLocaleString()} pcs (sum)</div>
                 </div>

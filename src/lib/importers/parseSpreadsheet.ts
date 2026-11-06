@@ -76,8 +76,8 @@ function findSheet(workbook: XLSX.WorkBook, name: string): XLSX.WorkSheet | unde
 }
 
 /** Parses an uploaded .csv/.xlsx File's FIRST sheet into an array of row objects keyed by header.
- * Used for single-flat-sheet imports (Location Master) — see parseWmsOrderWorkbook below for the
- * two-sheet WMS Transfer Order format, which is a different shape entirely and gets its own
+ * Used for single-flat-sheet imports (Location Master) — see parseWmsOrderFiles below for the
+ * two-file WMS Transfer Order format, which is a different shape entirely and gets its own
  * parser rather than overloading this one. */
 export async function parseSpreadsheet(file: File): Promise<Record<string, string>[]> {
   const buffer = await file.arrayBuffer()
@@ -87,40 +87,70 @@ export async function parseSpreadsheet(file: File): Promise<Record<string, strin
   return sheetToRows(sheet)
 }
 
+/** Header texts of a sheet's first row (used to check a file is the report it claims to be). */
+function sheetHeaders(sheet: XLSX.WorkSheet): string[] {
+  const ref = sheet['!ref']
+  if (!ref) return []
+  const range = XLSX.utils.decode_range(ref)
+  const headers: string[] = []
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c })]
+    const text = String(cell?.w ?? cell?.v ?? '').trim()
+    if (text) headers.push(text)
+  }
+  return headers
+}
+
+const normalizeHeader = (s: string) => s.toLowerCase().replace(/[\s._-]/g, '')
+
+/** Reads one uploaded WMS report file. Each report is now exported and uploaded as its OWN file,
+ * so the sheet is taken by name when present (a workbook that still carries both sheets keeps
+ * working) and otherwise falls back to the file's first sheet -- a single-report export's one
+ * sheet is often named something generic like "Sheet1". The required columns are then checked so
+ * that picking the wrong file for a slot (e.g. the two files swapped) fails with a clear message
+ * instead of silently importing nothing. */
+async function readWmsReport(file: File, sheetName: string, requiredColumns: string[][]): Promise<Record<string, string>[]> {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+  const sheet = findSheet(workbook, sheetName) ?? workbook.Sheets[workbook.SheetNames[0]]
+  if (!sheet) throw new Error(`"${file.name}" has no sheets — expected the WMS "${sheetName}" export.`)
+
+  const headers = sheetHeaders(sheet).map(normalizeHeader)
+  const missing = requiredColumns.filter((alts) => !alts.some((a) => headers.includes(normalizeHeader(a)))).map((alts) => `"${alts[0]}"`)
+  if (missing.length > 0) {
+    throw new Error(
+      `"${file.name}" doesn't look like the WMS "${sheetName}" export — missing column(s): ${missing.join(', ')}. ` +
+        `ไฟล์นี้ไม่ใช่ "${sheetName}" — ตรวจว่าเลือกไฟล์ถูกช่อง (อาจสลับไฟล์กัน)`,
+    )
+  }
+  return sheetToRows(sheet)
+}
+
 /**
- * §5 WMS order import — the WMS's own Transfer Order export is two related sheets, not one flat
- * file: "Transfer List" (one row per order/Transfer, its own header-level fields) and "Warehouse
- * Pick Lines" (one row per order line, joined back to its order by Source No. <-> Transfer List's
- * own No.). This reads both, keeps only orders whose BT Status is "Picking" (any other status, or
- * no status, means the order isn't real picking work yet), and produces the same canonical flat
- * row shape processOrderRowsBatch already expects (one row per line, header fields carried onto
- * each of its lines) -- so the rest of the import pipeline (required-field validation, Location
- * Master join, batching/upsert) needs no changes at all.
+ * §5 WMS order import — the WMS Transfer Order data comes as two related reports, uploaded as two
+ * SEPARATE files: "Transfer List" (one row per order/Transfer, its own header-level fields) and
+ * "Warehouse Pick Lines" (one row per order line, joined back to its order by Source No. <->
+ * Transfer List's own No.). This reads both, keeps only orders whose BT Status is "Picking" (any
+ * other status, or no status, means the order isn't real picking work yet), and produces the same
+ * canonical flat row shape processOrderRowsBatch already expects (one row per line, header fields
+ * carried onto each of its lines) -- so the rest of the import pipeline (required-field
+ * validation, Location Master join, batching/upsert) needs no changes at all.
  *
- * Both sheets are required; a workbook missing either (e.g. someone uploads just one sheet, or a
- * completely different file) is rejected outright with a clear error rather than silently reading
- * nothing, since there's no way to produce an order row without both.
+ * Both files are required; there's no way to produce an order row without both.
  *
  * Bin Code arrives from WMS WITH the two display dashes (e.g. "A5J-08-A04") but
  * `locations.bin_code` (the join key this value is matched against) never has them -- stripped
  * here before the row is even returned, so the rest of the pipeline only ever sees the canonical
  * form (see src/lib/locations/locationDisplay.ts).
  */
-export async function parseWmsOrderWorkbook(file: File): Promise<Record<string, string>[]> {
-  const buffer = await file.arrayBuffer()
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
-
-  const transferSheet = findSheet(workbook, 'Transfer List')
-  const pickLinesSheet = findSheet(workbook, 'Warehouse Pick Lines')
-  if (!transferSheet || !pickLinesSheet) {
-    const missing = [!transferSheet && '"Transfer List"', !pickLinesSheet && '"Warehouse Pick Lines"'].filter(Boolean).join(' and ')
-    throw new Error(
-      `This file is missing the required sheet(s): ${missing}. Expected a WMS Transfer Order export with both a "Transfer List" (order header) sheet and a "Warehouse Pick Lines" (order lines) sheet — found: ${workbook.SheetNames.join(', ') || '(no sheets)'}.`,
-    )
-  }
+export async function parseWmsOrderFiles(transferFile: File, pickLinesFile: File): Promise<Record<string, string>[]> {
+  const [transferRows, pickLineRows] = await Promise.all([
+    readWmsReport(transferFile, 'Transfer List', [['BT Status'], ['No.', 'No'], ['Transfer-from Code'], ['Transfer-to Code']]),
+    readWmsReport(pickLinesFile, 'Warehouse Pick Lines', [['Source No.', 'Source No'], ['Item No.', 'Item No'], ['Bin Code'], ['Quantity']]),
+  ])
 
   const headerByOrderNo = new Map<string, { warehouseCode: string; storeCode: string; originalOrderDate: string }>()
-  for (const row of sheetToRows(transferSheet)) {
+  for (const row of transferRows) {
     if (col(row, 'BT Status').trim().toLowerCase() !== 'picking') continue
     const orderNo = col(row, 'No.', 'No')
     if (!orderNo) continue
@@ -132,7 +162,7 @@ export async function parseWmsOrderWorkbook(file: File): Promise<Record<string, 
   }
 
   const rows: Record<string, string>[] = []
-  for (const row of sheetToRows(pickLinesSheet)) {
+  for (const row of pickLineRows) {
     const orderNo = col(row, 'Source No.', 'Source No')
     const header = orderNo ? headerByOrderNo.get(orderNo) : undefined
     // Not a Picking-status order (or not in Transfer List at all) -- excluded, not an error: this

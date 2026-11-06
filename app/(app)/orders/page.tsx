@@ -33,7 +33,7 @@ export default async function OrderPoolPage() {
       <div className="page-body">
         <OrderImportForm
           endpointBase="/api/imports/orders"
-          hint={'Upload the WMS Transfer Order export (.xlsx) — must contain both the "Transfer List" (order header, only BT Status = Picking is imported) and "Warehouse Pick Lines" (order lines) sheets'}
+          hint={'อัปโหลด 2 ไฟล์แยกกันจาก WMS · Upload the two WMS exports (.xlsx) as separate files — "Transfer List" (order header, only BT Status = Picking is imported) and "Warehouse Pick Lines" (order lines, matched by Source No.)'}
         />
 
         <div className="card">

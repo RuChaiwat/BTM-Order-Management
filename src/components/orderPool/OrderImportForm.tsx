@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { parseWmsOrderWorkbook, orderGroupKey } from '@/lib/importers/parseSpreadsheet'
+import { parseWmsOrderFiles, orderGroupKey } from '@/lib/importers/parseSpreadsheet'
 
 // processOrderRowsBatch now does a small constant number of DB round trips per HTTP call
 // (bulk order lookup/insert/line-upsert/re-aggregate) instead of one round trip per order or per
@@ -43,27 +43,29 @@ type Phase = 'idle' | 'parsing' | 'importing' | 'finishing' | 'done' | 'error'
  */
 export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; hint: string }) {
   const router = useRouter()
-  const [file, setFile] = useState<File | null>(null)
+  // The two WMS reports are uploaded as separate files (no longer two sheets of one workbook).
+  const [transferFile, setTransferFile] = useState<File | null>(null)
+  const [pickLinesFile, setPickLinesFile] = useState<File | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [progress, setProgress] = useState(0)
   const [result, setResult] = useState<ImportSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Bumped after a successful import to remount the <input type="file"> — a file input's
+  // Bumped after a successful import to remount both <input type="file">s — a file input's
   // displayed filename can't be cleared via its `value` (read-only), only by remounting it.
   const [inputKey, setInputKey] = useState(0)
 
   const busy = phase === 'parsing' || phase === 'importing' || phase === 'finishing'
 
   async function handleUpload() {
-    if (!file) return
+    if (!transferFile || !pickLinesFile) return
     setPhase('parsing')
     setProgress(0)
     setError(null)
     setResult(null)
 
     try {
-      const rows = await parseWmsOrderWorkbook(file)
-      if (rows.length === 0) throw new Error('No Picking-status order lines found — check BT Status in "Transfer List" and that "Warehouse Pick Lines" has matching Source No. rows')
+      const rows = await parseWmsOrderFiles(transferFile, pickLinesFile)
+      if (rows.length === 0) throw new Error('No Picking-status order lines found — check BT Status in the Transfer List file and that the Warehouse Pick Lines file has matching Source No. rows')
       const rawRows = rows.map((data, i) => ({ rowNumber: i + 2, data }))
 
       const groups = new Map<string, typeof rawRows>()
@@ -81,7 +83,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
       const startRes = await fetch(`${endpointBase}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_name: file.name, total_rows: rows.length }),
+        body: JSON.stringify({ file_name: `${transferFile.name} + ${pickLinesFile.name}`, total_rows: rows.length }),
       })
       const startBody = await startRes.json()
       if (!startRes.ok) throw new Error(startBody.error)
@@ -156,13 +158,20 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
         errors_truncated: allErrors.length > 100,
       })
       setPhase('done')
-      setFile(null)
+      setTransferFile(null)
+      setPickLinesFile(null)
       setInputKey((k) => k + 1)
       router.refresh()
     } catch (e) {
       setError((e as Error).message)
       setPhase('error')
     }
+  }
+
+  function resetResult() {
+    setPhase('idle')
+    setResult(null)
+    setError(null)
   }
 
   const barLabel = phase === 'parsing' ? 'กำลังอ่านไฟล์…' : phase === 'importing' ? `กำลังนำเข้า… ${progress}%` : phase === 'finishing' ? 'กำลังสรุปผล…' : ''
@@ -175,23 +184,36 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
       <div className="card-subtitle" style={{ marginBottom: 14 }}>
         {hint}
       </div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <input
-          key={inputKey}
-          type="file"
-          accept=".xlsx,.xls"
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <FilePicker
+          key={`transfer-${inputKey}`}
+          label="1. Transfer List"
+          sublabel="รายการ Transfer (หัวออเดอร์)"
           disabled={busy}
-          onChange={(e) => {
-            setFile(e.target.files?.[0] ?? null)
-            setPhase('idle')
-            setResult(null)
-            setError(null)
+          onChange={(f) => {
+            setTransferFile(f)
+            resetResult()
           }}
         />
-        <button className="btn btn-primary btn-sm" disabled={!file || busy} onClick={handleUpload}>
+        <FilePicker
+          key={`pick-${inputKey}`}
+          label="2. Warehouse Pick Lines"
+          sublabel="รายการหยิบสินค้า (บรรทัดออเดอร์)"
+          disabled={busy}
+          onChange={(f) => {
+            setPickLinesFile(f)
+            resetResult()
+          }}
+        />
+        <button className="btn btn-primary btn-sm" disabled={!transferFile || !pickLinesFile || busy} onClick={handleUpload}>
           {busy ? 'Importing…' : 'Upload'}
         </button>
       </div>
+      {!busy && (transferFile ? !pickLinesFile : !!pickLinesFile) && (
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          เลือกไฟล์ให้ครบทั้ง 2 ไฟล์ก่อนกด Upload · Choose both files to upload
+        </div>
+      )}
 
       {busy && (
         <div style={{ marginTop: 14 }}>
@@ -269,5 +291,16 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
         </div>
       )}
     </div>
+  )
+}
+
+function FilePicker({ label, sublabel, disabled, onChange }: { label: string; sublabel: string; disabled: boolean; onChange: (file: File | null) => void }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, fontWeight: 600 }}>
+      <span>
+        {label} <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>· {sublabel}</span>
+      </span>
+      <input type="file" accept=".xlsx,.xls" disabled={disabled} onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
+    </label>
   )
 }

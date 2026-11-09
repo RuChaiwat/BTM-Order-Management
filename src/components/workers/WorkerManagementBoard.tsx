@@ -32,9 +32,9 @@ const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'zone_controll
 // it has to be manually kept in sync if a role's permissions change, same judgment call already
 // flagged in src/lib/roles.ts's own comments.
 const ROLE_SUMMARY: Record<string, string> = {
-  system_admin: 'สิทธิ์เต็มทุกอย่าง — role เดียวที่จัดการ User Management, Location Master, Configuration ได้ และแก้ไข/ปิดใช้งาน System Admin คนอื่นได้',
-  warehouse_manager: 'กำกับดูแลภาพรวม จัดการ Picker Management และ User Management ได้ (สร้าง/แก้ไข/Deactivate — ยกเว้นบัญชี System Admin) แต่ไม่มีสิทธิ์ Run Matching, Approve/Reject Verification, Work Assignment, หรือ Cancel/Unassign Order',
-  supervisor: 'คุมงานปฏิบัติการเต็มรูปแบบ — Matching, Admin Verification, Work Assignment, Cancel/Unassign Order, Picker Management, Reason Master — ยกเว้น User Management และ Location Master',
+  system_admin: 'สิทธิ์เต็มทุกอย่าง — role เดียวที่แก้ไข Location Master, ค่า Configuration และ Reason Master ได้ และแก้ไข/ปิดใช้งานบัญชี System Admin คนอื่นได้',
+  warehouse_manager: 'กำกับดูแลภาพรวม ไม่ทำงานปฏิบัติการหน้างาน — จัดการ User Management (สร้าง/แก้ไข/Deactivate ยกเว้นบัญชี System Admin), Picker Management และประเภทการจ้างงานได้ · ดู Dashboard, รายงาน, Location Master, Configuration, Audit Trail ได้ แต่แก้ Location/ค่าระบบไม่ได้',
+  supervisor: 'คุมงานปฏิบัติการเต็มรูปแบบ — Import Order, Matching, Work Assignment, Pick Completion, Admin Verification, Cancel/Unassign Order, Print & Reprint, Picker Management · ไม่เข้าหน้าผู้ดูแลระบบ (User Management, Location Master, Configuration, Audit Trail)',
   zone_controller: 'จำกัดเฉพาะโซนที่รับผิดชอบ (ดู Scope) ทำ action ได้แค่บันทึก Pick Completion แทนพนักงาน ที่เหลือดูได้อย่างเดียว',
   viewer: 'ดูรายงาน/dashboard ได้เท่านั้น ทำ action ใดๆ ในระบบไม่ได้เลย',
 }

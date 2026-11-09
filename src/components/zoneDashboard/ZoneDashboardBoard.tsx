@@ -154,12 +154,22 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             <div style={{ fontSize: 13, fontWeight: 700 }}>Zone {z.zone}</div>
             <div style={{ fontSize: 22, fontWeight: 700, margin: '4px 0' }}>{z.pendingPieces.toLocaleString()}</div>
             <div style={{ fontSize: 11, color: '#6B7280' }}>pieces pending</div>
-            <div style={{ fontSize: 11, color: '#6B7280' }}>{z.totalPieces.toLocaleString()} total pieces</div>
-            <div style={{ fontSize: 11, color: '#6B7280' }}>{z.activePickers} active picker(s)</div>
-            <div style={{ marginTop: 8, display: 'flex', gap: 6, justifyContent: 'center' }}>
-              {z.criticalCount > 0 && <span className="badge badge-danger">{z.criticalCount} critical</span>}
-              {z.criticalCount === 0 && z.overdueCount > 0 && <span className="badge badge-warning">{z.overdueCount} overdue</span>}
-              {z.criticalCount === 0 && z.overdueCount === 0 && <span className="badge badge-success">On track</span>}
+            <div style={{ fontSize: 11, color: '#6B7280' }}>
+              <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{z.totalPieces.toLocaleString()}</span> total pieces
+            </div>
+            <div style={{ fontSize: 11, color: '#6B7280' }}>
+              <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{z.activePickers}</span> active picker(s)
+            </div>
+            {/* % completed = picker-submitted share of the zone's pieces (total - pending), same basis
+                as Operations Dashboard's Zone Status cards. The badge keeps the risk colour; the old
+                "N critical / N overdue / On track" text moved to the tooltip. */}
+            <div
+              style={{ marginTop: 8, display: 'flex', gap: 6, justifyContent: 'center' }}
+              title={z.criticalCount > 0 ? `${z.criticalCount} critical` : z.overdueCount > 0 ? `${z.overdueCount} overdue` : 'On track'}
+            >
+              <span className={`badge ${z.criticalCount > 0 ? 'badge-danger' : z.overdueCount > 0 ? 'badge-warning' : 'badge-success'}`} style={{ fontWeight: 700 }}>
+                {z.totalPieces > 0 ? Math.round(((z.totalPieces - z.pendingPieces) / z.totalPieces) * 1000) / 10 : 0}% completed
+              </span>
             </div>
           </button>
         ))}

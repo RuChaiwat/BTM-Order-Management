@@ -242,7 +242,11 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
                 <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>pieces pending</div>
                 <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.3, marginTop: 4 }}>{z.totalPieces.toLocaleString()}</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>total pieces</div>
-                <div style={{ fontSize: 11, marginTop: 6, color: riskColor, fontWeight: 700 }}>{pctDone}% completed</div>
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center' }}>
+                  <span className={`badge ${z.riskLevel === 'red' ? 'badge-danger' : z.riskLevel === 'yellow' ? 'badge-warning' : 'badge-success'}`} style={{ fontWeight: 700 }}>
+                    {pctDone}% completed
+                  </span>
+                </div>
               </Link>
             )
           })}

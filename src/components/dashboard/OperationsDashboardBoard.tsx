@@ -213,6 +213,11 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {data.zoneStatus.map((z) => {
             const riskColor = RISK_COLOR[z.riskLevel]
+            // Share of this zone's pieces whose order the picker has already submitted -- the same
+            // basis as "pieces pending" on this card (total - pending), not the admin-verified basis
+            // of the % COMPLETED KPI above. Coloured by the zone's lateness risk so a red/yellow zone
+            // still stands out now that the "On track / N overdue" label is gone (it moved to the tooltip).
+            const pctDone = z.totalPieces > 0 ? Math.round(((z.totalPieces - z.pendingPieces) / z.totalPieces) * 1000) / 10 : 0
             const riskLabel =
               z.riskLevel === 'red' ? `${z.criticalCount} critical` : z.riskLevel === 'yellow' ? `${z.overdueCount} overdue` : 'On track'
             return (
@@ -228,13 +233,16 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
                   maxWidth: 200,
                   padding: 12,
                   borderTop: `3px solid ${riskColor}`,
+                  textAlign: 'center',
                 }}
+                title={riskLabel}
               >
-                <div style={{ fontSize: 12, fontWeight: 700 }}>Zone {z.zone}</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Zone {z.zone}</div>
                 <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3 }}>{z.pendingPieces.toLocaleString()}</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>pieces pending</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{z.totalPieces.toLocaleString()} total pieces</div>
-                <div style={{ fontSize: 11, marginTop: 6, color: riskColor, fontWeight: 500 }}>{riskLabel}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.3, marginTop: 4 }}>{z.totalPieces.toLocaleString()}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>total pieces</div>
+                <div style={{ fontSize: 11, marginTop: 6, color: riskColor, fontWeight: 700 }}>{pctDone}% completed</div>
               </Link>
             )
           })}

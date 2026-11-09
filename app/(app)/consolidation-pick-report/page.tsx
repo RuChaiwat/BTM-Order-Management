@@ -6,6 +6,7 @@ import { ConsolidationPickReportBoard } from '@/components/consolidation/Consoli
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getActivePickReportBatches } from '@/lib/queries/consolidationPickReport'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -16,6 +17,7 @@ export const dynamic = 'force-dynamic'
 export default async function ConsolidationPickReportPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 5)
   const admin = createAdminClient()
   const { batches, kpis } = await getActivePickReportBatches(admin)
 

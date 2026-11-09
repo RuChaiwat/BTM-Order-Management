@@ -7,6 +7,7 @@ import { CancelOrderPanel } from '@/components/orderPool/CancelOrderPanel'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getOrderPoolOverview } from '@/lib/queries/orderPool'
 import { getSessionUser } from '@/lib/auth'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // The Recent Imports table must reflect the import that just happened, not a stale server-cached
 // render — force this route to always be server-rendered per request.
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic'
 export default async function OrderPoolPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 2)
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
 

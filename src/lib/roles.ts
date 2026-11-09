@@ -34,10 +34,17 @@ export const ROLE_LABELS: Record<string, string> = {
 // warehouse_manager can create/edit/deactivate any user EXCEPT a System Admin account, enforced by
 // canManageUserRole() below both in the UI and in /api/users (the actual authority; the menu entry
 // here only controls whether the link/page is reachable at all).
+//
+// 2026-11 client request: Supervisor no longer reaches User Management (13), Location Master (14),
+// Configuration (15) or Audit Trail (18); Warehouse Manager no longer reaches Order Pool (2),
+// Matching Analysis & Batch Review (4), Consolidation Pick Report (5), Consolidation History (6),
+// Pick Completion (8), Admin Verification (16) or Print & Reprint (20). Pages enforce this via
+// requireMenuAccess() (src/lib/pageAccess.ts), not just the sidebar, and the write APIs used only
+// by those pages dropped the same roles.
 export const ROLE_MENU_ACCESS: Record<string, number[]> = {
   system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-  warehouse_manager: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-  supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20],
+  warehouse_manager: [1, 3, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19],
+  supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 19, 20],
   zone_controller: [1, 3, 8, 9, 10, 11, 12, 19, 20],
   viewer: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 16, 19],
 }

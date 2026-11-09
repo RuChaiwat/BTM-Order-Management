@@ -4,6 +4,7 @@ import { AdminVerificationBoard } from '@/components/verification/AdminVerificat
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getVerificationData } from '@/lib/queries/verification'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -14,6 +15,7 @@ export const dynamic = 'force-dynamic'
 export default async function AdminVerificationPage({ searchParams }: { searchParams: { order_id?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 16)
   const admin = createAdminClient()
   const data = await getVerificationData(admin, user.warehouse_code ?? 'DC002')
 

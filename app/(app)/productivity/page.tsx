@@ -9,6 +9,7 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getProductivityData, getMonthlyProductivityHistory } from '@/lib/queries/productivity'
 import { bangkokDateKey, formatDate } from '@/lib/formatDate'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -19,6 +20,7 @@ export const dynamic = 'force-dynamic'
 export default async function ProductivityPage({ searchParams }: { searchParams: { date?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 12)
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
   const date = searchParams.date || bangkokDateKey(new Date()) || new Date().toISOString().slice(0, 10)

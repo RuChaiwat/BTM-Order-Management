@@ -6,6 +6,7 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getControlTowerData } from '@/lib/queries/controlTower'
 import { ALERT_COLOR, ALERT_LABEL_COLOR, ALERT_BADGE_TONE } from '@/lib/alertColors'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -23,6 +24,7 @@ const ZONE_ROW_STYLE: Record<string, { background?: string }> = {
 export default async function ControlTowerPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 10)
   const admin = createAdminClient()
   const data = await getControlTowerData(admin, user.warehouse_code ?? 'DC002')
 

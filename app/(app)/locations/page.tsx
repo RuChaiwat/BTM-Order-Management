@@ -8,6 +8,7 @@ import { PaginationLinks } from '@/components/Pagination'
 import { ExportExcelButton } from '@/components/ExportExcelButton'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/auth'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -20,6 +21,7 @@ const PAGE_SIZE = 30
 export default async function LocationMasterPage({ searchParams }: { searchParams: { warehouse?: string; bin?: string; zone?: string; page?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 14)
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
 

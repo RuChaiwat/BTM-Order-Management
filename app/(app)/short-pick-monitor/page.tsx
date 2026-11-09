@@ -8,12 +8,14 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getShortPickMonitorData } from '@/lib/queries/shortPickMonitor'
 import { bangkokDateKey, formatDate } from '@/lib/formatDate'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ShortPickMonitorPage({ searchParams }: { searchParams: { date?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 19)
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
   const date = searchParams.date || bangkokDateKey(new Date()) || new Date().toISOString().slice(0, 10)

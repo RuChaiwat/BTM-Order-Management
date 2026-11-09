@@ -5,6 +5,7 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getDashboardData } from '@/lib/queries/dashboard'
 import { redirect } from 'next/navigation'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic'
 export default async function OperationsDashboardPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 1)
   const admin = createAdminClient()
   const data = await getDashboardData(admin, user.warehouse_code ?? 'DC002')
 

@@ -7,6 +7,7 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getMatchingOverviewData } from '@/lib/queries/matchingOverview'
 import { getMostRecentOrderDate } from '@/lib/queries/orderDates'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -23,6 +24,7 @@ function yesterday() {
 export default async function MatchingDashboardPage({ searchParams }: { searchParams: { date?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 3)
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
   const orderDate = searchParams.date || (await getMostRecentOrderDate(admin, warehouseCode)) || yesterday()

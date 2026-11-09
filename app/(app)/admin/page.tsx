@@ -8,6 +8,7 @@ import { HousekeepingPanel } from '@/components/admin/HousekeepingPanel'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/auth'
 import { CONFIG_FIELDS } from '@/lib/configCatalog'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -18,6 +19,7 @@ export const dynamic = 'force-dynamic'
 export default async function AdminPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 15)
   const admin = createAdminClient()
 
   const knownConfigKeys = CONFIG_FIELDS.map((f) => f.key)

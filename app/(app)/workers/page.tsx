@@ -5,6 +5,7 @@ import { WorkerManagementBoard } from '@/components/workers/WorkerManagementBoar
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getWorkerData } from '@/lib/queries/workers'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic'
 export default async function WorkerManagementPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 13)
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
   const { users } = await getWorkerData(admin, warehouseCode)

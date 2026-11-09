@@ -10,7 +10,7 @@ import { submitPickerCompletion } from '@/lib/pickerCompletionActions'
 export async function GET(request: Request) {
   let caller
   try {
-    caller = await requireRole(['system_admin', 'warehouse_manager', 'supervisor', 'zone_controller'])
+    caller = await requireRole(['system_admin', 'supervisor', 'zone_controller'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let caller
   try {
-    caller = await requireRole(['system_admin', 'warehouse_manager', 'supervisor', 'zone_controller'])
+    caller = await requireRole(['system_admin', 'supervisor', 'zone_controller'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

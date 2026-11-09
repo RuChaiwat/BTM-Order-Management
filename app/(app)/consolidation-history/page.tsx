@@ -7,6 +7,7 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getConsolidationHistory, type ConsolidationHistorySearchField } from '@/lib/queries/consolidationHistory'
 import { bangkokDateKey } from '@/lib/formatDate'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -19,6 +20,7 @@ const VALID_FIELDS: ConsolidationHistorySearchField[] = ['released', 'order_date
 export default async function ConsolidationHistoryPage({ searchParams }: { searchParams: { field?: string; date?: string; q?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 6)
   const admin = createAdminClient()
 
   const field: ConsolidationHistorySearchField = VALID_FIELDS.includes(searchParams.field as ConsolidationHistorySearchField)

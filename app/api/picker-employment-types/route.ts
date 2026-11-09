@@ -5,7 +5,7 @@ import { writeAudit } from '@/lib/audit'
 
 // Same admin-role set as /api/pickers -- Employment Type is Picker master data, maintained from
 // Configuration without a code deploy (migration 0033).
-const ADMIN_ROLES = ['system_admin', 'warehouse_manager', 'supervisor']
+const ADMIN_ROLES = ['system_admin', 'warehouse_manager']
 
 export async function POST(request: Request) {
   let caller

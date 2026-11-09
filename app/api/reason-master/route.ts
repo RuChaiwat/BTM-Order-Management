@@ -7,7 +7,7 @@ import { writeAudit } from '@/lib/audit'
 export async function POST(request: Request) {
   let caller
   try {
-    caller = await requireRole(['system_admin', 'supervisor'])
+    caller = await requireRole(['system_admin'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   let caller
   try {
-    caller = await requireRole(['system_admin', 'supervisor'])
+    caller = await requireRole(['system_admin'])
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }

@@ -5,12 +5,14 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getOpenOrdersForPrint } from '@/lib/queries/printReprint'
 import { getActivePickers } from '@/lib/queries/pickers'
+import { requireMenuAccess } from '@/lib/pageAccess'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PrintReprintPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  requireMenuAccess(user.role, 20)
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
 

@@ -246,8 +246,16 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
               padding: '10px 12px',
             }}
           >
-            {result.blocking_count > 0 ? '⚠' : '✓'} นำเข้าสำเร็จ: สร้างใหม่ {result.orders_created} ออเดอร์ · อัปเดต {result.orders_updated} ออเดอร์ · {result.lines_upserted} รายการสินค้า
+            {result.blocking_count > 0 ? '⚠' : '✓'} นำเข้าสำเร็จ: ออเดอร์ใหม่ {result.orders_created.toLocaleString()} · ออเดอร์ซ้ำ {result.orders_updated.toLocaleString()} ·{' '}
+            {result.lines_upserted.toLocaleString()} รายการสินค้า
           </div>
+          {result.orders_updated > 0 && (
+            <div style={{ marginTop: 8, fontSize: 12.5, color: '#B45309', background: '#FFFBEB', borderRadius: 8, padding: '8px 12px' }}>
+              {result.orders_created === 0
+                ? `ทุกออเดอร์ในไฟล์นี้ (${result.orders_updated.toLocaleString()} ออเดอร์) เคยนำเข้าแล้ว — ระบบไม่สร้างออเดอร์ใหม่ซ้ำ แต่อัปเดตรายการสินค้าของออเดอร์เดิมตามไฟล์ล่าสุด`
+                : `${result.orders_updated.toLocaleString()} ออเดอร์มีอยู่ในระบบแล้ว (Warehouse + Order No + วันที่ออเดอร์ ตรงกัน) — ไม่สร้างใหม่ซ้ำ แต่อัปเดตรายการสินค้าตามไฟล์ล่าสุด`}
+            </div>
+          )}
 
           {result.error_count > 0 && (
             <div style={{ marginTop: 10 }}>

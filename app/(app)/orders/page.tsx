@@ -29,6 +29,23 @@ export default async function OrderPoolPage() {
   ])
   if (importsError) console.error('[orders] import_batches error', importsError.message)
 
+  // New vs duplicate order counts per import aren't columns on import_batches -- the finish step
+  // records them on the import's audit_logs entry ('orders.import'), so read them from there.
+  const importIds = (importBatches ?? []).map((b) => b.import_id)
+  const { data: importAudits } = importIds.length
+    ? await admin.from('audit_logs').select('entity_id, after').eq('action', 'orders.import').in('entity_id', importIds)
+    : { data: [] as { entity_id: string; after: unknown }[] }
+  const countsByImport = new Map<string, { created: number | null; updated: number | null }>()
+  for (const a of importAudits ?? []) {
+    const after = (a.after ?? {}) as { orders_created?: number | null; orders_updated?: number | null }
+    countsByImport.set(a.entity_id as string, { created: after.orders_created ?? null, updated: after.orders_updated ?? null })
+  }
+  const importRows = (importBatches ?? []).map((b) => ({
+    ...b,
+    new_orders: countsByImport.get(b.import_id)?.created ?? null,
+    duplicate_orders: countsByImport.get(b.import_id)?.updated ?? null,
+  }))
+
   return (
     <>
       <TopBar title="Order Pool / Import Status" subtitle="พูลออเดอร์ / สถานะนำเข้า · WMS Transfer Order export" />
@@ -43,7 +60,7 @@ export default async function OrderPoolPage() {
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
             ประวัติการนำเข้าล่าสุด · click a column to sort
           </div>
-          <RecentImportsTable rows={importBatches ?? []} />
+          <RecentImportsTable rows={importRows} />
         </div>
 
         <OrderPoolOverview totalOrders={overview.totalOrders} zoneDensity={overview.zoneDensity} bands={overview.bands} thresholds={overview.thresholds} />

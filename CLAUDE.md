@@ -86,3 +86,10 @@ of overflowing past the column's fixed width.
   clips that overflow, the content renders outside the visible card boundary instead of the card
   growing or the page scrolling. This caused two separate reported bugs on Location Master (the
   inner table wrapper and the outer card both had it) before being fixed and written up here.
+  The same bug came back on Picker Management (2026-11) because 15 other cards still carried
+  `style={{ minHeight: 0 }}` -- most of them grid items of a `.page-body` turned into
+  `display: 'grid'`, where minHeight:0 lets the grid row shrink to the page height and the list
+  spills out below the white card. All were removed; `grep -rn "minHeight: 0" src app` should only
+  ever match non-`.card` wrappers (Pick Completion's invisible list wrapper, the print-only Pick
+  Sheet). For a side detail panel next to a long list, give the grid `alignItems: 'start'` so the
+  panel doesn't stretch to the list's height.

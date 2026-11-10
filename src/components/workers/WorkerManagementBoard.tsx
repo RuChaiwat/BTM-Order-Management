@@ -185,8 +185,8 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
 
   return (
     <div className="page-body">
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
-      <div className="card" style={{ minHeight: 0 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
+      <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span className="card-title">User List</span>
           <span className="card-subtitle">{users.length} users · {warehouseCode}</span>
@@ -235,7 +235,7 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
         {users.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
       </div>
 
-      <div className="card" style={{ minHeight: 0 }}>
+      <div className="card">
         {selected ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>

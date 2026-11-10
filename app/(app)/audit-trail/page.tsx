@@ -32,7 +32,7 @@ export default async function AuditTrailPage({ searchParams }: { searchParams: {
             shrink below its content gets squeezed by the flex algorithm once total page content
             exceeds the viewport (same fix as Consolidation Pick Report/Zone Dashboard). This is
             the only card on the page, so it's the one allowed to claim flex:1. */}
-        <div className="card" style={{ flex: 1, minHeight: 0 }}>
+        <div className="card" style={{ flex: 1 }}>
           <div className="card-title">Audit Trail</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
             Immutable — System Admin / Warehouse Manager only. Purged after the configured retention window (Configuration page), same as other transactional data.

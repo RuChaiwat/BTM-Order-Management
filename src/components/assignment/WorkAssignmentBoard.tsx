@@ -383,7 +383,7 @@ export function WorkAssignmentBoard({
     <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div className="page-body" style={{ display: 'grid', gridTemplateColumns: '300px 1fr 360px', gap: 16, alignItems: 'start' }}>
         {/* Section 1: Criteria */}
-        <div className="card" style={{ minHeight: 0 }}>
+        <div className="card">
           <div className="card-title">Criteria</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
             เกณฑ์การเลือกออเดอร์
@@ -506,7 +506,7 @@ export function WorkAssignmentBoard({
         </div>
 
         {/* Section 2: Unassigned Order Pool */}
-        <div className="card" style={{ minHeight: 0 }}>
+        <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <span className="card-title">Unassigned Order Pool</span>
             <span className="card-subtitle">
@@ -575,7 +575,7 @@ export function WorkAssignmentBoard({
         </div>
 
         {/* Section 3: Assignment Summary */}
-        <div className="card" style={{ minHeight: 0 }}>
+        <div className="card">
           <div className="card-title">Assignment Summary</div>
           <div className="card-subtitle" style={{ marginBottom: 14 }}>
             สรุปการมอบหมายงาน

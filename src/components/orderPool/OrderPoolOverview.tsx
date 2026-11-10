@@ -21,7 +21,7 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-      <div className="card" style={{ minHeight: 0 }}>
+      <div className="card">
         <div className="card-header" style={{ marginBottom: 10 }}>
           <span className="card-title">Order Density by Zone</span>
           <span className="card-subtitle">ความหนาแน่นของออเดอร์แต่ละโซน · {totalOrders.toLocaleString()} orders in pool</span>
@@ -69,7 +69,7 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
         </table>
       </div>
 
-      <div className="card" style={{ minHeight: 0 }}>
+      <div className="card">
         <div className="card-header" style={{ marginBottom: 10 }}>
           <span className="card-title">Order Complexity</span>
           <span className="card-subtitle">ความยากง่ายของออเดอร์ · ตาม pieces/SKU ratio</span>

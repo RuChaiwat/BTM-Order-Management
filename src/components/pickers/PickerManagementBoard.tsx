@@ -160,8 +160,8 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
   }
 
   return (
-    <div className="page-body" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
-      <div className="card" style={{ minHeight: 0 }}>
+    <div className="page-body" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
+      <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span className="card-title">Picker List</span>
           <span className="card-subtitle">รายชื่อพนักงานหยิบสินค้า · {pickers.length} pickers · {warehouseCode}</span>
@@ -229,7 +229,7 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
         {pickers.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
       </div>
 
-      <div className="card" style={{ minHeight: 0 }}>
+      <div className="card">
         {selected ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>

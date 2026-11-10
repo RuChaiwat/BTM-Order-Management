@@ -44,7 +44,7 @@ export function LocationTable({ locations }: { locations: Location[] }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 320px' : '1fr', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 320px' : '1fr', gap: 14, alignItems: 'start' }}>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
           <col style={{ width: '14%' }} />
@@ -102,7 +102,7 @@ export function LocationTable({ locations }: { locations: Location[] }) {
       </table>
 
       {selected && (
-        <div className="card" style={{ minHeight: 0 }}>
+        <div className="card">
           <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: 15, fontWeight: 700 }}>{formatLocationDisplay(selected.bin_code)}</div>

@@ -282,16 +282,6 @@ export function PickCompletionBoard({
               {picker.name_th && picker.name_en && <div style={{ fontSize: 12, color: '#6B7280' }}>{picker.name_en}</div>}
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {showUnassign && (
-                <button
-                  className="btn btn-danger btn-sm"
-                  disabled={orders.length === 0 || submitting || unassigning}
-                  onClick={() => setShowUnassignAll(true)}
-                  title="Send every order on this picker's list back to the pool for a different picker"
-                >
-                  Unassign All ({orders.length})
-                </button>
-              )}
               {showReprint && (
                 <button
                   className="btn btn-info btn-sm"
@@ -300,6 +290,16 @@ export function PickCompletionBoard({
                   title="Reprint every currently-assigned order's Pick Slip -- paper jam, empty roll, or the picker lost it"
                 >
                   Reprint All ({orders.length})
+                </button>
+              )}
+              {showUnassign && (
+                <button
+                  className="btn btn-danger btn-sm"
+                  disabled={orders.length === 0 || submitting || unassigning}
+                  onClick={() => setShowUnassignAll(true)}
+                  title="Send every order on this picker's list back to the pool for a different picker"
+                >
+                  Unassign All ({orders.length})
                 </button>
               )}
               <button className="btn btn-success btn-sm" disabled={orders.length === 0 || submitting || unassigning} onClick={() => setShowCompletedAll(true)}>

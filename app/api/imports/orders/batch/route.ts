@@ -32,6 +32,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     orders_created: result.ordersCreated,
     orders_updated: result.ordersUpdated,
+    orders_locked: result.ordersLocked,
     lines_upserted: result.linesUpserted,
     errors: result.errors.map((e) => ({ row_number: e.rowNumber, reason: e.reason, severity: e.severity })),
   })

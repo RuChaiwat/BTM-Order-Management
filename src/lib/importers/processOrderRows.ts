@@ -16,6 +16,8 @@ export interface ImportErrorRow {
 export interface BatchResult {
   ordersCreated: number
   ordersUpdated: number
+  /** Duplicates left untouched because the order was already assigned (or further along). */
+  ordersLocked: number
   linesUpserted: number
   errors: ImportErrorRow[]
 }
@@ -242,10 +244,27 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
   const ordersCreated = resolvedGroups.filter((r) => r.isNew).length
   const ordersUpdated = resolvedGroups.filter((r) => !r.isNew).length
 
+  // A duplicate order is only refreshed from the file while it's still 'new' (not yet assigned).
+  // Once assigned its Pick List has been printed and picking/verification may already be recorded,
+  // so changing its lines or totals from a later WMS export would make the system disagree with the
+  // paper and with what was actually picked -- such orders are left exactly as they are, with one
+  // warning per order (not per line, which would flood a whole-file re-upload) saying why.
+  const lockedGroups = resolvedGroups.filter((r) => !r.isNew && r.status !== 'new')
+  for (const { group, status } of lockedGroups) {
+    const first = group.lines[0]
+    errors.push({
+      rowNumber: first.rowNumber,
+      raw: first.raw,
+      reason: `Order ${group.orderNo} is already '${status}' (assigned or further) — duplicate NOT updated from this file; its ${group.lines.length} line(s) were left as they are. ออเดอร์นี้มอบหมายงานแล้ว จึงไม่อัปเดตตามไฟล์`,
+      severity: 'warning',
+    })
+  }
+  const writableGroups = resolvedGroups.filter((r) => r.isNew || r.status === 'new')
+
   // Step 3: one bulk upsert for every line across every order in this batch, instead of one
   // upsert per line -- this is the change that matters most at WMS Transfer Order volume.
   const lineRows: { orderId: string; rowNumber: number; raw: Record<string, string>; row: Record<string, unknown> }[] = []
-  for (const { group, orderId } of resolvedGroups) {
+  for (const { group, orderId } of writableGroups) {
     for (const line of group.lines) {
       const location = locationMap.get(`${line.warehouseCode}|${line.binCode}`)
       if (!location || !location.active) {
@@ -305,7 +324,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
   // a value for even on the conflict-update path of an upsert -- they're each set to the row's own
   // existing/just-inserted value, not touched otherwise (import_id is deliberately omitted so an
   // existing order's original import provenance is never overwritten by a later re-upload).
-  const touchedOrderIds = [...new Set(resolvedGroups.map((r) => r.orderId))]
+  const touchedOrderIds = [...new Set(writableGroups.map((r) => r.orderId))]
   if (touchedOrderIds.length > 0) {
     const { data: lineAgg, error: aggError } = await admin.from('order_lines').select('order_id, sku, qty').in('order_id', touchedOrderIds).limit(50000)
     if (aggError) console.error('[processOrderRowsBatch] line aggregation error', aggError.message)
@@ -316,7 +335,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
       entry.skus.add(l.sku)
       aggByOrder.set(l.order_id, entry)
     }
-    const orderUpdates = resolvedGroups.map(({ group, orderId, status }) => ({
+    const orderUpdates = writableGroups.map(({ group, orderId, status }) => ({
       order_id: orderId,
       order_no: group.orderNo,
       warehouse_code: group.warehouseCode,
@@ -334,5 +353,5 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
     await admin.from('import_errors').insert(errors.map((e) => ({ import_id: importId, row_number: e.rowNumber, raw_data: e.raw, error_reason: e.reason, severity: e.severity })))
   }
 
-  return { ordersCreated, ordersUpdated, linesUpserted, errors }
+  return { ordersCreated, ordersUpdated, ordersLocked: lockedGroups.length, linesUpserted, errors }
 }

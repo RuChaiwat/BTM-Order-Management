@@ -23,6 +23,7 @@ interface ImportSummary {
   status: string
   orders_created: number
   orders_updated: number
+  orders_locked: number
   lines_upserted: number
   error_count: number
   blocking_count: number
@@ -92,6 +93,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
       setPhase('importing')
       let ordersCreated = 0
       let ordersUpdated = 0
+      let ordersLocked = 0
       let linesUpserted = 0
       const allErrors: ErrorRow[] = []
 
@@ -103,7 +105,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
       // just shown in this browser tab) and the loop moves on, so one bad batch only costs its own
       // rows instead of every batch after it.
       for (let i = 0; i < batches.length; i++) {
-        let body: { orders_created: number; orders_updated: number; lines_upserted: number; errors: ErrorRow[] } | null = null
+        let body: { orders_created: number; orders_updated: number; orders_locked: number; lines_upserted: number; errors: ErrorRow[] } | null = null
         let lastError: Error | null = null
         for (let attempt = 0; attempt < 2 && !body; attempt++) {
           try {
@@ -122,6 +124,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
         if (body) {
           ordersCreated += body.orders_created
           ordersUpdated += body.orders_updated
+          ordersLocked += body.orders_locked ?? 0
           linesUpserted += body.lines_upserted
           allErrors.push(...body.errors)
         } else {
@@ -140,7 +143,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
       const finishRes = await fetch(`${endpointBase}/finish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ import_id: importId, orders_created: ordersCreated, orders_updated: ordersUpdated, lines_upserted: linesUpserted }),
+        body: JSON.stringify({ import_id: importId, orders_created: ordersCreated, orders_updated: ordersUpdated, orders_locked: ordersLocked, lines_upserted: linesUpserted }),
       })
       const finishBody = await finishRes.json()
       if (!finishRes.ok) throw new Error(finishBody.error)
@@ -150,6 +153,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
         status: finishBody.status,
         orders_created: ordersCreated,
         orders_updated: ordersUpdated,
+        orders_locked: ordersLocked,
         lines_upserted: linesUpserted,
         error_count: allErrors.length,
         blocking_count: blockingCount,
@@ -252,8 +256,11 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
           {result.orders_updated > 0 && (
             <div style={{ marginTop: 8, fontSize: 12.5, color: '#B45309', background: '#FFFBEB', borderRadius: 8, padding: '8px 12px' }}>
               {result.orders_created === 0
-                ? `ทุกออเดอร์ในไฟล์นี้ (${result.orders_updated.toLocaleString()} ออเดอร์) เคยนำเข้าแล้ว — ระบบไม่สร้างออเดอร์ใหม่ซ้ำ แต่อัปเดตรายการสินค้าของออเดอร์เดิมตามไฟล์ล่าสุด`
-                : `${result.orders_updated.toLocaleString()} ออเดอร์มีอยู่ในระบบแล้ว (Warehouse + Order No + วันที่ออเดอร์ ตรงกัน) — ไม่สร้างใหม่ซ้ำ แต่อัปเดตรายการสินค้าตามไฟล์ล่าสุด`}
+                ? `ทุกออเดอร์ในไฟล์นี้ (${result.orders_updated.toLocaleString()} ออเดอร์) เคยนำเข้าแล้ว — ระบบไม่สร้างออเดอร์ใหม่ซ้ำ`
+                : `${result.orders_updated.toLocaleString()} ออเดอร์มีอยู่ในระบบแล้ว (Warehouse + Order No + วันที่ออเดอร์ ตรงกัน) — ไม่สร้างใหม่ซ้ำ`}
+              {result.orders_updated - result.orders_locked > 0 &&
+                ` · ${(result.orders_updated - result.orders_locked).toLocaleString()} ออเดอร์ที่ยังไม่มอบหมายงาน อัปเดตรายการสินค้าตามไฟล์ล่าสุด`}
+              {result.orders_locked > 0 && ` · ${result.orders_locked.toLocaleString()} ออเดอร์มอบหมายงานแล้ว ไม่อัปเดต (ล็อกไว้)`}
             </div>
           )}
 

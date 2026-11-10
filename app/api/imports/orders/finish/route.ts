@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
 
-  const { import_id, orders_created, orders_updated, lines_upserted } = await request.json()
+  const { import_id, orders_created, orders_updated, orders_locked, lines_upserted } = await request.json()
   if (!import_id) return NextResponse.json({ error: 'import_id is required' }, { status: 400 })
 
   const admin = createAdminClient()
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     action: 'orders.import',
     entityType: 'import_batches',
     entityId: import_id,
-    after: { orders_created: orders_created ?? null, orders_updated: orders_updated ?? null, lines_upserted: lines_upserted ?? null, errors: errorCount },
+    after: { orders_created: orders_created ?? null, orders_updated: orders_updated ?? null, orders_locked: orders_locked ?? null, lines_upserted: lines_upserted ?? null, errors: errorCount },
   })
 
   return NextResponse.json({ import_id, status, success_rows: successRows, error_count: errorCount, blocking_count: blockingCount, warning_count: warningCount })

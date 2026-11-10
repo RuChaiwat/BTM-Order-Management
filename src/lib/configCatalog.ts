@@ -21,7 +21,13 @@
  * getActiveConfig() has to change.
  */
 
-export type ConfigFieldKind = 'integer' | 'percent' | 'nullable_integer'
+export type ConfigFieldKind = 'integer' | 'percent' | 'nullable_integer' | 'choice'
+
+export interface ConfigChoiceOption {
+  value: string
+  labelEn: string
+  labelTh: string
+}
 
 export interface ConfigFieldMeta {
   key: string
@@ -35,6 +41,10 @@ export interface ConfigFieldMeta {
   min?: number
   max?: number
   step?: number
+  /** kind 'choice' only: the allowed values (shown as a dropdown) and the value used while no
+   * configuration row exists yet for this key. */
+  options?: ConfigChoiceOption[]
+  defaultValue?: string
 }
 
 export interface ConfigCategoryMeta {
@@ -51,7 +61,13 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
   { id: 'admin_verification', labelEn: 'Verification SLA & Alerts', labelTh: 'เกณฑ์เวลาแจ้งเตือน (ขั้น Verification)' },
   { id: 'picker_productivity', labelEn: 'Picker Productivity', labelTh: 'ประสิทธิผลพนักงานหยิบสินค้า' },
   { id: 'housekeeping', labelEn: 'Data Retention', labelTh: 'ระยะเวลาเก็บข้อมูล' },
+  { id: 'printing', labelEn: 'Printing', labelTh: 'การพิมพ์เอกสาร' },
 ]
+
+/** Which document Work Assignment opens for printing right after Confirm Assignment. One global
+ * setting (scope 'global'), not per user -- read by app/(app)/assignment/page.tsx. */
+export const WORK_ASSIGNMENT_PRINT_KEY = 'work_assignment.print_document'
+export type WorkAssignmentPrintDocument = 'pick_slip' | 'pick_sheet'
 
 export const CONFIG_FIELDS: ConfigFieldMeta[] = [
   {
@@ -301,12 +317,28 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     unit: 'days',
     min: 1,
   },
+  {
+    key: WORK_ASSIGNMENT_PRINT_KEY,
+    category: 'printing',
+    labelEn: 'Document printed after Confirm Assignment',
+    labelTh: 'เอกสารที่พิมพ์หลังกด Confirm Assignment',
+    descriptionEn: 'Work Assignment prints this document automatically once an assignment is confirmed. Applies to every user. Either document can still be (re)printed any time from Print & Reprint.',
+    descriptionTh: 'หน้า Work Assignment จะพิมพ์เอกสารนี้อัตโนมัติหลังยืนยันการมอบหมายงาน ใช้กับผู้ใช้ทุกคน · พิมพ์ซ้ำได้ทั้ง 2 แบบจากหน้า Print & Reprint',
+    kind: 'choice',
+    unit: '',
+    options: [
+      { value: 'pick_slip', labelEn: 'Pick Slip (80mm thermal slip)', labelTh: 'Pick Slip (ใบเล็ก 80 มม.)' },
+      { value: 'pick_sheet', labelEn: 'Pick Sheet (item list by pick sequence)', labelTh: 'Pick Sheet (รายการสินค้าตามลำดับหยิบ)' },
+    ],
+    defaultValue: 'pick_slip',
+  },
 ]
 
 export const CONFIG_FIELD_BY_KEY = new Map(CONFIG_FIELDS.map((f) => [f.key, f]))
 
 /** Raw stored value -> what the input box shows. */
 export function toDisplayValue(kind: ConfigFieldKind, raw: unknown): string {
+  if (kind === 'choice') return typeof raw === 'string' ? raw : ''
   if (raw === null || raw === undefined) return ''
   const n = Number(raw)
   if (Number.isNaN(n)) return ''
@@ -314,12 +346,23 @@ export function toDisplayValue(kind: ConfigFieldKind, raw: unknown): string {
 }
 
 /** What the input box shows -> the value sent back to the API (nullable_integer allows blank). */
-export function fromDisplayValue(kind: ConfigFieldKind, display: string): { ok: true; value: number | null } | { ok: false } {
+export function fromDisplayValue(kind: ConfigFieldKind, display: string): { ok: true; value: number | string | null } | { ok: false } {
   const trimmed = display.trim()
+  if (kind === 'choice') return trimmed ? { ok: true, value: trimmed } : { ok: false }
   if (trimmed === '') {
     return kind === 'nullable_integer' ? { ok: true, value: null } : { ok: false }
   }
   const n = Number(trimmed)
   if (Number.isNaN(n)) return { ok: false }
   return { ok: true, value: kind === 'percent' ? Math.round((n / 100) * 10000) / 10000 : Math.round(n) }
+}
+
+/** Human-readable value for read-only displays (history): a choice shows its option label, a
+ * number its display value plus unit. A choice with no stored row yet reads as its default. */
+export function formatConfigValue(field: ConfigFieldMeta, raw: unknown): string {
+  if (field.kind === 'choice') {
+    const v = toDisplayValue('choice', raw) || field.defaultValue || ''
+    return field.options?.find((o) => o.value === v)?.labelEn ?? v
+  }
+  return `${toDisplayValue(field.kind, raw)} ${field.unit}`.trim()
 }

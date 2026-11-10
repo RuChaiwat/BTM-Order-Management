@@ -20,16 +20,20 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  function displayFor(key: string): string {
-    if (key in edits) return edits[key]
+  // The server's current value as the input shows it -- a choice with no stored row yet shows its
+  // default (what the app is actually using), so it never appears blank.
+  function storedDisplay(key: string): string {
     const field = CONFIG_FIELD_BY_KEY.get(key)!
-    return toDisplayValue(field.kind, configByKey.get(key)?.value)
+    const v = toDisplayValue(field.kind, configByKey.get(key)?.value)
+    return field.kind === 'choice' ? v || field.defaultValue || '' : v
+  }
+
+  function displayFor(key: string): string {
+    return key in edits ? edits[key] : storedDisplay(key)
   }
 
   function isDirty(key: string): boolean {
-    if (!(key in edits)) return false
-    const field = CONFIG_FIELD_BY_KEY.get(key)!
-    return edits[key] !== toDisplayValue(field.kind, configByKey.get(key)?.value)
+    return key in edits && edits[key] !== storedDisplay(key)
   }
 
   function setEdit(key: string, display: string) {
@@ -111,15 +115,33 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
                       {error && <div style={{ fontSize: 11.5, color: 'var(--color-danger)', marginTop: 4 }}>{error}</div>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
-                      <input
-                        className="field-input"
-                        style={{ border: '1px solid var(--color-border)', width: 90, textAlign: 'right' }}
-                        value={displayFor(field.key)}
-                        placeholder={field.kind === 'nullable_integer' ? 'no limit' : undefined}
-                        onChange={(e) => setEdit(field.key, e.target.value)}
-                        disabled={busy}
-                      />
-                      <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', width: 52 }}>{field.unit}</span>
+                      {field.kind === 'choice' ? (
+                        <select
+                          className="field-input"
+                          style={{ border: '1px solid var(--color-border)', width: 300 }}
+                          value={displayFor(field.key)}
+                          onChange={(e) => setEdit(field.key, e.target.value)}
+                          disabled={busy}
+                        >
+                          {field.options?.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.labelEn} · {o.labelTh}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <input
+                            className="field-input"
+                            style={{ border: '1px solid var(--color-border)', width: 90, textAlign: 'right' }}
+                            value={displayFor(field.key)}
+                            placeholder={field.kind === 'nullable_integer' ? 'no limit' : undefined}
+                            onChange={(e) => setEdit(field.key, e.target.value)}
+                            disabled={busy}
+                          />
+                          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', width: 52 }}>{field.unit}</span>
+                        </>
+                      )}
                       {dirty && (
                         <>
                           <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => cancelEdit(field.key)}>

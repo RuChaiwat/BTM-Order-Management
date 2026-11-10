@@ -1,4 +1,4 @@
-import { CONFIG_CATEGORIES, CONFIG_FIELDS, toDisplayValue } from '@/lib/configCatalog'
+import { CONFIG_CATEGORIES, CONFIG_FIELDS, formatConfigValue } from '@/lib/configCatalog'
 import { formatDateTime } from '@/lib/formatDate'
 
 interface ConfigVersionRow {
@@ -85,10 +85,10 @@ export function ConfigHistoryPanel({ versions }: { versions: ConfigVersionRow[] 
                       <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)' }}>{field.labelTh}</div>
                     </td>
                     <td style={{ color: 'var(--color-text-secondary)', overflowWrap: 'break-word' }}>
-                      {toDisplayValue(field.kind, previous.value)} {field.unit}
+                      {formatConfigValue(field, previous.value)}
                     </td>
                     <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
-                      {toDisplayValue(field.kind, current.value)} {field.unit}
+                      {formatConfigValue(field, current.value)}
                     </td>
                     <td>{current.changed_by ?? '—'}</td>
                     <td>{formatDateTime(current.changed_at)}</td>

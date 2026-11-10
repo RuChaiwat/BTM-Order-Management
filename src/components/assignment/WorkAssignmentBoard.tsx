@@ -99,7 +99,18 @@ function compatibleZonesOf(orders: SelectedOrder[]): string[] | null {
  *      the already-loaded active picker roster) instead of a login-account dropdown, since
  *      Pickers no longer have login accounts at all.
  */
-export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, pickers }: { warehouseCode: string; initialBacklogByDate: BacklogByDate[]; pickers: Picker[] }) {
+export function WorkAssignmentBoard({
+  warehouseCode,
+  initialBacklogByDate,
+  pickers,
+  printDocument = 'pick_slip',
+}: {
+  warehouseCode: string
+  initialBacklogByDate: BacklogByDate[]
+  pickers: Picker[]
+  /** Configuration > Printing: which document opens after Confirm Assignment. */
+  printDocument?: 'pick_slip' | 'pick_sheet'
+}) {
   const [backlogByDate] = useState(initialBacklogByDate)
   const [orderDate, setOrderDate] = useState<string | null>(null)
   const [zoneDensity, setZoneDensity] = useState<ZoneDensity[]>([])
@@ -350,7 +361,7 @@ export function WorkAssignmentBoard({ warehouseCode, initialBacklogByDate, picke
       setSubmitError(body.error)
       return
     }
-    if (printWindow) printWindow.location.href = `/pick-slip/print?order_ids=${[...selected].join(',')}`
+    if (printWindow) printWindow.location.href = `${printDocument === 'pick_sheet' ? '/pick-sheet/print' : '/pick-slip/print'}?order_ids=${[...selected].join(',')}`
     // Refresh the pool for the SAME Criteria selection (rather than resetting it) -- assigning one
     // picker's batch is usually the first of several against the same date/zone, so the admin can
     // keep going against an accurate remaining list without re-clicking through Criteria again.

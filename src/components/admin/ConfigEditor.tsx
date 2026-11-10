@@ -25,7 +25,7 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
   function storedDisplay(key: string): string {
     const field = CONFIG_FIELD_BY_KEY.get(key)!
     const v = toDisplayValue(field.kind, configByKey.get(key)?.value)
-    return field.kind === 'choice' ? v || field.defaultValue || '' : v
+    return v || field.defaultValue || ''
   }
 
   function displayFor(key: string): string {
@@ -60,6 +60,13 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
     if (!parsed.ok) {
       setErrors((e) => ({ ...e, [key]: 'Enter a valid number · กรอกตัวเลขให้ถูกต้อง' }))
       return
+    }
+    if (typeof parsed.value === 'number' && field.kind !== 'percent') {
+      if ((field.min !== undefined && parsed.value < field.min) || (field.max !== undefined && parsed.value > field.max)) {
+        const range = field.max !== undefined ? `${field.min ?? 0}–${field.max}` : `≥ ${field.min}`
+        setErrors((e) => ({ ...e, [key]: `Allowed range ${range} ${field.unit} · ค่าที่ใส่ได้ ${range} ${field.unit}` }))
+        return
+      }
     }
     setBusyKey(key)
     const res = await fetch('/api/configuration', {

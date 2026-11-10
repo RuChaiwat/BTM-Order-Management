@@ -7,6 +7,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getControlTowerData } from '@/lib/queries/controlTower'
 import { ALERT_COLOR, ALERT_LABEL_COLOR, ALERT_BADGE_TONE } from '@/lib/alertColors'
 import { requireMenuAccess } from '@/lib/pageAccess'
+import { getRefreshIntervalMs } from '@/lib/queries/config'
+import { AUTO_REFRESH_KEYS } from '@/lib/configCatalog'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -26,11 +28,14 @@ export default async function ControlTowerPage() {
   if (!user) redirect('/login')
   requireMenuAccess(user.role, 10)
   const admin = createAdminClient()
-  const data = await getControlTowerData(admin, user.warehouse_code ?? 'DC002')
+  const [data, refreshMs] = await Promise.all([
+    getControlTowerData(admin, user.warehouse_code ?? 'DC002'),
+    getRefreshIntervalMs(admin, AUTO_REFRESH_KEYS.controlTower),
+  ])
 
   return (
     <>
-      <AutoRefresh />
+      <AutoRefresh intervalMs={refreshMs} />
       <TopBar title="Control Tower" subtitle={`ศูนย์ควบคุม · ${user.warehouse_code ?? ''}`} />
 
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>

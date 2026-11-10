@@ -41,9 +41,10 @@ export interface ConfigFieldMeta {
   min?: number
   max?: number
   step?: number
-  /** kind 'choice' only: the allowed values (shown as a dropdown) and the value used while no
-   * configuration row exists yet for this key. */
+  /** kind 'choice' only: the allowed values (shown as a dropdown). */
   options?: ConfigChoiceOption[]
+  /** Display value used while no configuration row exists yet for this key (what the app falls
+   * back to), so the editor never shows a blank for a setting that is actually in effect. */
   defaultValue?: string
 }
 
@@ -62,7 +63,16 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
   { id: 'picker_productivity', labelEn: 'Picker Productivity', labelTh: 'ประสิทธิผลพนักงานหยิบสินค้า' },
   { id: 'housekeeping', labelEn: 'Data Retention', labelTh: 'ระยะเวลาเก็บข้อมูล' },
   { id: 'printing', labelEn: 'Printing', labelTh: 'การพิมพ์เอกสาร' },
+  { id: 'auto_refresh', labelEn: 'Dashboard Auto-Refresh', labelTh: 'รีเฟรชข้อมูลอัตโนมัติของแดชบอร์ด' },
 ]
+
+/** Auto-refresh interval (minutes) per dashboard page -- read by getRefreshIntervalMs(). */
+export const AUTO_REFRESH_KEYS = {
+  operationsDashboard: 'auto_refresh.operations_dashboard_minutes',
+  zoneDashboard: 'auto_refresh.zone_dashboard_minutes',
+  matchingDashboard: 'auto_refresh.matching_dashboard_minutes',
+  controlTower: 'auto_refresh.control_tower_minutes',
+} as const
 
 /** Which document Work Assignment opens for printing right after Confirm Assignment. One global
  * setting (scope 'global'), not per user -- read by app/(app)/assignment/page.tsx. */
@@ -332,6 +342,58 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     ],
     defaultValue: 'pick_slip',
   },
+  {
+    key: 'auto_refresh.operations_dashboard_minutes',
+    category: 'auto_refresh',
+    labelEn: 'Operations Dashboard',
+    labelTh: 'แดชบอร์ดปฏิบัติการ',
+    descriptionEn: 'How often an open Operations Dashboard page re-loads its data by itself (no full page reload; selections and filters stay). Applies to every user.',
+    descriptionTh: 'หน้า Operations Dashboard ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ไม่โหลดหน้าใหม่ทั้งหน้า สิ่งที่เลือกไว้ไม่หาย) ใช้กับผู้ใช้ทุกคน',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+    max: 60,
+    defaultValue: '5',
+  },
+  {
+    key: 'auto_refresh.zone_dashboard_minutes',
+    category: 'auto_refresh',
+    labelEn: 'Zone Dashboard',
+    labelTh: 'แดชบอร์ดโซน',
+    descriptionEn: 'How often an open Zone Dashboard page re-loads its data by itself (no full page reload; selections and filters stay). Applies to every user.',
+    descriptionTh: 'หน้า Zone Dashboard ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ไม่โหลดหน้าใหม่ทั้งหน้า สิ่งที่เลือกไว้ไม่หาย) ใช้กับผู้ใช้ทุกคน',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+    max: 60,
+    defaultValue: '5',
+  },
+  {
+    key: 'auto_refresh.matching_dashboard_minutes',
+    category: 'auto_refresh',
+    labelEn: 'Matching Dashboard',
+    labelTh: 'แดชบอร์ดการจับคู่',
+    descriptionEn: 'How often an open Matching Dashboard page re-loads its data by itself (no full page reload; selections and filters stay). Applies to every user.',
+    descriptionTh: 'หน้า Matching Dashboard ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ไม่โหลดหน้าใหม่ทั้งหน้า สิ่งที่เลือกไว้ไม่หาย) ใช้กับผู้ใช้ทุกคน',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+    max: 60,
+    defaultValue: '5',
+  },
+  {
+    key: 'auto_refresh.control_tower_minutes',
+    category: 'auto_refresh',
+    labelEn: 'Control Tower',
+    labelTh: 'ศูนย์ควบคุม',
+    descriptionEn: 'How often an open Control Tower page re-loads its data by itself (no full page reload; selections and filters stay). Applies to every user.',
+    descriptionTh: 'หน้า Control Tower ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ไม่โหลดหน้าใหม่ทั้งหน้า สิ่งที่เลือกไว้ไม่หาย) ใช้กับผู้ใช้ทุกคน',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+    max: 60,
+    defaultValue: '5',
+  },
 ]
 
 export const CONFIG_FIELD_BY_KEY = new Map(CONFIG_FIELDS.map((f) => [f.key, f]))
@@ -360,9 +422,7 @@ export function fromDisplayValue(kind: ConfigFieldKind, display: string): { ok: 
 /** Human-readable value for read-only displays (history): a choice shows its option label, a
  * number its display value plus unit. A choice with no stored row yet reads as its default. */
 export function formatConfigValue(field: ConfigFieldMeta, raw: unknown): string {
-  if (field.kind === 'choice') {
-    const v = toDisplayValue('choice', raw) || field.defaultValue || ''
-    return field.options?.find((o) => o.value === v)?.labelEn ?? v
-  }
-  return `${toDisplayValue(field.kind, raw)} ${field.unit}`.trim()
+  const v = toDisplayValue(field.kind, raw) || field.defaultValue || ''
+  if (field.kind === 'choice') return field.options?.find((o) => o.value === v)?.labelEn ?? v
+  return `${v} ${field.unit}`.trim()
 }

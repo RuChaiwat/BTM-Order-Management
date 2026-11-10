@@ -8,6 +8,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getMatchingOverviewData } from '@/lib/queries/matchingOverview'
 import { getMostRecentOrderDate } from '@/lib/queries/orderDates'
 import { requireMenuAccess } from '@/lib/pageAccess'
+import { getRefreshIntervalMs } from '@/lib/queries/config'
+import { AUTO_REFRESH_KEYS } from '@/lib/configCatalog'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -28,11 +30,14 @@ export default async function MatchingDashboardPage({ searchParams }: { searchPa
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
   const orderDate = searchParams.date || (await getMostRecentOrderDate(admin, warehouseCode)) || yesterday()
-  const data = await getMatchingOverviewData(admin, warehouseCode, orderDate)
+  const [data, refreshMs] = await Promise.all([
+    getMatchingOverviewData(admin, warehouseCode, orderDate),
+    getRefreshIntervalMs(admin, AUTO_REFRESH_KEYS.matchingDashboard),
+  ])
 
   return (
     <>
-      <AutoRefresh />
+      <AutoRefresh intervalMs={refreshMs} />
       <TopBar title="Matching Dashboard" subtitle={`แดชบอร์ดการจับคู่ · ${warehouseCode}`}>
         <MatchingDateFilter orderDate={orderDate} />
       </TopBar>

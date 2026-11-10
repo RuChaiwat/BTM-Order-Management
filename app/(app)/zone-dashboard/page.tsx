@@ -6,6 +6,8 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getZoneDashboardData } from '@/lib/queries/zoneDashboard'
 import { requireMenuAccess } from '@/lib/pageAccess'
+import { getRefreshIntervalMs } from '@/lib/queries/config'
+import { AUTO_REFRESH_KEYS } from '@/lib/configCatalog'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -19,11 +21,14 @@ export default async function ZoneDashboardPage({ searchParams }: { searchParams
   requireMenuAccess(user.role, 9)
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const admin = createAdminClient()
-  const data = await getZoneDashboardData(admin, warehouseCode)
+  const [data, refreshMs] = await Promise.all([
+    getZoneDashboardData(admin, warehouseCode),
+    getRefreshIntervalMs(admin, AUTO_REFRESH_KEYS.zoneDashboard),
+  ])
 
   return (
     <>
-      <AutoRefresh />
+      <AutoRefresh intervalMs={refreshMs} />
       <TopBar title="Zone Dashboard" subtitle={`แดชบอร์ดโซน · ${data.zoneDetail.length} zones · ${warehouseCode}`} />
       <ZoneDashboardBoard zoneDetail={data.zoneDetail} initialZone={searchParams.zone} />
     </>

@@ -81,6 +81,7 @@ export function PickCompletionBoard({
   const [unassignTarget, setUnassignTarget] = useState<string | null>(null)
   const [unassigning, setUnassigning] = useState(false)
   const [unassignError, setUnassignError] = useState<string | null>(null)
+  const [showUnassignAll, setShowUnassignAll] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -166,6 +167,27 @@ export function PickCompletionBoard({
     await refreshOrders()
     setUnassigning(false)
     setUnassignTarget(null)
+    router.refresh()
+  }
+
+  // Same per-order unassign endpoint, once per order on this picker's list -- an order that can't be
+  // recalled here (e.g. part of an approved Consolidation Batch) is reported and skipped, the rest
+  // still go back to the pool.
+  async function unassignAll() {
+    setUnassigning(true)
+    setUnassignError(null)
+    const failures: string[] = []
+    for (const o of orders) {
+      const res = await apiFetch(`/api/orders/${o.order_id}/unassign`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json()
+        failures.push(`${o.order_no}: ${body.error}`)
+      }
+    }
+    await refreshOrders()
+    setUnassigning(false)
+    setShowUnassignAll(false)
+    if (failures.length > 0) setSubmitError(`Unassign failed for ${failures.length} order(s) — ${failures.join('; ')}`)
     router.refresh()
   }
 
@@ -260,17 +282,27 @@ export function PickCompletionBoard({
               {picker.name_th && picker.name_en && <div style={{ fontSize: 12, color: '#6B7280' }}>{picker.name_en}</div>}
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {showUnassign && (
+                <button
+                  className="btn btn-danger btn-sm"
+                  disabled={orders.length === 0 || submitting || unassigning}
+                  onClick={() => setShowUnassignAll(true)}
+                  title="Send every order on this picker's list back to the pool for a different picker"
+                >
+                  Unassign All ({orders.length})
+                </button>
+              )}
               {showReprint && (
                 <button
-                  className="btn btn-secondary btn-sm"
+                  className="btn btn-info btn-sm"
                   disabled={orders.length === 0}
                   onClick={() => reprintSlip(orders.map((o) => o.order_id))}
                   title="Reprint every currently-assigned order's Pick Slip -- paper jam, empty roll, or the picker lost it"
                 >
-                  Reprint All
+                  Reprint All ({orders.length})
                 </button>
               )}
-              <button className="btn btn-success btn-sm" disabled={orders.length === 0 || submitting} onClick={() => setShowCompletedAll(true)}>
+              <button className="btn btn-success btn-sm" disabled={orders.length === 0 || submitting || unassigning} onClick={() => setShowCompletedAll(true)}>
                 Completed All ({orders.length})
               </button>
               <button className="btn btn-secondary btn-sm" onClick={switchPicker}>
@@ -332,7 +364,7 @@ export function PickCompletionBoard({
               <div style={{ flex: '1 1 260px', display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 {showReprint && (
                   <button
-                    className="btn btn-secondary"
+                    className="btn btn-info-outline"
                     style={{ padding: '12px 18px', fontSize: 14, flex: '0 0 auto' }}
                     onClick={() => reprintSlip([o.order_id])}
                     title="Reprint this order's Pick Slip"
@@ -419,6 +451,29 @@ export function PickCompletionBoard({
             <button type="submit" className="modal-footer-btn btn-success" style={{ minWidth: 190, border: 0 }} disabled={submitting} autoFocus>
               {submitting && <Spinner />}
               {submitting ? 'Submitting…' : `Complete all ${orders.length}`}
+            </button>
+          </ModalFooter>
+        </Modal>
+      )}
+
+      {showUnassignAll && (
+        <Modal title={`Unassign all ${orders.length} orders?`} subtitle="ยกเลิกการมอบหมายงานทั้งหมดของ Picker คนนี้" onSubmit={unassignAll}>
+          <div className="modal-body">
+            <div>
+              Stops the timer and sends every order assigned to {picker?.name_th || picker?.name_en} back to the pool for another picker. Orders that are part of a
+              Consolidation Batch are skipped and listed afterwards. This cannot be undone.
+            </div>
+            <div style={{ marginTop: 6, color: '#6B7280' }}>
+              หยุดจับเวลาและส่งทุก Order ของ Picker คนนี้กลับเข้า Pool เพื่อมอบหมายให้คนอื่น (Order ที่อยู่ใน Consolidation Batch จะถูกข้ามและแจ้งให้ทราบ) ไม่สามารถย้อนกลับได้
+            </div>
+          </div>
+          <ModalFooter>
+            <button type="button" className="modal-footer-btn btn-secondary" disabled={unassigning} onClick={() => setShowUnassignAll(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="modal-footer-btn btn-danger" style={{ minWidth: 190, border: 0 }} disabled={unassigning} autoFocus>
+              {unassigning && <Spinner />}
+              {unassigning ? 'Unassigning…' : `Unassign all ${orders.length}`}
             </button>
           </ModalFooter>
         </Modal>

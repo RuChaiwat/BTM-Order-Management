@@ -547,6 +547,17 @@ table { border-collapse: collapse; width: 100%; }
 }
 
 .btn-danger { background: var(--color-danger); color: #fff; }
+.btn-danger:hover { background: var(--color-danger-dark); }
+
+.btn-info { background: var(--color-info); color: #fff; }
+.btn-info:hover { background: var(--color-info-dark); }
+
+.btn-info-outline {
+  background: var(--color-surface);
+  border: 1px solid var(--color-info);
+  color: var(--color-info-dark);
+}
+.btn-info-outline:hover { background: var(--color-info-bg); }
 
 .btn-sm { height: 36px; font-size: 13px; padding: 0 16px; }
 .btn-block { width: 100%; }

@@ -9,6 +9,7 @@ import { createClient } from '../../lib/supabase/client'
 import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
 import { formatDateTime } from '../../lib/formatDate'
 import { productivityMeta } from '../../lib/pickerProductivity'
+import { PickerImportModal } from './PickerImportModal'
 
 interface PickerRow {
   picker_id: string
@@ -95,6 +96,7 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'picker_id', dir: 'asc' })
   const [page, setPage] = useState(1)
   const [showAdd, setShowAdd] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [editing, setEditing] = useState(false)
   const [auditTrail, setAuditTrail] = useState<{ id: string; action: string; created_at: string }[]>([])
   const [busy, setBusy] = useState(false)
@@ -163,9 +165,25 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span className="card-title">Picker List</span>
           <span className="card-subtitle">รายชื่อพนักงานหยิบสินค้า · {pickers.length} pickers · {warehouseCode}</span>
-          <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setShowAdd(true)}>
-            + Add picker
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <a className="btn btn-secondary btn-sm" href="/api/pickers/template" download title="Standard Excel format for bulk upload · ดาวน์โหลดแบบฟอร์มสำหรับกรอกข้อมูล">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Download template
+            </a>
+            <button className="btn btn-info btn-sm" onClick={() => setShowImport(true)} title="Add or update pickers from the filled-in template · นำเข้าจากไฟล์ Excel">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 15V3m0 0l-4 4m4-4l4 4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Upload Excel
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>
+              + Add picker
+            </button>
+          </div>
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
@@ -277,6 +295,7 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
       </div>
 
       {showAdd && <PickerModal warehouseCode={warehouseCode} employmentTypes={employmentTypes} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); router.refresh() }} />}
+      {showImport && <PickerImportModal warehouseCode={warehouseCode} onClose={() => setShowImport(false)} onImported={() => router.refresh()} />}
       {editing && selected && (
         <PickerModal warehouseCode={warehouseCode} employmentTypes={employmentTypes} picker={selected} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); router.refresh() }} />
       )}

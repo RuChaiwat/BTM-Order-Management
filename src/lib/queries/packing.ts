@@ -451,3 +451,48 @@ export async function getPackIssueDashboard(db: SupabaseClient, warehouseCode: s
     days,
   }
 }
+
+// ---------------------------------------------------------------- Pack queue (orders waiting to pack)
+
+export interface PackQueueRow {
+  order_id: string
+  order_no: string
+  store_code: string
+  order_date: string
+  pick_status: string
+  pieces: number
+  skus: number
+  pack_ready_at: string | null
+  waitMinutes: number
+}
+
+/** Every order waiting to be packed (pack_status = 'pending') in this warehouse, longest-waiting
+ * first. Pieces are Admin Verification's verified pieces (what will actually be packed). */
+export async function getPackQueue(db: SupabaseClient, warehouseCode: string): Promise<PackQueueRow[]> {
+  const { data, error } = await db
+    .from('orders')
+    .select('order_id, order_no, store_code, original_order_date, status, planned_pieces, unique_sku_count, pack_ready_at')
+    .eq('warehouse_code', warehouseCode)
+    .eq('pack_status', 'pending')
+    .order('pack_ready_at', { ascending: true })
+    .limit(10000)
+  if (error) throw new Error(error.message)
+  const orders = data ?? []
+  const completions = await inChunks<{ order_id: string; actual_pieces: number | null }>(
+    orders.map((o) => o.order_id),
+    (c) => db.from('picker_completions').select('order_id, actual_pieces').in('order_id', c),
+  )
+  const pcs = new Map(completions.map((c) => [c.order_id, c.actual_pieces]))
+  const now = Date.now()
+  return orders.map((o) => ({
+    order_id: o.order_id,
+    order_no: o.order_no,
+    store_code: o.store_code,
+    order_date: o.original_order_date,
+    pick_status: o.status,
+    pieces: Number(pcs.get(o.order_id) ?? o.planned_pieces),
+    skus: o.unique_sku_count,
+    pack_ready_at: o.pack_ready_at,
+    waitMinutes: o.pack_ready_at ? Math.max(0, Math.round((now - new Date(o.pack_ready_at).getTime()) / 60000)) : 0,
+  }))
+}

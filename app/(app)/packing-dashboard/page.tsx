@@ -38,7 +38,23 @@ export default async function PackingDashboardPage() {
       <TopBar title="Packing Dashboard" subtitle={`แดชบอร์ดงานแพ็ก · วันนี้ · ${warehouseCode}`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
-          <KpiCard label="WAITING TO PACK" labelTh="รอแพ็ก" value={d.counts.pending.toLocaleString()} sub={d.counts.pending ? `เก่าสุด ${hm(d.oldestMinutes)}` : 'ไม่มีงานค้าง'} compact style={{ padding: 14 }} />
+          <Link href="/packing-dashboard/queue" title="ดูรายการ order ที่รอแพ็ก" style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
+            <KpiCard
+              label="WAITING TO PACK"
+              labelTh="รอแพ็ก"
+              value={d.counts.pending.toLocaleString()}
+              sub={
+                <>
+                  {d.counts.pending ? `เก่าสุด ${hm(d.oldestMinutes)} · ` : 'ไม่มีงานค้าง · '}
+                  <span className="card-link" style={{ fontSize: 12 }}>
+                    ดูรายการ →
+                  </span>
+                </>
+              }
+              compact
+              style={{ padding: 14, height: '100%', cursor: 'pointer' }}
+            />
+          </Link>
           <KpiCard label="PACKING NOW" labelTh="กำลังแพ็ก" value={d.counts.packing.toLocaleString()} sub={link(22, '/pack-monitor', 'Live monitor')} compact style={{ padding: 14 }} />
           <KpiCard label="AWAITING CONFIRM" labelTh="แพ็กเสร็จ รอยืนยัน" value={d.counts.packed.toLocaleString()} sub={link(23, '/pack-verification', 'Admin Pack Verify')} compact style={{ padding: 14 }} />
           <KpiCard

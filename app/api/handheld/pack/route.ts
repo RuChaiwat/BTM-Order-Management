@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
-import { getPackMinDurationMinutes, getPackOrderLines } from '@/lib/packing'
+import { getPackMinDurationMinutes, getPackOrderLines, issueDeductPieces } from '@/lib/packing'
 
 /**
  * Public, unauthenticated API behind the Pack Handheld (/handheld/pack) -- same trust model as
@@ -16,8 +16,9 @@ import { getPackMinDurationMinutes, getPackOrderLines } from '@/lib/packing'
  * POST { action: 'scan_order', ... } -> start packing an order, or resume this packer's own open one
  * POST { action: 'finish', result }  -> 'completed' / 'completed_short' (after re-scanning the order; the
  *                                     packer enters nothing -- Admin Pack Verify itemizes the short)
- *                                     or 'issue' (แจ้งปัญหา from the timer screen, with problem lines;
- *                                     stops the timer at once, no minimum time)
+ *                                     or 'issue' (problem lines picked from the order list on the timer
+ *                                     screen, one per barcode with an optional comment; stops the timer
+ *                                     at once, no minimum time)
  */
 
 type Db = ReturnType<typeof createAdminClient>
@@ -105,7 +106,7 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
 
   const [minMinutes, { lines, pieces }, { data: reasons }] = await Promise.all([
     getPackMinDurationMinutes(db),
-    getPackOrderLines(db, order.order_id),
+    getPackOrderLines(db, order.order_id, { includeZero: true }),
     db.from('pack_issue_reasons').select('reason_code, label_en, label_th').eq('active', true).order('sort_order'),
   ])
   const orderOut = { order_id: order.order_id, order_no: order.order_no, store_code: order.store_code, pieces, lines, reasons: reasons ?? [] }
@@ -146,9 +147,13 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
 
 interface IssueLineInput {
   line_id?: string | null
+  /** scanned barcode of an item that is not in the TO (line_id empty) */
+  barcode?: string
+  /** older clients sent the not-in-TO code as sku */
   sku?: string
   reason_code?: string
   qty?: number
+  remark?: string | null
 }
 
 async function finish(db: Db, picker: { picker_id: string; name: string }, body: { session_id?: string; result?: string; remark?: string; issue_lines?: IssueLineInput[] }) {
@@ -169,33 +174,42 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
   }
 
   // Validate the problem lines before writing anything.
-  let issueRows: { line_id: string | null; sku: string; item_description: string | null; bin_code: string | null; reason_code: string; qty: number }[] = []
+  let issueRows: { line_id: string | null; sku: string; barcode: string | null; item_description: string | null; bin_code: string | null; reason_code: string; qty: number; remark: string | null }[] = []
+  let issuePieces = 0
   if (result === 'issue') {
     const input = Array.isArray(body.issue_lines) ? body.issue_lines : []
     if (input.length === 0) return err('ต้องระบุสินค้าที่มีปัญหาอย่างน้อย 1 รายการ · Add at least one problem item')
     const [{ data: lines }, { data: reasons }] = await Promise.all([
-      db.from('order_lines').select('line_id, sku, item_description, bin_code').eq('order_id', session.order_id),
+      db.from('order_lines').select('line_id, sku, sku_barcode, item_description, bin_code').eq('order_id', session.order_id),
       db.from('pack_issue_reasons').select('reason_code').eq('active', true),
     ])
     const lineById = new Map((lines ?? []).map((l) => [l.line_id, l]))
     const validReasons = new Set((reasons ?? []).map((r) => r.reason_code))
+    const seen = new Set<string>()
     for (const [i, l] of input.entries()) {
       const n = i + 1
       const qty = Number(l.qty)
+      const remark = typeof l.remark === 'string' ? l.remark.trim().slice(0, 500) || null : null
       if (!l.reason_code || !validReasons.has(l.reason_code)) return err(`รายการที่ ${n}: เลือกปัญหา · Choose a problem`)
+      // No upper limit: สินค้าเกิน can be far more than was verified (client rule).
       if (!Number.isInteger(qty) || qty < 1) return err(`รายการที่ ${n}: จำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป · Qty must be 1 or more`)
       if (l.line_id) {
         const line = lineById.get(l.line_id)
         if (!line) return err(`รายการที่ ${n}: สินค้านี้ไม่อยู่ใน order · Line not on this order`)
-        issueRows.push({ line_id: line.line_id, sku: line.sku, item_description: line.item_description, bin_code: line.bin_code, reason_code: l.reason_code, qty })
+        if (seen.has(line.line_id)) return err(`รายการที่ ${n}: บาร์โค้ดซ้ำ · Duplicate item`)
+        seen.add(line.line_id)
+        issueRows.push({ line_id: line.line_id, sku: line.sku, barcode: line.sku_barcode, item_description: line.item_description, bin_code: line.bin_code, reason_code: l.reason_code, qty, remark })
       } else {
-        const sku = (l.sku ?? '').trim()
-        if (!sku) return err(`รายการที่ ${n}: scan หรือพิมพ์บาร์โค้ด/SKU ของสินค้าที่ไม่อยู่ใน TO · SKU required`)
-        issueRows.push({ line_id: null, sku, item_description: null, bin_code: null, reason_code: l.reason_code, qty })
+        const code = (l.barcode ?? l.sku ?? '').trim()
+        if (!code) return err(`รายการที่ ${n}: scan บาร์โค้ดของสินค้าที่ไม่อยู่ใน TO · Barcode required`)
+        if (seen.has(`x:${code.toUpperCase()}`)) return err(`รายการที่ ${n}: บาร์โค้ดซ้ำ · Duplicate item`)
+        seen.add(`x:${code.toUpperCase()}`)
+        issueRows.push({ line_id: null, sku: code, barcode: code, item_description: null, bin_code: null, reason_code: l.reason_code, qty, remark })
       }
     }
+    const { lines: packLines } = await getPackOrderLines(db, session.order_id, { includeZero: true })
+    issuePieces = issueDeductPieces(issueRows, new Map(packLines.map((l) => [l.line_id, l.qty])))
   }
-  const issuePieces = issueRows.reduce((s, r) => s + r.qty, 0)
 
   // Close the session first, guarded on still being open, so a double tap can't finish it twice.
   const { data: closed } = await db

@@ -26,7 +26,7 @@ type Detail = {
     resolvedByName: string | null
     resolved_at: string | null
   }
-  issueLines: { id: string; line_id: string | null; sku: string; barcode: string; item_description: string | null; bin_code: string | null; reason_code: string; reasonLabel: string; qty: number }[]
+  issueLines: { id: string; line_id: string | null; sku: string; barcode: string; item_description: string | null; bin_code: string | null; reason_code: string; reasonLabel: string; qty: number; remark: string | null }[]
   order: { order_no: string; store_code: string; pack_status: string | null } | null
   pick: {
     pickerId: string | null
@@ -261,7 +261,10 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                         <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{l.line_id ? l.item_description : 'ไม่อยู่ใน TO'}</div>
                       </td>
                       <td>{l.bin_code ? formatLocationDisplay(l.bin_code) : '—'}</td>
-                      <td>{l.reasonLabel}</td>
+                      <td>
+                        {l.reasonLabel}
+                        {l.remark && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', overflowWrap: 'break-word' }}>“{l.remark}”</div>}
+                      </td>
                       <td>
                         {resolved ? (
                           <b>{l.qty}</b>

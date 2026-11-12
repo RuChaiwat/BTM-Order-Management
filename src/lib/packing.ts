@@ -37,6 +37,21 @@ export function creditedPieces(s: { pieces: number; issue_pieces: number; short_
   return Math.max(0, Number(s.pieces) - Number(s.issue_pieces) - Number(s.short_pieces ?? 0))
 }
 
+/** Problems that put extra stock in the box: the extra pieces were never in the order's pieces, so
+ * they take nothing off the packer's productivity (client rule). */
+export const PACK_EXTRA_REASONS = new Set(['OVER', 'NOT_IN_TO'])
+
+/** Pieces of a reported problem that come off the packer's productivity: for each TO line, the
+ * reported qty capped at that line's verified qty (V); สินค้าเกิน / สินค้าไม่มีใน TO take nothing. */
+export function issueDeductPieces(lines: { line_id: string | null; reason_code: string; qty: number }[], verifiedQtyByLine: Map<string, number>) {
+  let total = 0
+  for (const l of lines) {
+    if (!l.line_id || PACK_EXTRA_REASONS.has(l.reason_code)) continue
+    total += Math.min(Number(l.qty), verifiedQtyByLine.get(l.line_id) ?? 0)
+  }
+  return Math.max(0, Math.round(total))
+}
+
 /** Root causes the Pack Supervisor records when closing a pack issue. */
 export const PACK_ROOT_CAUSES: { code: string; th: string; en: string }[] = [
   { code: 'PICK_ERROR', th: 'Pick ผิด', en: 'Picking error' },
@@ -53,13 +68,17 @@ export interface PackOrderLine {
   sku_barcode: string | null
   item_description: string | null
   bin_code: string
+  /** verified picked qty (V) */
   qty: number
+  /** ordered qty (O) */
+  ordered_qty: number
 }
 
 /** Lines of an order as they should be packed: the quantity is Admin Verification's verified
  * picked quantity (picker_completion_lines) when there is one, so a short-closed order shows what
- * was actually picked, not what was ordered. Lines verified at 0 picked are left out. */
-export async function getPackOrderLines(db: SupabaseClient, orderId: string): Promise<{ lines: PackOrderLine[]; pieces: number }> {
+ * was actually picked, not what was ordered. Lines verified at 0 picked are left out unless
+ * includeZero (the handheld shows them as O/0 so a packer can still report them). */
+export async function getPackOrderLines(db: SupabaseClient, orderId: string, opts: { includeZero?: boolean } = {}): Promise<{ lines: PackOrderLine[]; pieces: number }> {
   const [{ data: lines }, { data: completion }] = await Promise.all([
     db.from('order_lines').select('line_id, sku, sku_barcode, item_description, bin_code, qty').eq('order_id', orderId).order('sku'),
     db.from('picker_completions').select('completion_id, actual_pieces').eq('order_id', orderId).maybeSingle(),
@@ -70,8 +89,8 @@ export async function getPackOrderLines(db: SupabaseClient, orderId: string): Pr
     for (const l of cl ?? []) pickedByLine.set(l.line_id, Number(l.picked_qty))
   }
   const out = (lines ?? [])
-    .map((l) => ({ ...l, qty: pickedByLine.get(l.line_id) ?? Number(l.qty) }))
-    .filter((l) => l.qty > 0)
+    .map((l) => ({ ...l, qty: pickedByLine.get(l.line_id) ?? Number(l.qty), ordered_qty: Number(l.qty) }))
+    .filter((l) => opts.includeZero || l.qty > 0)
   const pieces = completion?.actual_pieces ?? out.reduce((s, l) => s + l.qty, 0)
   return { lines: out, pieces: Number(pieces) }
 }

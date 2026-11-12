@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Spinner } from '../Spinner'
 
 interface Station {
@@ -17,7 +17,10 @@ interface Line {
   sku_barcode: string | null
   item_description: string | null
   bin_code: string
+  /** verified picked qty (V) */
   qty: number
+  /** ordered qty (O) */
+  ordered_qty: number
 }
 interface Reason {
   reason_code: string
@@ -36,18 +39,35 @@ interface Session {
   session_id: string
   started_at: string
 }
+/** One reported problem -- one per barcode (choosing the same barcode again edits it). */
 interface IssueDraft {
-  key: number
-  lineId: string // order line_id, or NOT_IN_TO
-  sku: string
+  /** order line_id, or null for an item that is not in the TO */
+  lineId: string | null
+  barcode: string
+  description: string | null
+  reasonCode: string
+  qty: number
+  remark: string
+}
+/** The problem popup being filled in. */
+interface IssueForm {
+  lineId: string | null
+  barcode: string
+  description: string | null
+  ordered: number | null
+  verified: number | null
   reasonCode: string
   qty: string
+  remark: string
+  editing: boolean
 }
 
-type Step = 'station' | 'picker' | 'order' | 'packing' | 'finish' | 'issue' | 'done'
+type Step = 'station' | 'picker' | 'order' | 'packing' | 'finish' | 'done'
 
 const API = '/api/handheld/pack'
-const NOT_IN_TO = '__not_in_to__'
+const NOT_IN_TO_REASON = 'NOT_IN_TO'
+const draftKey = (sessionId: string) => `btm.pack.issues.${sessionId}`
+const issueKey = (d: { lineId: string | null; barcode: string }) => d.lineId ?? `x:${d.barcode.toUpperCase()}`
 
 /** Short beep through Web Audio -- no sound files to ship. Silently does nothing if the device
  * blocks audio. */
@@ -76,8 +96,10 @@ function mmss(totalSeconds: number) {
 /**
  * Pack Handheld: Scan Station -> Scan employee -> Scan order (timer starts) -> Scan the same order
  * again -> Completed / Completed with Short (the short is itemized later by Admin Pack Verify).
- * แจ้งปัญหา on the timer screen lists the problem items and ends the order at once (no minimum
- * time) for the Pack Supervisor to investigate. After every finished order it clears back to Scan
+ * Problems are reported by tapping a line of the order (barcode filled in; one problem + qty +
+ * optional comment per barcode) or "+ สินค้าไม่อยู่ใน TO". While any problem is listed the finish
+ * scan is locked and the only way out is ส่งแจ้งปัญหา & หยุดเวลา, which ends the order at once (no
+ * minimum time) for the Pack Supervisor to investigate. After every finished order it clears back to Scan
  * Station, so each order is always tied to the station and person who actually packed it.
  * Hardware scanners type the code and press Enter, so every step is one auto-focused input.
  */
@@ -95,8 +117,44 @@ export function PackHandheldBoard() {
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [issues, setIssues] = useState<IssueDraft[]>([])
-  const [remark, setRemark] = useState('')
+  const [form, setForm] = useState<IssueForm | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Unsent problem lines survive a page refresh on this device (keyed by the pack session).
+  useEffect(() => {
+    if (!session) return
+    try {
+      const raw = localStorage.getItem(draftKey(session.session_id))
+      setIssues(raw ? (JSON.parse(raw) as IssueDraft[]) : [])
+    } catch {
+      setIssues([])
+    }
+  }, [session])
+  useEffect(() => {
+    if (!session) return
+    try {
+      if (issues.length) localStorage.setItem(draftKey(session.session_id), JSON.stringify(issues))
+      else localStorage.removeItem(draftKey(session.session_id))
+    } catch {
+      /* storage blocked */
+    }
+  }, [issues, session])
+
+  // Lines sorted by barcode; lines without a barcode (shown as SKU) go last.
+  const sortedLines = useMemo(
+    () =>
+      [...(order?.lines ?? [])].sort((a, b) => {
+        if (!a.sku_barcode !== !b.sku_barcode) return a.sku_barcode ? -1 : 1
+        return (a.sku_barcode ?? a.sku).localeCompare(b.sku_barcode ?? b.sku, undefined, { numeric: true })
+      }),
+    [order],
+  )
+  const issueByKey = useMemo(() => new Map(issues.map((d) => [issueKey(d), d])), [issues])
+  const reasonLabel = (code: string) => {
+    const r = order?.reasons.find((x) => x.reason_code === code)
+    return r ? r.label_th || r.label_en : code
+  }
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
@@ -105,8 +163,9 @@ export function PackHandheldBoard() {
 
   // Keep the scanner's keystrokes going into the scan box on every scanning step.
   useEffect(() => {
+    if (form) return
     if (step === 'station' || step === 'picker' || step === 'order' || step === 'packing') inputRef.current?.focus()
-  }, [step, busy])
+  }, [step, busy, form, issues.length])
 
   const elapsedSec = session ? (now + clockOffset - new Date(session.started_at).getTime()) / 1000 : 0
   const minSec = minMinutes * 60
@@ -119,12 +178,19 @@ export function PackHandheldBoard() {
   }
 
   function resetAll(message?: string) {
+    if (session) {
+      try {
+        localStorage.removeItem(draftKey(session.session_id))
+      } catch {
+        /* storage blocked */
+      }
+    }
+    setForm(null)
     setStation(null)
     setPicker(null)
     setOrder(null)
     setSession(null)
     setIssues([])
-    setRemark('')
     setScan('')
     setError(null)
     setNotice(message ?? null)
@@ -151,6 +217,7 @@ export function PackHandheldBoard() {
     setError(null)
 
     if (step === 'packing') {
+      if (issues.length > 0) return fail('มีรายการแจ้งปัญหาอยู่ — ลบรายการปัญหาให้หมดก่อน จึงจะ scan ปิดงานได้')
       if (!order || value.toUpperCase() !== order.order_no.toUpperCase()) return fail(`เลข order ไม่ตรงกับงานที่กำลังแพ็ก (${order?.order_no}) · Scan the same order to finish`)
       if (!canFinish) return fail(`ยังไม่ครบเวลาขั้นต่ำ ${minMinutes} นาที — รออีก ${mmss(minSec - elapsedSec)}`)
       beep(true)
@@ -190,29 +257,20 @@ export function PackHandheldBoard() {
 
   async function submitFinish(result: 'completed' | 'completed_short' | 'issue') {
     if (!station || !picker || !session) return
-    let issueLines: { line_id: string | null; sku?: string; reason_code: string; qty: number }[] = []
-    if (result === 'issue') {
-      if (issues.length === 0) return fail('เพิ่มสินค้าที่มีปัญหาอย่างน้อย 1 รายการ')
-      for (const [i, d] of issues.entries()) {
-        const qty = Number(d.qty)
-        if (!d.lineId) return fail(`รายการที่ ${i + 1}: เลือกสินค้า`)
-        if (d.lineId === NOT_IN_TO && !d.sku.trim()) return fail(`รายการที่ ${i + 1}: scan หรือพิมพ์บาร์โค้ดสินค้าที่ไม่อยู่ใน TO`)
-        if (!d.reasonCode) return fail(`รายการที่ ${i + 1}: เลือกปัญหา`)
-        if (!Number.isInteger(qty) || qty < 1) return fail(`รายการที่ ${i + 1}: จำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป`)
-      }
-      issueLines = issues.map((d) => (d.lineId === NOT_IN_TO ? { line_id: null, sku: d.sku.trim(), reason_code: d.reasonCode, qty: Number(d.qty) } : { line_id: d.lineId, reason_code: d.reasonCode, qty: Number(d.qty) }))
-    }
+    if (result === 'issue' && issues.length === 0) return fail('กดที่รายการสินค้าเพื่อแจ้งปัญหาอย่างน้อย 1 รายการ')
+    if (result !== 'issue' && issues.length > 0) return fail('มีรายการแจ้งปัญหาอยู่ — ลบรายการปัญหาให้หมดก่อนปิดงาน')
+    const issueLines = result === 'issue' ? issues.map((d) => ({ line_id: d.lineId, barcode: d.lineId ? undefined : d.barcode, reason_code: d.reasonCode, qty: d.qty, remark: d.remark.trim() || null })) : []
     setBusy(true)
     setError(null)
     try {
-      await call('POST', { action: 'finish', station: station.station_code, picker: picker.picker_id, session_id: session.session_id, result, remark, issue_lines: issueLines })
+      await call('POST', { action: 'finish', station: station.station_code, picker: picker.picker_id, session_id: session.session_id, result, issue_lines: issueLines })
       beep(true)
       const doneMsg =
         result === 'completed'
           ? `✓ ${order?.order_no} แพ็กเสร็จ (${mmss(elapsedSec)})`
           : result === 'completed_short'
             ? `✓ ${order?.order_no} ปิดงานแบบ Completed with Short (${mmss(elapsedSec)}) · Admin จะระบุรายการที่ขาด`
-            : `⚠ ${order?.order_no} แจ้งปัญหาให้ Supervisor แล้ว`
+            : `⚠ ${order?.order_no} แจ้งปัญหาให้ Supervisor แล้ว (${issues.length} รายการ)`
       resetAll(doneMsg)
     } catch (err) {
       fail((err as Error).message)
@@ -221,11 +279,62 @@ export function PackHandheldBoard() {
     }
   }
 
-  function addIssue() {
-    setIssues((prev) => [...prev, { key: Date.now() + prev.length, lineId: '', sku: '', reasonCode: '', qty: '1' }])
+  /** Tap a line of the order -> problem popup with its barcode filled in (edits it if already listed). */
+  function openLine(l: Line) {
+    if (step !== 'packing' || busy) return
+    const existing = issueByKey.get(l.line_id)
+    setFormError(null)
+    setForm({
+      lineId: l.line_id,
+      barcode: l.sku_barcode || `SKU ${l.sku}`,
+      description: l.item_description,
+      ordered: l.ordered_qty,
+      verified: l.qty,
+      reasonCode: existing?.reasonCode ?? '',
+      qty: String(existing?.qty ?? 1),
+      remark: existing?.remark ?? '',
+      editing: !!existing,
+    })
   }
-  function updateIssue(key: number, patch: Partial<IssueDraft>) {
-    setIssues((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)))
+  function openNotInTo(existing?: IssueDraft) {
+    if (step !== 'packing' || busy) return
+    setFormError(null)
+    const fixed = order?.reasons.some((r) => r.reason_code === NOT_IN_TO_REASON) ? NOT_IN_TO_REASON : ''
+    setForm({ lineId: null, barcode: existing?.barcode ?? '', description: null, ordered: null, verified: null, reasonCode: existing?.reasonCode ?? fixed, qty: String(existing?.qty ?? 1), remark: existing?.remark ?? '', editing: !!existing })
+  }
+  function openDraft(d: IssueDraft) {
+    const line = d.lineId ? order?.lines.find((l) => l.line_id === d.lineId) : undefined
+    if (line) openLine(line)
+    else openNotInTo(d)
+  }
+
+  function saveForm() {
+    if (!form || !order) return
+    const barcode = form.barcode.trim()
+    const qty = Number(form.qty)
+    if (!form.lineId) {
+      if (!barcode) return setFormError('scan บาร์โค้ดของสินค้าที่ไม่อยู่ใน TO')
+      const inTo = order.lines.find((l) => (l.sku_barcode ?? '').toUpperCase() === barcode.toUpperCase())
+      if (inTo) return setFormError(`บาร์โค้ด ${barcode} อยู่ใน TO — ปิดหน้านี้แล้วกดที่รายการนั้นแทน`)
+    }
+    if (!form.reasonCode) return setFormError('เลือกปัญหา')
+    // No upper limit -- สินค้าเกิน can be far more than was verified.
+    if (!Number.isInteger(qty) || qty < 1) return setFormError('จำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป')
+    const draft: IssueDraft = { lineId: form.lineId, barcode, description: form.description, reasonCode: form.reasonCode, qty, remark: form.remark.trim() }
+    const key = issueKey(draft)
+    setIssues((prev) => {
+      const i = prev.findIndex((d) => issueKey(d) === key)
+      if (i < 0) return [...prev, draft]
+      const next = [...prev]
+      next[i] = draft
+      return next
+    })
+    setForm(null)
+    setError(null)
+  }
+
+  function removeIssue(key: string) {
+    setIssues((prev) => prev.filter((d) => issueKey(d) !== key))
   }
 
   const stepNo = step === 'station' ? 1 : step === 'picker' ? 2 : 3
@@ -278,7 +387,7 @@ export function PackHandheldBoard() {
         </div>
       )}
 
-      {(step === 'packing' || step === 'finish' || step === 'issue') && order && (
+      {(step === 'packing' || step === 'finish') && order && (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10, borderColor: canFinish ? 'var(--color-success-border)' : undefined }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
             <span style={big}>{order.order_no}</span>
@@ -289,26 +398,38 @@ export function PackHandheldBoard() {
             {canFinish ? 'ครบเวลาขั้นต่ำแล้ว ปิดงานได้' : `ขั้นต่ำ ${mmss(minSec)} · ยังปิดงานไม่ได้`} · {order.lines.length} รายการ · {order.pieces.toLocaleString()} ชิ้น
           </div>
 
-          {step === 'packing' && (
+          {step === 'packing' && issues.length === 0 && (
             <>
               <div style={{ fontWeight: 600 }}>{prompt.title}</div>
               <form onSubmit={onScan}>
                 <input ref={inputRef} value={scan} onChange={(e) => setScan(e.target.value)} style={{ ...scanBox, borderColor: canFinish ? 'var(--color-success)' : 'var(--color-border)' }} autoComplete="off" placeholder={prompt.th} />
               </form>
-              <button
-                type="button"
-                className="btn btn-danger-outline"
-                style={{ height: 50, fontSize: 16, fontWeight: 700 }}
-                disabled={busy}
-                onClick={() => {
-                  if (issues.length === 0) addIssue()
-                  setError(null)
-                  setStep('issue')
-                }}
-              >
-                ⚠ แจ้งปัญหา
-              </button>
+              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>พบปัญหา? กดที่รายการสินค้าด้านล่างเพื่อแจ้ง</div>
             </>
+          )}
+
+          {step === 'packing' && issues.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid var(--color-danger-border)', background: 'var(--color-danger-bg)', borderRadius: 10, padding: 10 }}>
+              <div style={{ fontWeight: 700, color: 'var(--color-danger-dark)' }}>รายการแจ้งปัญหา ({issues.length})</div>
+              {issues.map((d) => (
+                <div key={issueKey(d)} style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--color-surface, #fff)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px' }}>
+                  <button type="button" onClick={() => openDraft(d)} disabled={busy} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
+                    <div style={{ fontWeight: 700, overflowWrap: 'break-word' }}>{d.barcode}</div>
+                    <div style={{ fontSize: 13 }}>
+                      {reasonLabel(d.reasonCode)} · <b>{d.qty}</b> ชิ้น{!d.lineId && <span style={{ color: 'var(--color-text-secondary)' }}> · ไม่อยู่ใน TO</span>}
+                    </div>
+                    {d.remark && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', overflowWrap: 'break-word' }}>“{d.remark}”</div>}
+                  </button>
+                  <button type="button" className="btn btn-danger-outline btn-sm" disabled={busy} onClick={() => removeIssue(issueKey(d))}>
+                    ลบ
+                  </button>
+                </div>
+              ))}
+              <div style={{ fontSize: 12.5, color: 'var(--color-danger-dark)' }}>ช่อง scan ปิดงานถูกล็อกไว้ — ถ้าไม่มีปัญหาจริง ให้ลบรายการปัญหาให้หมด</div>
+              <button className="btn btn-danger" style={{ height: 52, fontSize: 17 }} disabled={busy} onClick={() => submitFinish('issue')}>
+                {busy && <Spinner />} ส่งแจ้งปัญหา &amp; หยุดเวลา
+              </button>
+            </div>
           )}
 
           {step === 'finish' && (
@@ -330,99 +451,132 @@ export function PackHandheldBoard() {
             </div>
           )}
 
-          {step === 'issue' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>แจ้งปัญหา · ระบุสินค้าที่มีปัญหา</div>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>ส่งแล้วจะหยุดเวลาและจบงาน order นี้ทันที Supervisor จะมาตรวจสอบสินค้า</div>
-              {issues.map((d, i) => (
-                <div key={d.key} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600 }}>
-                    รายการที่ {i + 1}
-                    {issues.length > 1 && (
-                      <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => setIssues((prev) => prev.filter((x) => x.key !== d.key))}>
-                        ลบ
-                      </button>
-                    )}
-                  </div>
-                  <select className="field-input" style={{ height: 44, fontSize: 15, border: '1px solid var(--color-border)' }} value={d.lineId} onChange={(e) => updateIssue(d.key, { lineId: e.target.value })}>
-                    <option value="">— เลือกสินค้า —</option>
-                    {order.lines.map((l) => (
-                      <option key={l.line_id} value={l.line_id}>
-                        {l.sku_barcode || `SKU ${l.sku}`} · {l.item_description ?? ''} ({l.qty})
-                      </option>
-                    ))}
-                    <option value={NOT_IN_TO}>สินค้าไม่อยู่ใน TO (scan/พิมพ์บาร์โค้ด)</option>
-                  </select>
-                  {d.lineId === NOT_IN_TO && (
-                    <input className="field-input" style={{ height: 44, fontSize: 15, border: '1px solid var(--color-border)' }} placeholder="scan หรือพิมพ์บาร์โค้ดสินค้า" value={d.sku} onChange={(e) => updateIssue(d.key, { sku: e.target.value })} />
-                  )}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8 }}>
-                    <select className="field-input" style={{ height: 44, fontSize: 15, border: '1px solid var(--color-border)' }} value={d.reasonCode} onChange={(e) => updateIssue(d.key, { reasonCode: e.target.value })}>
-                      <option value="">— เลือกปัญหา —</option>
-                      {order.reasons.map((r) => (
-                        <option key={r.reason_code} value={r.reason_code}>
-                          {r.label_th || r.label_en}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      className="field-input"
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      step={1}
-                      style={{ height: 44, fontSize: 15, border: '1px solid var(--color-border)' }}
-                      value={d.qty}
-                      onChange={(e) => updateIssue(d.key, { qty: e.target.value })}
-                      aria-label="จำนวนที่มีปัญหา"
-                    />
-                  </div>
-                </div>
-              ))}
-              <button type="button" className="btn btn-secondary" onClick={addIssue} disabled={busy}>
-                + เพิ่มรายการ
-              </button>
-              <textarea
-                value={remark}
-                onChange={(e) => setRemark(e.target.value)}
-                placeholder="หมายเหตุ (ไม่บังคับ)"
-                style={{ width: '100%', minHeight: 60, border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px', fontSize: 15, fontFamily: 'inherit' }}
-              />
-              <button className="btn btn-danger" style={{ height: 52, fontSize: 17 }} disabled={busy} onClick={() => submitFinish('issue')}>
-                {busy && <Spinner />} ส่งเรื่องแจ้งปัญหา &amp; หยุดเวลา
-              </button>
-              <button className="btn btn-secondary" disabled={busy} onClick={() => setStep('packing')}>
-                ย้อนกลับ (แพ็กต่อ)
-              </button>
-            </div>
-          )}
-
-          <details style={{ fontSize: 13 }}>
-            <summary style={{ cursor: 'pointer', color: 'var(--color-text-secondary)' }}>รายการสินค้าใน order ({order.lines.length})</summary>
-            <table className="table" style={{ tableLayout: 'fixed', width: '100%', marginTop: 6 }}>
-              <colgroup>
-                <col style={{ width: '70%' }} />
-                <col style={{ width: '30%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>BARCODE</th>
-                  <th>QTY</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.lines.map((l) => (
-                  <tr key={l.line_id}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>รายการสินค้าใน order ({order.lines.length})</div>
+          <table className="table" style={{ tableLayout: 'fixed', width: '100%', fontSize: 14 }}>
+            <colgroup>
+              <col style={{ width: '72%' }} />
+              <col style={{ width: '28%' }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>BARCODE</th>
+                <th title="Order QTY / Verify QTY">
+                  QTY <span style={{ fontWeight: 400, fontSize: 11 }}>(O/V)</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedLines.map((l) => {
+                const flagged = issueByKey.get(l.line_id)
+                const short = l.qty < l.ordered_qty
+                return (
+                  <tr key={l.line_id} onClick={() => openLine(l)} style={{ cursor: step === 'packing' ? 'pointer' : undefined, background: flagged ? 'var(--color-danger-bg)' : undefined }}>
                     <td style={{ overflowWrap: 'break-word' }}>
-                      {l.sku_barcode || `SKU ${l.sku}`}
+                      <span style={{ fontWeight: 600 }}>{l.sku_barcode || `SKU ${l.sku}`}</span>
+                      {flagged && (
+                        <span style={{ color: 'var(--color-danger-dark)', fontSize: 12 }}>
+                          {' '}
+                          ⚠ {reasonLabel(flagged.reasonCode)} {flagged.qty}
+                        </span>
+                      )}
                       {l.item_description && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{l.item_description}</div>}
                     </td>
-                    <td style={{ fontWeight: 700 }}>{l.qty}</td>
+                    <td style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: short ? 'var(--color-warning-dark)' : undefined }}>
+                      {l.ordered_qty}/{l.qty}
+                    </td>
+                  </tr>
+                )
+              })}
+              {issues
+                .filter((d) => !d.lineId)
+                .map((d) => (
+                  <tr key={issueKey(d)} onClick={() => openNotInTo(d)} style={{ cursor: step === 'packing' ? 'pointer' : undefined, background: 'var(--color-danger-bg)' }}>
+                    <td style={{ overflowWrap: 'break-word' }}>
+                      <span style={{ fontWeight: 600 }}>{d.barcode}</span>
+                      <span style={{ color: 'var(--color-danger-dark)', fontSize: 12 }}>
+                        {' '}
+                        ⚠ {reasonLabel(d.reasonCode)} {d.qty}
+                      </span>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>ไม่อยู่ใน TO</div>
+                    </td>
+                    <td style={{ fontWeight: 700 }}>0/0</td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </details>
+            </tbody>
+          </table>
+          {step === 'packing' && (
+            <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => openNotInTo()}>
+              + สินค้าไม่อยู่ใน TO
+            </button>
+          )}
+        </div>
+      )}
+
+      {form && order && (
+        <div role="dialog" aria-modal="true" onClick={() => setForm(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000, padding: 12 }}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 18 }}>{form.lineId ? (form.editing ? 'แก้ไขปัญหา' : 'แจ้งปัญหา') : 'สินค้าไม่อยู่ใน TO'}</div>
+            {form.lineId ? (
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, overflowWrap: 'break-word' }}>{form.barcode}</div>
+                {form.description && <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{form.description}</div>}
+                <div style={{ fontSize: 13, marginTop: 2 }}>
+                  QTY (O/V):{' '}
+                  <b>
+                    {form.ordered}/{form.verified}
+                  </b>
+                </div>
+              </div>
+            ) : (
+              <input
+                autoFocus
+                className="field-input"
+                style={{ height: 48, fontSize: 18, border: '2px solid var(--color-info)' }}
+                placeholder="scan บาร์โค้ดสินค้า"
+                autoComplete="off"
+                value={form.barcode}
+                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.preventDefault()
+                }}
+              />
+            )}
+            {!form.lineId && form.reasonCode === NOT_IN_TO_REASON ? (
+              <div style={{ fontSize: 14 }}>
+                ปัญหา: <b>{reasonLabel(NOT_IN_TO_REASON)}</b>
+              </div>
+            ) : (
+              <select className="field-input" style={{ height: 48, fontSize: 16, border: '1px solid var(--color-border)' }} value={form.reasonCode} onChange={(e) => setForm({ ...form, reasonCode: e.target.value })}>
+                <option value="">— เลือกปัญหา —</option>
+                {order.reasons
+                  .filter((r) => !form.lineId || r.reason_code !== NOT_IN_TO_REASON)
+                  .map((r) => (
+                    <option key={r.reason_code} value={r.reason_code}>
+                      {r.label_th || r.label_en}
+                    </option>
+                  ))}
+              </select>
+            )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
+              จำนวน
+              <input className="field-input" type="number" inputMode="numeric" min={1} step={1} style={{ height: 48, fontSize: 18, width: 120, border: '1px solid var(--color-border)' }} value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} />
+              ชิ้น
+            </label>
+            <textarea
+              value={form.remark}
+              onChange={(e) => setForm({ ...form, remark: e.target.value })}
+              placeholder="Comment (ไม่บังคับ)"
+              maxLength={500}
+              style={{ width: '100%', minHeight: 64, border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px', fontSize: 15, fontFamily: 'inherit' }}
+            />
+            {formError && <div style={{ color: 'var(--color-danger-dark)', fontWeight: 600, fontSize: 14 }}>{formError}</div>}
+            <button className="btn btn-danger" style={{ height: 50, fontSize: 17 }} onClick={saveForm}>
+              ยืนยัน
+            </button>
+            <button className="btn btn-secondary" onClick={() => setForm(null)}>
+              ยกเลิก
+            </button>
+          </div>
         </div>
       )}
     </div>

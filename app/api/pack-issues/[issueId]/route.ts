@@ -3,7 +3,7 @@ import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
 import { getPackIssueDetail } from '@/lib/queries/packing'
-import { PACK_ROOT_CAUSES } from '@/lib/packing'
+import { PACK_ROOT_CAUSES, getPackOrderLines, issueDeductPieces } from '@/lib/packing'
 
 const PACK_ADMIN_ROLES = ['system_admin', 'pack_supervisor']
 
@@ -80,10 +80,13 @@ export async function POST(request: Request, { params }: { params: { issueId: st
 
   for (const [id, qty] of corrections) await admin.from('pack_issue_lines').update({ qty }).eq('id', id)
   if (issue.session_id) {
-    const { data: fresh } = await admin.from('pack_issue_lines').select('qty').eq('issue_id', issue.issue_id)
+    const [{ data: fresh }, { lines: packLines }] = await Promise.all([
+      admin.from('pack_issue_lines').select('line_id, reason_code, qty').eq('issue_id', issue.issue_id),
+      getPackOrderLines(admin, issue.order_id, { includeZero: true }),
+    ])
     await admin
       .from('pack_sessions')
-      .update({ issue_pieces: (fresh ?? []).reduce((s, l) => s + Number(l.qty), 0) })
+      .update({ issue_pieces: issueDeductPieces(fresh ?? [], new Map(packLines.map((l) => [l.line_id, l.qty]))) })
       .eq('session_id', issue.session_id)
   }
 

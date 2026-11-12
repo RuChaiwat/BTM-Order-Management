@@ -43,7 +43,7 @@ export default async function PackingProductivityPage({ searchParams }: { search
           <KpiCard label="PIECES PACKED" labelTh="ชิ้นที่แพ็กเสร็จ (ไม่นับชิ้นมีปัญหา)" value={d.totals.pieces.toLocaleString()} valueColor="#16A34A" sub={`${d.totals.orders.toLocaleString()} orders`} compact style={{ padding: 14 }} />
           <KpiCard label="AVG PCS / HOUR" labelTh="ชิ้นต่อชั่วโมง (เฉลี่ยทั้งทีม)" value={d.totals.pcsPerHour?.toLocaleString() ?? '—'} valueColor={pctColor(totalPct)} sub={`target ${target.toLocaleString()} pcs/hr${totalPct !== null ? ` · ${totalPct}%` : ''}`} compact style={{ padding: 14 }} />
           <KpiCard label="PACKERS" labelTh="จำนวนพนักงานแพ็ก" value={d.totals.packers.toLocaleString()} sub={`เวลาแพ็กรวม ${dur(d.totals.seconds)}`} compact style={{ padding: 14 }} />
-          <KpiCard label="ISSUES REPORTED" labelTh="order ที่แจ้งปัญหา" value={d.totals.issues.toLocaleString()} valueColor={d.totals.issues ? '#DC2626' : undefined} sub={`${d.totals.issuePieces.toLocaleString()} ชิ้นมีปัญหา`} compact style={{ padding: 14 }} />
+          <KpiCard label="ISSUES REPORTED" labelTh="order ที่แจ้งปัญหา" value={d.totals.issues.toLocaleString()} valueColor={d.totals.issues ? '#DC2626' : undefined} sub={`หัก ${d.totals.issuePieces.toLocaleString()} ชิ้นจากปัญหา`} compact style={{ padding: 14 }} />
           <KpiCard label="AVG TIME / ORDER" labelTh="เวลาเฉลี่ยต่อ order" value={d.totals.orders ? dur(Math.round(d.totals.seconds / d.totals.orders)) : '—'} compact style={{ padding: 14 }} />
         </div>
 
@@ -110,7 +110,7 @@ export default async function PackingProductivityPage({ searchParams }: { search
                     <td>{dur(p.avgSecondsPerOrder)}</td>
                     <td style={{ color: p.issuesReported ? 'var(--color-danger)' : undefined }}>
                       {p.issuesReported}
-                      {p.issuePieces > 0 && <div style={{ fontSize: 11 }}>{p.issuePieces} ชิ้น</div>}
+                      {p.issuePieces > 0 && <div style={{ fontSize: 11 }}>หัก {p.issuePieces} ชิ้น</div>}
                     </td>
                     <td style={{ fontSize: 12, overflowWrap: 'break-word' }}>{p.stations.join(', ')}</td>
                   </tr>

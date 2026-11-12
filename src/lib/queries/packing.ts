@@ -296,7 +296,7 @@ export async function getPackIssueDetail(db: SupabaseClient, issueId: string) {
 
   const [{ data: order }, { data: issueLines }, reasons, { data: orderLines }, { data: completion }, { data: verifications }, { data: sessions }, { data: station }] = await Promise.all([
     db.from('orders').select('order_id, order_no, store_code, status, pack_status, assignment_batch_id, original_order_date').eq('order_id', orderId).maybeSingle(),
-    db.from('pack_issue_lines').select('id, line_id, sku, item_description, bin_code, reason_code, qty').eq('issue_id', issueId),
+    db.from('pack_issue_lines').select('id, line_id, sku, barcode, item_description, bin_code, reason_code, qty, remark').eq('issue_id', issueId),
     getReasonLabels(db),
     db.from('order_lines').select('line_id, sku, sku_barcode, item_description, bin_code, zone_code, qty').eq('order_id', orderId).order('pick_sequence'),
     db.from('picker_completions').select('completion_id, picker_completed_time, actual_pieces, result').eq('order_id', orderId).maybeSingle(),
@@ -331,7 +331,7 @@ export async function getPackIssueDetail(db: SupabaseClient, issueId: string) {
     // Packers and supervisors work from the barcode printed on the product, not the internal SKU.
     issueLines: (issueLines ?? []).map((l) => {
       const ol = l.line_id ? lineById.get(l.line_id) : undefined
-      return { ...l, barcode: ol ? ol.sku_barcode || `SKU ${ol.sku}` : l.sku, reasonLabel: label.get(l.reason_code) ?? l.reason_code }
+      return { ...l, barcode: ol ? ol.sku_barcode || `SKU ${ol.sku}` : l.barcode || l.sku, reasonLabel: label.get(l.reason_code) ?? l.reason_code }
     }),
     order,
     pick: {

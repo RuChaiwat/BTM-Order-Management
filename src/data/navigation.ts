@@ -45,7 +45,12 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Packing Control',
     items: [
+      { id: 21, en: 'Packing Dashboard', th: 'แดชบอร์ดงานแพ็ก', path: '/packing-dashboard' },
+      { id: 22, en: 'Live Packing Monitor', th: 'ติดตามการแพ็กแบบเรียลไทม์', path: '/pack-monitor' },
       { id: 23, en: 'Admin Pack Verify', th: 'ยืนยันการแพ็ก (แอดมิน)', path: '/pack-verification' },
+      { id: 24, en: 'Pack Issue Investigation', th: 'ตรวจสอบปัญหาจากการแพ็ก', path: '/pack-issues' },
+      { id: 25, en: 'Packing Productivity', th: 'ประสิทธิผลงานแพ็กรายวัน', path: '/packing-productivity' },
+      { id: 26, en: 'Pack Issue Dashboard', th: 'แดชบอร์ดปัญหาการแพ็ก', path: '/pack-issue-dashboard' },
       { id: 27, en: 'Pack Settings', th: 'ตั้งค่างานแพ็ก (Station / ปัญหา)', path: '/pack-settings' },
     ],
   },

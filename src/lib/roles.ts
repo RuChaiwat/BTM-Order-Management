@@ -46,15 +46,17 @@ export const ROLE_LABELS: Record<string, string> = {
 // by those pages dropped the same roles.
 //
 // 2026-11 Packing module: 'pack_supervisor' (shown as "Supervisor (Pack)") sees ONLY the Packing
-// Control menus (23 = Admin Pack Verify, 27 = Pack Settings; more Packing screens join in later
-// phases) and none of the Pick/Consolidation ones -- and the Pick-side 'supervisor' gets none of
+// Control menus (21-27: Packing Dashboard, Live Packing Monitor, Admin Pack Verify, Pack Issue
+// Investigation, Packing Productivity, Pack Issue Dashboard, Pack Settings) and none of the
+// Pick/Consolidation ones -- and the Pick-side 'supervisor' gets none of
 // the Packing menus. The two never see each other's data. Since pack_supervisor can't open the
 // Operations Dashboard (id 1), a blocked page sends each role to its own first menu instead
-// (homePathForRole below).
+// (homePathForRole below). Warehouse Manager gets every Packing dashboard (21, 22 view-only, 25,
+// 26) but none of the Packing action screens.
 export const ROLE_MENU_ACCESS: Record<string, number[]> = {
-  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 23, 27],
-  pack_supervisor: [23, 27],
-  warehouse_manager: [1, 3, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19],
+  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
+  pack_supervisor: [21, 22, 23, 24, 25, 26, 27],
+  warehouse_manager: [1, 3, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 21, 22, 25, 26],
   supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 19, 20],
   zone_controller: [1, 3, 8, 9, 10, 11, 12, 19, 20],
   viewer: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 16, 19],

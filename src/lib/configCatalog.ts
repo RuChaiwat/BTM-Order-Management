@@ -71,6 +71,12 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
  * Pack Handheld, for both Completed and Completed with Short. Read by /api/handheld/pack. */
 export const PACKING_MIN_DURATION_KEY = 'packing.min_duration_minutes'
 export const PACKING_MIN_DURATION_DEFAULT = 5
+/** Live Packing Monitor flags an order still being packed after this many minutes (red). */
+export const PACKING_LONG_SESSION_KEY = 'packing.long_session_minutes'
+export const PACKING_LONG_SESSION_DEFAULT = 30
+/** Packing Productivity: one target speed (pieces per hour) for every packer. */
+export const PACKING_TARGET_KEY = 'packing.target_pcs_per_hour'
+export const PACKING_TARGET_DEFAULT = 100
 
 /** Auto-refresh interval (minutes) per dashboard page -- read by getRefreshIntervalMs(). */
 export const AUTO_REFRESH_KEYS = {
@@ -78,6 +84,8 @@ export const AUTO_REFRESH_KEYS = {
   zoneDashboard: 'auto_refresh.zone_dashboard_minutes',
   matchingDashboard: 'auto_refresh.matching_dashboard_minutes',
   controlTower: 'auto_refresh.control_tower_minutes',
+  packingDashboard: 'auto_refresh.packing_dashboard_minutes',
+  livePackingMonitor: 'auto_refresh.live_packing_monitor_minutes',
 } as const
 
 /** Which document Work Assignment opens for printing right after Confirm Assignment. One global
@@ -413,6 +421,58 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     min: 0,
     max: 120,
     defaultValue: String(5),
+  },
+  {
+    key: PACKING_LONG_SESSION_KEY,
+    category: 'packing',
+    labelEn: 'Packing taking too long after',
+    labelTh: 'แพ็กนานผิดปกติเมื่อเกิน',
+    descriptionEn: 'Live Packing Monitor highlights an order in red once it has been open (scanned to start, not finished) longer than this.',
+    descriptionTh: 'หน้า Live Packing Monitor จะแสดงสีแดงเมื่อ order ถูกเปิดงาน (scan เริ่มแล้วยังไม่ปิด) นานเกินเวลานี้',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+    max: 480,
+    defaultValue: String(30),
+  },
+  {
+    key: PACKING_TARGET_KEY,
+    category: 'packing',
+    labelEn: 'Target packing speed',
+    labelTh: 'เป้าหมายความเร็วในการแพ็ก',
+    descriptionEn: 'One target for every packer. Packing Productivity compares each packer against it (pieces packed per hour of packing time; pieces reported as a problem are not counted).',
+    descriptionTh: 'เป้าหมายเดียวใช้กับพนักงานแพ็กทุกคน หน้า Packing Productivity เทียบผลงานแต่ละคนกับค่านี้ (ชิ้นต่อชั่วโมงของเวลาแพ็กจริง ไม่นับชิ้นที่แจ้งปัญหา)',
+    kind: 'integer',
+    unit: 'pcs/hr',
+    min: 0,
+    step: 10,
+    defaultValue: String(100),
+  },
+  {
+    key: 'auto_refresh.packing_dashboard_minutes',
+    category: 'auto_refresh',
+    labelEn: 'Packing Dashboard',
+    labelTh: 'แดชบอร์ดงานแพ็ก',
+    descriptionEn: 'How often an open Packing Dashboard page re-loads its data by itself. Applies to every user.',
+    descriptionTh: 'หน้า Packing Dashboard ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที ใช้กับผู้ใช้ทุกคน',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+    max: 60,
+    defaultValue: '5',
+  },
+  {
+    key: 'auto_refresh.live_packing_monitor_minutes',
+    category: 'auto_refresh',
+    labelEn: 'Live Packing Monitor',
+    labelTh: 'ติดตามการแพ็กแบบเรียลไทม์',
+    descriptionEn: 'How often an open Live Packing Monitor re-loads who is packing what (the elapsed timers tick every second regardless). Applies to every user.',
+    descriptionTh: 'หน้า Live Packing Monitor ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ตัวนับเวลาเดินทุกวินาทีอยู่แล้ว) ใช้กับผู้ใช้ทุกคน',
+    kind: 'integer',
+    unit: 'min',
+    min: 1,
+    max: 60,
+    defaultValue: '1',
   },
 ]
 

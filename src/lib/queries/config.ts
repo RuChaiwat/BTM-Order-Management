@@ -29,8 +29,8 @@ export const MATCHING_CONFIG_KEYS = [
 /** A dashboard's auto-refresh interval (Configuration > Dashboard Auto-Refresh), in ms for
  * <AutoRefresh intervalMs>. 5 minutes while unset; clamped to 1-60 minutes so a bad stored value
  * can never make a page hammer the database or effectively stop refreshing. */
-export async function getRefreshIntervalMs(db: SupabaseClient, key: string): Promise<number> {
+export async function getRefreshIntervalMs(db: SupabaseClient, key: string, defaultMinutes = 5): Promise<number> {
   const raw = Number((await getActiveConfig(db, [key])).value(key))
-  const minutes = Number.isFinite(raw) && raw > 0 ? Math.min(60, Math.max(1, Math.round(raw))) : 5
+  const minutes = Number.isFinite(raw) && raw > 0 ? Math.min(60, Math.max(1, Math.round(raw))) : defaultMinutes
   return minutes * 60_000
 }

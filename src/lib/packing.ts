@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getActiveConfig } from './queries/config'
-import { PACKING_MIN_DURATION_DEFAULT, PACKING_MIN_DURATION_KEY } from './configCatalog'
+import { PACKING_LONG_SESSION_DEFAULT, PACKING_LONG_SESSION_KEY, PACKING_MIN_DURATION_DEFAULT, PACKING_MIN_DURATION_KEY, PACKING_TARGET_DEFAULT, PACKING_TARGET_KEY } from './configCatalog'
 
 /** orders.pack_status values (migration 0035). NULL = the order never entered packing. */
 export type PackStatus = 'pending' | 'packing' | 'packed' | 'issue' | 'confirmed'
@@ -18,6 +18,33 @@ export async function getPackMinDurationMinutes(db: SupabaseClient): Promise<num
   const raw = Number((await getActiveConfig(db, [PACKING_MIN_DURATION_KEY])).value(PACKING_MIN_DURATION_KEY))
   return Number.isFinite(raw) && raw >= 0 ? Math.min(120, Math.round(raw)) : PACKING_MIN_DURATION_DEFAULT
 }
+
+/** The other two Packing settings: long-running threshold (minutes) and target pcs/hr. */
+export async function getPackingSettings(db: SupabaseClient) {
+  const cfg = await getActiveConfig(db, [PACKING_LONG_SESSION_KEY, PACKING_TARGET_KEY])
+  const long = Number(cfg.value(PACKING_LONG_SESSION_KEY))
+  const target = Number(cfg.value(PACKING_TARGET_KEY))
+  return {
+    longSessionMinutes: Number.isFinite(long) && long > 0 ? Math.round(long) : PACKING_LONG_SESSION_DEFAULT,
+    targetPcsPerHour: Number.isFinite(target) && target >= 0 ? Math.round(target) : PACKING_TARGET_DEFAULT,
+  }
+}
+
+/** Pieces a finished pack session earns for productivity: the order's pieces minus the pieces the
+ * packer reported as a problem (client rule), never below 0. */
+export function creditedPieces(s: { pieces: number; issue_pieces: number }) {
+  return Math.max(0, Number(s.pieces) - Number(s.issue_pieces))
+}
+
+/** Root causes the Pack Supervisor records when closing a pack issue. */
+export const PACK_ROOT_CAUSES: { code: string; th: string; en: string }[] = [
+  { code: 'PICK_ERROR', th: 'Pick ผิด', en: 'Picking error' },
+  { code: 'VERIFY_ERROR', th: 'Verify ผิด', en: 'Verification error' },
+  { code: 'PRODUCT_DEFECT', th: 'สินค้าเสีย / หมดอายุจากต้นทาง', en: 'Product defect at source' },
+  { code: 'WMS_DATA', th: 'ข้อมูล WMS ผิด', en: 'WMS data error' },
+  { code: 'PACKER_ERROR', th: 'Packer ผิด', en: 'Packer error' },
+  { code: 'NOT_ISSUE', th: 'ไม่ใช่ปัญหา', en: 'Not an issue' },
+]
 
 export interface PackOrderLine {
   line_id: string

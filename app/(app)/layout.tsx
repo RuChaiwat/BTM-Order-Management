@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/Sidebar'
 import { GlobalLoadingBar } from '@/components/GlobalLoadingBar'
+import { PackIssueAlert } from '@/components/packing/PackIssueAlert'
+import { canAccessMenuItem } from '@/lib/roles'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -20,12 +22,13 @@ export default async function AppShellLayout({ children }: { children: React.Rea
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
-  const [orderPool, assignable, backlog, verificationQueue, packVerifyQueue] = await Promise.all([
+  const [orderPool, assignable, backlog, verificationQueue, packVerifyQueue, openPackIssues] = await Promise.all([
     admin.from('orders').select('order_id', { count: 'exact', head: true }).eq('status', 'new'),
     admin.from('orders').select('order_id', { count: 'exact', head: true }).in('status', ['assigned', 'in_progress']),
     admin.from('order_alerts').select('order_id', { count: 'exact', head: true }).eq('is_picking_backlog', true),
     admin.from('orders').select('order_id', { count: 'exact', head: true }).in('status', ['picker_completed_100', 'picker_completed_short']),
     admin.from('orders').select('order_id', { count: 'exact', head: true }).eq('pack_status', 'packed'),
+    admin.from('pack_issues').select('issue_id', { count: 'exact', head: true }).in('status', ['open', 'investigating']),
   ])
 
   const badges: Record<number, string> = {
@@ -34,6 +37,7 @@ export default async function AppShellLayout({ children }: { children: React.Rea
     11: String(backlog.count ?? 0),
     16: String(verificationQueue.count ?? 0),
     23: String(packVerifyQueue.count ?? 0),
+    24: String(openPackIssues.count ?? 0),
   }
 
   return (
@@ -41,6 +45,7 @@ export default async function AppShellLayout({ children }: { children: React.Rea
       <GlobalLoadingBar />
       <Sidebar user={user} badges={badges} />
       <div className="app-main">{children}</div>
+      {canAccessMenuItem(user.role, 24) && <PackIssueAlert />}
     </div>
   )
 }

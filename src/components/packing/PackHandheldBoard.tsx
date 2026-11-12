@@ -44,7 +44,7 @@ interface IssueDraft {
   qty: string
 }
 
-type Step = 'station' | 'picker' | 'order' | 'packing' | 'finish' | 'short' | 'done'
+type Step = 'station' | 'picker' | 'order' | 'packing' | 'finish' | 'issue' | 'done'
 
 const API = '/api/handheld/pack'
 const NOT_IN_TO = '__not_in_to__'
@@ -75,7 +75,9 @@ function mmss(totalSeconds: number) {
 
 /**
  * Pack Handheld: Scan Station -> Scan employee -> Scan order (timer starts) -> Scan the same order
- * again -> Completed / Completed with Short. After every finished order it clears back to Scan
+ * again -> Completed / Completed with Short (the short is itemized later by Admin Pack Verify).
+ * แจ้งปัญหา on the timer screen lists the problem items and ends the order at once (no minimum
+ * time) for the Pack Supervisor to investigate. After every finished order it clears back to Scan
  * Station, so each order is always tied to the station and person who actually packed it.
  * Hardware scanners type the code and press Enter, so every step is one auto-focused input.
  */
@@ -186,10 +188,10 @@ export function PackHandheldBoard() {
     }
   }
 
-  async function submitFinish(result: 'completed' | 'completed_short') {
+  async function submitFinish(result: 'completed' | 'completed_short' | 'issue') {
     if (!station || !picker || !session) return
     let issueLines: { line_id: string | null; sku?: string; reason_code: string; qty: number }[] = []
-    if (result === 'completed_short') {
+    if (result === 'issue') {
       if (issues.length === 0) return fail('เพิ่มสินค้าที่มีปัญหาอย่างน้อย 1 รายการ')
       for (const [i, d] of issues.entries()) {
         const qty = Number(d.qty)
@@ -205,7 +207,12 @@ export function PackHandheldBoard() {
     try {
       await call('POST', { action: 'finish', station: station.station_code, picker: picker.picker_id, session_id: session.session_id, result, remark, issue_lines: issueLines })
       beep(true)
-      const doneMsg = result === 'completed' ? `✓ ${order?.order_no} แพ็กเสร็จ (${mmss(elapsedSec)})` : `⚠ ${order?.order_no} ส่งเรื่องปัญหาให้ Supervisor แล้ว`
+      const doneMsg =
+        result === 'completed'
+          ? `✓ ${order?.order_no} แพ็กเสร็จ (${mmss(elapsedSec)})`
+          : result === 'completed_short'
+            ? `✓ ${order?.order_no} ปิดงานแบบ Completed with Short (${mmss(elapsedSec)}) · Admin จะระบุรายการที่ขาด`
+            : `⚠ ${order?.order_no} แจ้งปัญหาให้ Supervisor แล้ว`
       resetAll(doneMsg)
     } catch (err) {
       fail((err as Error).message)
@@ -271,7 +278,7 @@ export function PackHandheldBoard() {
         </div>
       )}
 
-      {(step === 'packing' || step === 'finish' || step === 'short') && order && (
+      {(step === 'packing' || step === 'finish' || step === 'issue') && order && (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10, borderColor: canFinish ? 'var(--color-success-border)' : undefined }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
             <span style={big}>{order.order_no}</span>
@@ -288,9 +295,19 @@ export function PackHandheldBoard() {
               <form onSubmit={onScan}>
                 <input ref={inputRef} value={scan} onChange={(e) => setScan(e.target.value)} style={{ ...scanBox, borderColor: canFinish ? 'var(--color-success)' : 'var(--color-border)' }} autoComplete="off" placeholder={prompt.th} />
               </form>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', background: 'var(--color-surface-muted)', borderRadius: 8, padding: '8px 10px' }}>
-                เมื่อ scan order เดิมแล้ว จะมีให้เลือก <b>Completed</b> หรือ <b>Completed with Short</b> — มีปัญหา (สินค้าขาด/เกิน/เสียหาย ฯลฯ) ให้เลือก <b>Completed with Short</b> เพื่อแจ้งปัญหา
-              </div>
+              <button
+                type="button"
+                className="btn btn-danger-outline"
+                style={{ height: 50, fontSize: 16, fontWeight: 700 }}
+                disabled={busy}
+                onClick={() => {
+                  if (issues.length === 0) addIssue()
+                  setError(null)
+                  setStep('issue')
+                }}
+              >
+                ⚠ แจ้งปัญหา
+              </button>
             </>
           )}
 
@@ -303,12 +320,9 @@ export function PackHandheldBoard() {
                 className="btn btn-warning"
                 style={{ height: 56, fontSize: 18 }}
                 disabled={busy}
-                onClick={() => {
-                  if (issues.length === 0) addIssue()
-                  setStep('short')
-                }}
+                onClick={() => submitFinish('completed_short')}
               >
-                Completed with Short · แจ้งปัญหา
+                {busy && <Spinner />} Completed with Short
               </button>
               <button className="btn btn-secondary" disabled={busy} onClick={() => setStep('packing')}>
                 ย้อนกลับ (ยังไม่ปิดงาน)
@@ -316,9 +330,10 @@ export function PackHandheldBoard() {
             </div>
           )}
 
-          {step === 'short' && (
+          {step === 'issue' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>แจ้งสินค้าที่มีปัญหา</div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>แจ้งปัญหา · ระบุสินค้าที่มีปัญหา</div>
+              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>ส่งแล้วจะหยุดเวลาและจบงาน order นี้ทันที Supervisor จะมาตรวจสอบสินค้า</div>
               {issues.map((d, i) => (
                 <div key={d.key} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600 }}>
@@ -373,11 +388,11 @@ export function PackHandheldBoard() {
                 placeholder="หมายเหตุ (ไม่บังคับ)"
                 style={{ width: '100%', minHeight: 60, border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px', fontSize: 15, fontFamily: 'inherit' }}
               />
-              <button className="btn btn-warning" style={{ height: 52, fontSize: 17 }} disabled={busy} onClick={() => submitFinish('completed_short')}>
-                {busy && <Spinner />} ส่งเรื่อง &amp; ปิดงาน (Completed with Short)
+              <button className="btn btn-danger" style={{ height: 52, fontSize: 17 }} disabled={busy} onClick={() => submitFinish('issue')}>
+                {busy && <Spinner />} ส่งเรื่องแจ้งปัญหา &amp; หยุดเวลา
               </button>
-              <button className="btn btn-secondary" disabled={busy} onClick={() => setStep('finish')}>
-                ย้อนกลับ
+              <button className="btn btn-secondary" disabled={busy} onClick={() => setStep('packing')}>
+                ย้อนกลับ (แพ็กต่อ)
               </button>
             </div>
           )}

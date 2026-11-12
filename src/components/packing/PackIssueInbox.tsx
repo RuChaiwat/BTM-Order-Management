@@ -47,7 +47,7 @@ const STATUS_BADGE: Record<string, { cls: string; th: string }> = {
   investigating: { cls: 'badge-warning', th: 'กำลังตรวจสอบ' },
   resolved: { cls: 'badge-success', th: 'ปิดแล้ว' },
 }
-const RESULT_TH: Record<string, string> = { completed: 'Completed', completed_short: 'Completed with Short', cancelled: 'ยกเลิก' }
+const RESULT_TH: Record<string, string> = { completed: 'Completed', completed_short: 'Completed with Short', issue: 'แจ้งปัญหา', cancelled: 'ยกเลิก' }
 
 function dt(iso: string | null) {
   return iso ? new Date(iso).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'

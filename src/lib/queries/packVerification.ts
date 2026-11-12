@@ -10,8 +10,10 @@ export interface PackVerifyQueueItem {
   stationCode: string | null
   packedAt: string | null
   packSeconds: number | null
-  /** true when the last pack attempt was Completed with Short (closed by a supervisor afterwards) */
+  /** the last pack attempt was แจ้งปัญหา, closed by a supervisor afterwards (Admin ปิดเอง) */
   hadIssue: boolean
+  /** packer finished with Completed with Short -- Admin must itemize the short lines one order at a time */
+  isShort: boolean
   waitMinutes: number
 }
 
@@ -54,7 +56,8 @@ export async function getPackVerifyQueue(db: SupabaseClient, warehouseCode: stri
         stationCode: s?.station_code ?? null,
         packedAt,
         packSeconds: s?.finished_at ? Math.round((new Date(s.finished_at).getTime() - new Date(s.started_at).getTime()) / 1000) : null,
-        hadIssue: s?.result === 'completed_short',
+        hadIssue: s?.result === 'issue',
+        isShort: s?.result === 'completed_short',
         waitMinutes: packedAt ? Math.max(0, Math.round((Date.now() - new Date(packedAt).getTime()) / 60000)) : 0,
       }
     })

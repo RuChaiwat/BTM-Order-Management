@@ -100,7 +100,7 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
     count('issue'),
     db.from('pack_issues').select('issue_id', { count: 'exact', head: true }).eq('warehouse_code', warehouseCode).in('status', ['open', 'investigating']),
     db.from('orders').select('pack_ready_at').eq('warehouse_code', warehouseCode).eq('pack_status', 'pending').limit(10000),
-    db.from('pack_sessions').select('picker_id, finished_at, result, pieces, issue_pieces').eq('warehouse_code', warehouseCode).gte('finished_at', sinceIso).lt('finished_at', untilIso).neq('result', 'cancelled').limit(20000),
+    db.from('pack_sessions').select('picker_id, finished_at, result, pieces, issue_pieces, short_pieces').eq('warehouse_code', warehouseCode).gte('finished_at', sinceIso).lt('finished_at', untilIso).neq('result', 'cancelled').limit(20000),
     db.from('pack_verifications').select('order_id', { count: 'exact', head: true }).gte('verified_time', sinceIso).lt('verified_time', untilIso),
   ])
 
@@ -153,7 +153,7 @@ export async function getPackingProductivity(db: SupabaseClient, warehouseCode: 
   const { sinceIso, untilIso } = bangkokDayRange(dateKey)
   const { data } = await db
     .from('pack_sessions')
-    .select('picker_id, station_code, started_at, finished_at, result, pieces, issue_pieces')
+    .select('picker_id, station_code, started_at, finished_at, result, pieces, issue_pieces, short_pieces')
     .eq('warehouse_code', warehouseCode)
     .gte('finished_at', sinceIso)
     .lt('finished_at', untilIso)
@@ -183,7 +183,7 @@ export async function getPackingProductivity(db: SupabaseClient, warehouseCode: 
       acc.pieces += pcs
       acc.seconds += secs
       acc.stations.add(s.station_code)
-      if (s.result === 'completed_short') {
+      if (s.result === 'issue') {
         acc.issues++
         acc.issuePieces += Number(s.issue_pieces)
       }

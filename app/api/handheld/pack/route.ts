@@ -14,7 +14,10 @@ import { getPackMinDurationMinutes, getPackOrderLines } from '@/lib/packing'
  * GET  ?station=CODE                 -> validate the station (step 1)
  * GET  ?station=CODE&picker=ID       -> validate the employee for that station (step 2)
  * POST { action: 'scan_order', ... } -> start packing an order, or resume this packer's own open one
- * POST { action: 'finish', ... }     -> Completed / Completed with Short (with problem lines)
+ * POST { action: 'finish', result }  -> 'completed' / 'completed_short' (after re-scanning the order; the
+ *                                     packer enters nothing -- Admin Pack Verify itemizes the short)
+ *                                     or 'issue' (แจ้งปัญหา from the timer screen, with problem lines;
+ *                                     stops the timer at once, no minimum time)
  */
 
 type Db = ReturnType<typeof createAdminClient>
@@ -150,7 +153,7 @@ interface IssueLineInput {
 
 async function finish(db: Db, picker: { picker_id: string; name: string }, body: { session_id?: string; result?: string; remark?: string; issue_lines?: IssueLineInput[] }) {
   const result = body.result
-  if (!body.session_id || (result !== 'completed' && result !== 'completed_short')) return err("session_id and result ('completed' | 'completed_short') are required")
+  if (!body.session_id || (result !== 'completed' && result !== 'completed_short' && result !== 'issue')) return err("session_id and result ('completed' | 'completed_short' | 'issue') are required")
 
   const { data: session } = await db.from('pack_sessions').select('session_id, order_id, picker_id, station_code, warehouse_code, started_at, finished_at, pieces').eq('session_id', body.session_id).maybeSingle()
   if (!session) return err('ไม่พบงานแพ็กนี้ · Packing session not found', 404)
@@ -159,14 +162,15 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
 
   const minMinutes = await getPackMinDurationMinutes(db)
   const elapsedMs = Date.now() - new Date(session.started_at).getTime()
-  if (elapsedMs < minMinutes * 60_000) {
+  // A problem can be found the moment the box is opened, so reporting one is never held back.
+  if (result !== 'issue' && elapsedMs < minMinutes * 60_000) {
     const left = Math.ceil((minMinutes * 60_000 - elapsedMs) / 1000)
     return err(`ยังไม่ครบเวลาขั้นต่ำ ${minMinutes} นาที — รออีก ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} · Too soon to finish`, 409)
   }
 
   // Validate the problem lines before writing anything.
   let issueRows: { line_id: string | null; sku: string; item_description: string | null; bin_code: string | null; reason_code: string; qty: number }[] = []
-  if (result === 'completed_short') {
+  if (result === 'issue') {
     const input = Array.isArray(body.issue_lines) ? body.issue_lines : []
     if (input.length === 0) return err('ต้องระบุสินค้าที่มีปัญหาอย่างน้อย 1 รายการ · Add at least one problem item')
     const [{ data: lines }, { data: reasons }] = await Promise.all([
@@ -203,11 +207,11 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
     .maybeSingle()
   if (!closed) return err('งานนี้ถูกปิดไปแล้ว · Already finished', 409)
 
-  const newPackStatus = result === 'completed' ? 'packed' : 'issue'
+  const newPackStatus = result === 'issue' ? 'issue' : 'packed'
   await db.from('orders').update({ pack_status: newPackStatus }).eq('order_id', session.order_id).eq('pack_status', 'packing')
 
   let issueId: string | null = null
-  if (result === 'completed_short') {
+  if (result === 'issue') {
     const { data: issue, error: issueErr } = await db
       .from('pack_issues')
       .insert({ order_id: session.order_id, session_id: session.session_id, picker_id: picker.picker_id, station_code: session.station_code, warehouse_code: session.warehouse_code, remark: body.remark?.trim() || null })
@@ -222,7 +226,7 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
   await writeStatusHistory(db, { entityType: 'order_pack', entityId: session.order_id, oldStatus: 'packing', newStatus: newPackStatus, changedBy: null, reason: `${picker.picker_id} @ ${session.station_code}` })
   await writeAudit(db, {
     userId: null,
-    action: result === 'completed' ? 'pack.completed' : 'pack.completed_short',
+    action: `pack.${result}`,
     entityType: 'orders',
     entityId: session.order_id,
     after: { session_id: session.session_id, picker_id: picker.picker_id, station_code: session.station_code, elapsed_seconds: Math.round(elapsedMs / 1000), issue_id: issueId, issue_lines: issueRows },

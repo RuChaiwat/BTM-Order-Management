@@ -31,9 +31,10 @@ export async function getPackingSettings(db: SupabaseClient) {
 }
 
 /** Pieces a finished pack session earns for productivity: the order's pieces minus the pieces the
- * packer reported as a problem (client rule), never below 0. */
-export function creditedPieces(s: { pieces: number; issue_pieces: number }) {
-  return Math.max(0, Number(s.pieces) - Number(s.issue_pieces))
+ * packer reported as a problem (แจ้งปัญหา) and minus the pieces Admin Pack Verify recorded as short
+ * (client rules), never below 0. */
+export function creditedPieces(s: { pieces: number; issue_pieces: number; short_pieces?: number | null }) {
+  return Math.max(0, Number(s.pieces) - Number(s.issue_pieces) - Number(s.short_pieces ?? 0))
 }
 
 /** Root causes the Pack Supervisor records when closing a pack issue. */

@@ -286,7 +286,7 @@ export function PackHandheldBoard() {
           </div>
           <div style={{ textAlign: 'center', fontSize: 44, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: canFinish ? 'var(--color-success)' : 'var(--color-text)' }}>{mmss(elapsedSec)}</div>
           <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--color-text-secondary)' }}>
-            {canFinish ? 'ครบเวลาขั้นต่ำแล้ว ปิดงานได้' : `ขั้นต่ำ ${mmss(minSec)} · ยังปิดงานไม่ได้`} · {order.lines.length} SKU · {order.pieces.toLocaleString()} ชิ้น
+            {canFinish ? 'ครบเวลาขั้นต่ำแล้ว ปิดงานได้' : `ขั้นต่ำ ${mmss(minSec)} · ยังปิดงานไม่ได้`} · {order.lines.length} รายการ · {order.pieces.toLocaleString()} ชิ้น
           </div>
 
           {step === 'packing' && (
@@ -348,13 +348,13 @@ export function PackHandheldBoard() {
                     <option value="">— เลือกสินค้า —</option>
                     {order.lines.map((l) => (
                       <option key={l.line_id} value={l.line_id}>
-                        {l.sku} · {l.item_description ?? ''} ({l.qty})
+                        {l.sku_barcode || `SKU ${l.sku}`} · {l.item_description ?? ''} ({l.qty})
                       </option>
                     ))}
                     <option value={NOT_IN_TO}>สินค้าไม่อยู่ใน TO (scan/พิมพ์บาร์โค้ด)</option>
                   </select>
                   {d.lineId === NOT_IN_TO && (
-                    <input className="field-input" style={{ height: 44, fontSize: 15, border: '1px solid var(--color-border)' }} placeholder="บาร์โค้ด / SKU" value={d.sku} onChange={(e) => updateIssue(d.key, { sku: e.target.value })} />
+                    <input className="field-input" style={{ height: 44, fontSize: 15, border: '1px solid var(--color-border)' }} placeholder="scan หรือพิมพ์บาร์โค้ดสินค้า" value={d.sku} onChange={(e) => updateIssue(d.key, { sku: e.target.value })} />
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8 }}>
                     <select className="field-input" style={{ height: 44, fontSize: 15, border: '1px solid var(--color-border)' }} value={d.reasonCode} onChange={(e) => updateIssue(d.key, { reasonCode: e.target.value })}>
@@ -406,7 +406,7 @@ export function PackHandheldBoard() {
               </colgroup>
               <thead>
                 <tr>
-                  <th>SKU</th>
+                  <th>BARCODE</th>
                   <th>QTY</th>
                 </tr>
               </thead>
@@ -414,7 +414,7 @@ export function PackHandheldBoard() {
                 {order.lines.map((l) => (
                   <tr key={l.line_id}>
                     <td style={{ overflowWrap: 'break-word' }}>
-                      {l.sku}
+                      {l.sku_barcode || `SKU ${l.sku}`}
                       {l.item_description && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{l.item_description}</div>}
                     </td>
                     <td style={{ fontWeight: 700 }}>{l.qty}</td>

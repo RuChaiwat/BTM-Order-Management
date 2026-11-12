@@ -71,7 +71,7 @@ export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
               <br />
               RESULT
             </th>
-            <th>SKU</th>
+            <th>ITEMS</th>
             <th>PCS</th>
             <th>
               VERIFIED

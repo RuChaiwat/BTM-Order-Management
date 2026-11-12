@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { NAV_GROUPS } from '../data/navigation'
 import type { AppUser } from '../lib/auth'
@@ -14,9 +15,36 @@ interface SidebarProps {
   badges?: Record<number, string>
 }
 
+const COLLAPSE_KEY = 'btm.sidebar.collapsed'
+
 export function Sidebar({ user, badges }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  // Menu groups the user has collapsed with the +/− at the top-right of each group, remembered per
+  // browser (localStorage; falls back to all-expanded if storage is unavailable). The group holding
+  // the current page is always shown open so the highlighted item is never hidden.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(COLLAPSE_KEY)
+      if (raw) setCollapsed(new Set(JSON.parse(raw) as string[]))
+    } catch {
+      /* storage unavailable */
+    }
+  }, [])
+  function toggleGroup(label: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(label)) next.delete(label)
+      else next.add(label)
+      try {
+        window.localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next]))
+      } catch {
+        /* storage unavailable */
+      }
+      return next
+    })
+  }
 
   async function logout() {
     if (!confirm('ต้องการออกจากระบบใช่หรือไม่?\n\nLog out of this session?')) return
@@ -51,8 +79,20 @@ export function Sidebar({ user, badges }: SidebarProps) {
       <nav className="sidebar-nav">
         {NAV_GROUPS.filter((group) => group.items.some((item) => canAccessMenuItem(user.role, item.id))).map((group) => (
           <div key={group.label} className="nav-group">
-            <div className="nav-group-label">{group.label}</div>
-            {group.items.map((item) => {
+            {(() => {
+              const holdsCurrent = group.items.some((item) => item.path === pathname)
+              const isCollapsed = collapsed.has(group.label) && !holdsCurrent
+              const groupBadge = group.items.filter((item) => canAccessMenuItem(user.role, item.id)).reduce((sum, item) => sum + (Number(badges?.[item.id]) || 0), 0)
+              return (
+                <button type="button" className="nav-group-label nav-group-toggle" onClick={() => toggleGroup(group.label)} aria-expanded={!isCollapsed} title={isCollapsed ? 'Expand · ขยาย' : 'Collapse · ย่อ'}>
+                  <span>{group.label}</span>
+                  {isCollapsed && groupBadge > 0 && <span className="nav-item-badge">{groupBadge.toLocaleString()}</span>}
+                  <span className="nav-group-sign">{isCollapsed ? '+' : '−'}</span>
+                </button>
+              )
+            })()}
+            {!(collapsed.has(group.label) && !group.items.some((item) => item.path === pathname)) &&
+              group.items.map((item) => {
               if (!canAccessMenuItem(user.role, item.id)) return null
               const isActive = item.path === pathname
               const badge = badges?.[item.id] ?? item.badge

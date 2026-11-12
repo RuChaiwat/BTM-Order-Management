@@ -317,6 +317,7 @@ export async function getPackIssueDetail(db: SupabaseClient, issueId: string) {
   const [pNames, uNames] = await Promise.all([pickerNames(db, pickerIds), userNames(db, userIds)])
   const label = new Map(reasons.map((r) => [r.reason_code, r.label_th || r.label_en]))
   const picked = new Map((completionLines ?? []).map((c) => [c.line_id, c]))
+  const lineById = new Map((orderLines ?? []).map((l) => [l.line_id, l]))
   const flaggedLineIds = new Set((issueLines ?? []).map((l) => l.line_id).filter(Boolean))
 
   return {
@@ -327,7 +328,11 @@ export async function getPackIssueDetail(db: SupabaseClient, issueId: string) {
       acknowledgedByName: issue.acknowledged_by ? names(uNames, issue.acknowledged_by) : null,
       resolvedByName: issue.resolved_by ? names(uNames, issue.resolved_by) : null,
     },
-    issueLines: (issueLines ?? []).map((l) => ({ ...l, reasonLabel: label.get(l.reason_code) ?? l.reason_code })),
+    // Packers and supervisors work from the barcode printed on the product, not the internal SKU.
+    issueLines: (issueLines ?? []).map((l) => {
+      const ol = l.line_id ? lineById.get(l.line_id) : undefined
+      return { ...l, barcode: ol ? ol.sku_barcode || `SKU ${ol.sku}` : l.sku, reasonLabel: label.get(l.reason_code) ?? l.reason_code }
+    }),
     order,
     pick: {
       pickerId: batch?.picker_id ?? null,

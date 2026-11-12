@@ -156,6 +156,36 @@ table { border-collapse: collapse; width: 100%; }
 
 .nav-group-label:first-child { padding-top: 4px; }
 
+/* Collapsible menu group header (Sidebar.tsx): whole row toggles, +/− at the top-right corner. */
+.nav-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.nav-group-toggle:hover { color: var(--color-nav-text); }
+.nav-group-toggle .nav-item-badge { margin-left: auto; }
+.nav-group-sign {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--color-nav-text);
+}
+.nav-group-toggle .nav-item-badge + .nav-group-sign { margin-left: 0; }
+
 .nav-item {
   padding: 4px 10px;
   font-size: 12.5px;

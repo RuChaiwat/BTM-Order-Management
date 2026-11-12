@@ -282,7 +282,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
               <thead>
                 <tr>
                   <th />
-                  <th>SKU</th>
+                  <th>BARCODE</th>
                   <th>BIN</th>
                   <th>QTY</th>
                   <th>REASON</th>
@@ -308,7 +308,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
                     <tr key={l.line_id} className={st.isShort ? 'row-flag' : undefined}>
                       <td>{checkbox(st.isShort, () => toggleShort(l), false, 'แพ็กขาด?')}</td>
                       <td style={{ overflowWrap: 'break-word' }}>
-                        {l.sku}
+                        {l.sku_barcode || `SKU ${l.sku}`}
                         {l.item_description && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{l.item_description}</div>}
                       </td>
                       <td>{formatLocationDisplay(l.bin_code)}</td>

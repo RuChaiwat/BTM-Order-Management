@@ -26,7 +26,7 @@ type Detail = {
     resolvedByName: string | null
     resolved_at: string | null
   }
-  issueLines: { id: string; line_id: string | null; sku: string; item_description: string | null; bin_code: string | null; reason_code: string; reasonLabel: string; qty: number }[]
+  issueLines: { id: string; line_id: string | null; sku: string; barcode: string; item_description: string | null; bin_code: string | null; reason_code: string; reasonLabel: string; qty: number }[]
   order: { order_no: string; store_code: string; pack_status: string | null } | null
   pick: {
     pickerId: string | null
@@ -37,7 +37,7 @@ type Detail = {
     completedTime: string | null
     result: string | null
     verifications: { adminName: string; decision: string; verified_time: string; reject_reason: string | null }[]
-    lines: { line_id: string; sku: string; item_description: string | null; bin_code: string; zone_code: string | null; qty: number; picked_qty: number | null; short_reason_code: string | null; flagged: boolean }[]
+    lines: { line_id: string; sku: string; sku_barcode: string | null; item_description: string | null; bin_code: string; zone_code: string | null; qty: number; picked_qty: number | null; short_reason_code: string | null; flagged: boolean }[]
   }
   packSessions: { session_id: string; pickerName: string; picker_id: string; station_code: string; started_at: string; finished_at: string | null; result: string | null; pieces: number; issue_pieces: number; cancel_reason: string | null; cancelledByName: string | null }[]
 }
@@ -61,7 +61,7 @@ function ago(iso: string) {
  * Pack Issue Investigation -- an inbox: issue list on the left (unresolved first, newest first;
  * "ยังไม่มีคนรับ" = nobody has taken it yet), the selected issue on the right with what the packer
  * reported, the order's full Pick history (who picked it, from which bin/zone, who verified --
- * the reported SKU's line highlighted), every pack attempt, and the resolve form.
+ * the reported item's line highlighted), every pack attempt, and the resolve form.
  */
 export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueListItem[]; initialIssueId?: string }) {
   const router = useRouter()
@@ -141,7 +141,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
     const changed: Record<string, number> = {}
     for (const l of detail.issueLines) {
       const q = Number(lineQty[l.id])
-      if (!Number.isInteger(q) || q < 1) return setError(`จำนวนของ ${l.sku} ต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป`)
+      if (!Number.isInteger(q) || q < 1) return setError(`จำนวนของ ${l.barcode} ต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป`)
       if (q !== l.qty) changed[l.id] = q
     }
     act({ action: 'resolve', root_cause: rootCause, resolution, note, line_qty: changed })
@@ -247,7 +247,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>SKU</th>
+                    <th>BARCODE</th>
                     <th>BIN</th>
                     <th>ปัญหา</th>
                     <th>จำนวน</th>
@@ -257,7 +257,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                   {detail.issueLines.map((l) => (
                     <tr key={l.id}>
                       <td style={{ overflowWrap: 'break-word' }}>
-                        {l.sku}
+                        {l.barcode}
                         <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{l.line_id ? l.item_description : 'ไม่อยู่ใน TO'}</div>
                       </td>
                       <td>{l.bin_code ? formatLocationDisplay(l.bin_code) : '—'}</td>
@@ -312,7 +312,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>SKU</th>
+                    <th>BARCODE</th>
                     <th>LOCATION</th>
                     <th>ZONE</th>
                     <th>ORDERED</th>
@@ -323,7 +323,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                   {detail.pick.lines.map((l) => (
                     <tr key={l.line_id} className={l.flagged ? 'row-flag' : undefined} style={l.flagged ? { background: 'var(--color-warning-bg)' } : undefined}>
                       <td style={{ overflowWrap: 'break-word' }}>
-                        {l.sku}
+                        {l.sku_barcode || `SKU ${l.sku}`}
                         {l.item_description && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{l.item_description}</div>}
                       </td>
                       <td>{formatLocationDisplay(l.bin_code)}</td>

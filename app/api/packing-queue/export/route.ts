@@ -13,7 +13,7 @@ export async function GET() {
   if (!canAccessMenuItem(user.role, 21)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const rows = await getPackQueue(createAdminClient(), user.warehouse_code ?? 'DC002')
-  const header = ['Order No', 'Store', 'Shipment Date', 'Pick Result', 'SKU', 'Pieces', 'Verified At', 'Waiting (min)']
+  const header = ['Order No', 'Store', 'Shipment Date', 'Pick Result', 'Items', 'Pieces', 'Verified At', 'Waiting (min)']
   const body = rows.map((r) => [r.order_no, r.store_code, formatDate(r.order_date), r.pick_status === 'final_closed_short' ? 'Short' : '100%', r.skus, r.pieces, formatDateTime(r.pack_ready_at), r.waitMinutes])
   const buffer = buildXlsxBuffer([{ name: 'Waiting to Pack', rows: [header, ...body] }])
   const stamp = bangkokDateKey(new Date()) ?? new Date().toISOString().slice(0, 10)

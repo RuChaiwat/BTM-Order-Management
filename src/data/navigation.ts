@@ -65,7 +65,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Administration',
     items: [
       { id: 13, en: 'User Management', th: 'จัดการผู้ใช้งาน', path: '/workers' },
-      { id: 17, en: 'Picker Management', th: 'จัดการพนักงานหยิบสินค้า', path: '/pickers' },
+      { id: 17, en: 'Picker & Packer Management', th: 'จัดการพนักงานหยิบ / แพ็กสินค้า', path: '/pickers' },
       { id: 14, en: 'Location Master', th: 'ข้อมูลตำแหน่งจัดเก็บ', path: '/locations' },
       { id: 15, en: 'Configuration', th: 'ตั้งค่าระบบ', path: '/admin' },
       { id: 18, en: 'Audit Trail', th: 'ประวัติการตรวจสอบ', path: '/audit-trail' },

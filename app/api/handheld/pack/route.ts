@@ -35,12 +35,11 @@ async function loadStation(db: Db, code: string | undefined | null) {
 async function loadPicker(db: Db, raw: string | undefined | null, stationWarehouse: string | null) {
   const id = raw?.trim().toUpperCase()
   if (!id) return { error: 'กรุณา scan รหัสพนักงาน · Employee ID is required' }
-  // Also keeps the value safe to embed in the PostgREST or() filter below.
-  if (!/^[A-Z0-9_-]{1,40}$/.test(id)) return { error: `รหัสพนักงาน "${id}" ไม่ถูกต้อง · Invalid employee ID` }
-  // The ID card may carry either the Picker ID or the separate badge code.
-  const { data: rows } = await db.from('pickers').select('picker_id, badge_code, name_en, name_th, active, warehouse_code').or(`picker_id.eq.${id},badge_code.eq.${id}`).limit(2)
-  const picker = (rows ?? []).find((p) => p.picker_id === id) ?? (rows ?? [])[0]
-  if (!picker) return { error: `ไม่พบรหัสพนักงาน "${id}" · Unknown employee` }
+  // Packers are the same people as Pickers: looked up in `pickers` (Picker & Packer Management) by
+  // Picker ID, the only identifier since migration 0018 dropped the separate badge_code.
+  const { data: picker, error } = await db.from('pickers').select('picker_id, name_en, name_th, active, warehouse_code').eq('picker_id', id).maybeSingle()
+  if (error) return { error: `ค้นหารหัสพนักงานไม่สำเร็จ: ${error.message}` }
+  if (!picker) return { error: `ไม่พบรหัสพนักงาน "${id}" ใน Picker & Packer Management · Unknown employee` }
   if (!picker.active) return { error: `${picker.name_th || picker.name_en} (${picker.picker_id}) ถูกปิดใช้งาน · Employee is inactive` }
   if (stationWarehouse && picker.warehouse_code && picker.warehouse_code !== stationWarehouse) {
     return { error: `${picker.name_th || picker.name_en} อยู่คลัง ${picker.warehouse_code} ไม่ใช่คลังของ Station นี้ (${stationWarehouse})` }

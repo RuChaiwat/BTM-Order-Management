@@ -404,7 +404,7 @@ export function PackHandheldBoard() {
               <form onSubmit={onScan}>
                 <input ref={inputRef} value={scan} onChange={(e) => setScan(e.target.value)} style={{ ...scanBox, borderColor: canFinish ? 'var(--color-success)' : 'var(--color-border)' }} autoComplete="off" placeholder={prompt.th} />
               </form>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>พบปัญหา? กดที่รายการสินค้าด้านล่างเพื่อแจ้ง</div>
+              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>พบปัญหา? กด ▸ รายการสินค้าใน order ด้านล่าง แล้วกดที่สินค้าเพื่อแจ้ง</div>
             </>
           )}
 
@@ -451,8 +451,10 @@ export function PackHandheldBoard() {
             </div>
           )}
 
-          <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>รายการสินค้าใน order ({order.lines.length})</div>
-          <table className="table" style={{ tableLayout: 'fixed', width: '100%', fontSize: 14 }}>
+          {/* Collapsed by default so the timer screen stays short; tap ▸ to open, then tap a line to report. */}
+          <details style={{ fontSize: 13, marginTop: 4 }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '6px 0' }}>รายการสินค้าใน order ({order.lines.length})</summary>
+          <table className="table" style={{ tableLayout: 'fixed', width: '100%', fontSize: 14, marginTop: 6 }}>
             <colgroup>
               <col style={{ width: '72%' }} />
               <col style={{ width: '28%' }} />
@@ -505,10 +507,11 @@ export function PackHandheldBoard() {
             </tbody>
           </table>
           {step === 'packing' && (
-            <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => openNotInTo()}>
+            <button type="button" className="btn btn-secondary" style={{ width: '100%', marginTop: 8 }} disabled={busy} onClick={() => openNotInTo()}>
               + สินค้าไม่อยู่ใน TO
             </button>
           )}
+          </details>
         </div>
       )}
 

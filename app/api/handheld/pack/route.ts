@@ -39,7 +39,7 @@ async function loadPicker(db: Db, raw: string | undefined | null, stationWarehou
   // Picker ID, the only identifier since migration 0018 dropped the separate badge_code.
   const { data: picker, error } = await db.from('pickers').select('picker_id, name_en, name_th, active, warehouse_code').eq('picker_id', id).maybeSingle()
   if (error) return { error: `ค้นหารหัสพนักงานไม่สำเร็จ: ${error.message}` }
-  if (!picker) return { error: `ไม่พบรหัสพนักงาน "${id}" ใน Picker & Packer Management · Unknown employee` }
+  if (!picker) return { error: `ไม่พบรหัสพนักงานแพ็ก ${id} · Unknown packer` }
   if (!picker.active) return { error: `${picker.name_th || picker.name_en} (${picker.picker_id}) ถูกปิดใช้งาน · Employee is inactive` }
   if (stationWarehouse && picker.warehouse_code && picker.warehouse_code !== stationWarehouse) {
     return { error: `${picker.name_th || picker.name_en} อยู่คลัง ${picker.warehouse_code} ไม่ใช่คลังของ Station นี้ (${stationWarehouse})` }

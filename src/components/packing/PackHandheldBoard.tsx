@@ -288,6 +288,9 @@ export function PackHandheldBoard() {
               <form onSubmit={onScan}>
                 <input ref={inputRef} value={scan} onChange={(e) => setScan(e.target.value)} style={{ ...scanBox, borderColor: canFinish ? 'var(--color-success)' : 'var(--color-border)' }} autoComplete="off" placeholder={prompt.th} />
               </form>
+              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', background: 'var(--color-surface-muted)', borderRadius: 8, padding: '8px 10px' }}>
+                เมื่อ scan order เดิมแล้ว จะมีให้เลือก <b>Completed</b> หรือ <b>Completed with Short</b> — มีปัญหา (สินค้าขาด/เกิน/เสียหาย ฯลฯ) ให้เลือก <b>Completed with Short</b> เพื่อแจ้งปัญหา
+              </div>
             </>
           )}
 
@@ -305,7 +308,7 @@ export function PackHandheldBoard() {
                   setStep('short')
                 }}
               >
-                Completed with Short
+                Completed with Short · แจ้งปัญหา
               </button>
               <button className="btn btn-secondary" disabled={busy} onClick={() => setStep('packing')}>
                 ย้อนกลับ (ยังไม่ปิดงาน)

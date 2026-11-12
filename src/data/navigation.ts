@@ -43,6 +43,13 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'Packing Control',
+    items: [
+      { id: 23, en: 'Admin Pack Verify', th: 'ยืนยันการแพ็ก (แอดมิน)', path: '/pack-verification' },
+      { id: 27, en: 'Pack Settings', th: 'ตั้งค่างานแพ็ก (Station / ปัญหา)', path: '/pack-settings' },
+    ],
+  },
+  {
     label: 'Analytics',
     items: [
       { id: 12, en: 'Productivity & SLA', th: 'ประสิทธิผล / คุณภาพการให้บริการ', path: '/productivity' },

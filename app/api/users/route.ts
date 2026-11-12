@@ -8,7 +8,7 @@ import { canManageUserRole } from '@/lib/roles'
 // 'picker' is deliberately excluded -- Pickers are managed in their own `pickers` table (see
 // /api/pickers) with no login capability at all, not as an employees_users role.
 // 'planner_admin' retired (migration 0032), merged into 'supervisor'.
-const VALID_ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'zone_controller', 'viewer']
+const VALID_ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'pack_supervisor', 'zone_controller', 'viewer']
 
 /** Create a new user: Supabase Auth account + matching employees_users row, in one call.
  * Login is by User ID (§7), not email — `email` here is optional contact info only; the

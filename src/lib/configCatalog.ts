@@ -64,7 +64,13 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
   { id: 'housekeeping', labelEn: 'Data Retention', labelTh: 'ระยะเวลาเก็บข้อมูล' },
   { id: 'printing', labelEn: 'Printing', labelTh: 'การพิมพ์เอกสาร' },
   { id: 'auto_refresh', labelEn: 'Dashboard Auto-Refresh', labelTh: 'รีเฟรชข้อมูลอัตโนมัติของแดชบอร์ด' },
+  { id: 'packing', labelEn: 'Packing', labelTh: 'งานแพ็กสินค้า' },
 ]
+
+/** Packing: shortest time (minutes) allowed between the start scan and finishing an order on the
+ * Pack Handheld, for both Completed and Completed with Short. Read by /api/handheld/pack. */
+export const PACKING_MIN_DURATION_KEY = 'packing.min_duration_minutes'
+export const PACKING_MIN_DURATION_DEFAULT = 5
 
 /** Auto-refresh interval (minutes) per dashboard page -- read by getRefreshIntervalMs(). */
 export const AUTO_REFRESH_KEYS = {
@@ -393,6 +399,20 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     min: 1,
     max: 60,
     defaultValue: '5',
+  },
+  {
+    key: PACKING_MIN_DURATION_KEY,
+    category: 'packing',
+    labelEn: 'Minimum packing time per order',
+    labelTh: 'เวลาแพ็กขั้นต่ำต่อออเดอร์',
+    descriptionEn:
+      'On the Pack Handheld, an order can only be finished (Completed or Completed with Short) once at least this long has passed since its start scan -- stops a packer from scanning start and finish back to back.',
+    descriptionTh: 'บนหน้า Handheld แพ็ก จะปิดงาน (Completed หรือ Completed with Short) ได้ก็ต่อเมื่อผ่านเวลานี้แล้วนับจากการ scan เริ่ม — กันการ scan เปิดแล้วปิดทันที',
+    kind: 'integer',
+    unit: 'min',
+    min: 0,
+    max: 120,
+    defaultValue: String(5),
   },
 ]
 

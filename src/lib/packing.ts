@@ -1,0 +1,49 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { getActiveConfig } from './queries/config'
+import { PACKING_MIN_DURATION_DEFAULT, PACKING_MIN_DURATION_KEY } from './configCatalog'
+
+/** orders.pack_status values (migration 0035). NULL = the order never entered packing. */
+export type PackStatus = 'pending' | 'packing' | 'packed' | 'issue' | 'confirmed'
+
+export const PACK_STATUS_LABEL: Record<PackStatus, { en: string; th: string }> = {
+  pending: { en: 'Waiting to pack', th: 'รอแพ็ก' },
+  packing: { en: 'Packing', th: 'กำลังแพ็ก' },
+  packed: { en: 'Packed — awaiting confirm', th: 'แพ็กเสร็จ รอยืนยัน' },
+  issue: { en: 'Issue reported', th: 'มีปัญหา รอตรวจสอบ' },
+  confirmed: { en: 'Pack confirmed', th: 'ยืนยันแพ็กแล้ว' },
+}
+
+/** Configuration > Packing > minimum packing time, in minutes (default 5, clamped 0-120). */
+export async function getPackMinDurationMinutes(db: SupabaseClient): Promise<number> {
+  const raw = Number((await getActiveConfig(db, [PACKING_MIN_DURATION_KEY])).value(PACKING_MIN_DURATION_KEY))
+  return Number.isFinite(raw) && raw >= 0 ? Math.min(120, Math.round(raw)) : PACKING_MIN_DURATION_DEFAULT
+}
+
+export interface PackOrderLine {
+  line_id: string
+  sku: string
+  sku_barcode: string | null
+  item_description: string | null
+  bin_code: string
+  qty: number
+}
+
+/** Lines of an order as they should be packed: the quantity is Admin Verification's verified
+ * picked quantity (picker_completion_lines) when there is one, so a short-closed order shows what
+ * was actually picked, not what was ordered. Lines verified at 0 picked are left out. */
+export async function getPackOrderLines(db: SupabaseClient, orderId: string): Promise<{ lines: PackOrderLine[]; pieces: number }> {
+  const [{ data: lines }, { data: completion }] = await Promise.all([
+    db.from('order_lines').select('line_id, sku, sku_barcode, item_description, bin_code, qty').eq('order_id', orderId).order('sku'),
+    db.from('picker_completions').select('completion_id, actual_pieces').eq('order_id', orderId).maybeSingle(),
+  ])
+  const pickedByLine = new Map<string, number>()
+  if (completion) {
+    const { data: cl } = await db.from('picker_completion_lines').select('line_id, picked_qty').eq('completion_id', completion.completion_id)
+    for (const l of cl ?? []) pickedByLine.set(l.line_id, Number(l.picked_qty))
+  }
+  const out = (lines ?? [])
+    .map((l) => ({ ...l, qty: pickedByLine.get(l.line_id) ?? Number(l.qty) }))
+    .filter((l) => l.qty > 0)
+  const pieces = completion?.actual_pieces ?? out.reduce((s, l) => s + l.qty, 0)
+  return { lines: out, pieces: Number(pieces) }
+}

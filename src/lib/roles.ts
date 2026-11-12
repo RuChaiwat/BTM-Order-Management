@@ -1,3 +1,5 @@
+import { NAV_GROUPS } from '../data/navigation'
+
 // Role -> visible nav item ids, and display labels.
 //
 // §7's permission table is coarse (module-group level: "Order Consolidation: View/approve" etc.)
@@ -18,7 +20,8 @@
 export const ROLE_LABELS: Record<string, string> = {
   system_admin: 'System Admin',
   warehouse_manager: 'Warehouse Manager',
-  supervisor: 'Supervisor',
+  supervisor: 'Supervisor (Pick)',
+  pack_supervisor: 'Supervisor (Pack)',
   zone_controller: 'Zone Controller',
   viewer: 'Viewer',
 }
@@ -41,8 +44,16 @@ export const ROLE_LABELS: Record<string, string> = {
 // Pick Completion (8), Admin Verification (16) or Print & Reprint (20). Pages enforce this via
 // requireMenuAccess() (src/lib/pageAccess.ts), not just the sidebar, and the write APIs used only
 // by those pages dropped the same roles.
+//
+// 2026-11 Packing module: 'pack_supervisor' (shown as "Supervisor (Pack)") sees ONLY the Packing
+// Control menus (23 = Admin Pack Verify, 27 = Pack Settings; more Packing screens join in later
+// phases) and none of the Pick/Consolidation ones -- and the Pick-side 'supervisor' gets none of
+// the Packing menus. The two never see each other's data. Since pack_supervisor can't open the
+// Operations Dashboard (id 1), a blocked page sends each role to its own first menu instead
+// (homePathForRole below).
 export const ROLE_MENU_ACCESS: Record<string, number[]> = {
-  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+  system_admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 23, 27],
+  pack_supervisor: [23, 27],
   warehouse_manager: [1, 3, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19],
   supervisor: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 19, 20],
   zone_controller: [1, 3, 8, 9, 10, 11, 12, 19, 20],
@@ -51,6 +62,17 @@ export const ROLE_MENU_ACCESS: Record<string, number[]> = {
 
 export function canAccessMenuItem(role: string, navItemId: number): boolean {
   return ROLE_MENU_ACCESS[role]?.includes(navItemId) ?? false
+}
+
+/** Landing page for a role: the first menu item (in sidebar order) it can open. Every role but
+ * pack_supervisor can open the Operations Dashboard, so for them this is still /dashboard. */
+export function homePathForRole(role: string): string {
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (item.path && canAccessMenuItem(role, item.id)) return item.path
+    }
+  }
+  return '/dashboard'
 }
 
 /** A System Admin account can only be edited or deactivated by another System Admin -- every

@@ -94,7 +94,10 @@ export async function POST(request: Request) {
   // gets here first "locks" the order by flipping its status, and the second one matches zero rows
   // and stops immediately, instead of both writing (and clobbering each other's) picker_completion_
   // lines rows.
-  const { data: updatedOrder } = await admin.from('orders').update({ status: newStatus }).eq('order_id', order_id).eq('status', order.status).select('order_id').maybeSingle()
+  // Final Close also drops the order into the Packing queue (migration 0035) -- same statement, so
+  // an order can never be Final Closed without becoming packable.
+  const orderPatch = decision === 'final_close' ? { status: newStatus, pack_status: 'pending', pack_ready_at: new Date().toISOString() } : { status: newStatus }
+  const { data: updatedOrder } = await admin.from('orders').update(orderPatch).eq('order_id', order_id).eq('status', order.status).select('order_id').maybeSingle()
   if (!updatedOrder) {
     return NextResponse.json({ error: 'This order was just verified elsewhere — refresh and try again' }, { status: 409 })
   }

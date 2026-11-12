@@ -25,7 +25,7 @@ interface WorkerRow {
 
 // 'picker' deliberately excluded -- see /api/pickers and app/pickers for Picker management.
 // 'planner_admin' retired (migration 0032), merged into 'supervisor'.
-const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'zone_controller', 'viewer']
+const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'pack_supervisor', 'zone_controller', 'viewer']
 
 // One-line summary of each role's actual action-level permissions (requireRole([...]) across the
 // API routes) -- kept here as a human-readable cross-check next to the menu-access list below, so
@@ -34,7 +34,8 @@ const ROLES = ['system_admin', 'warehouse_manager', 'supervisor', 'zone_controll
 const ROLE_SUMMARY: Record<string, string> = {
   system_admin: 'สิทธิ์เต็มทุกอย่าง — role เดียวที่แก้ไข Location Master, ค่า Configuration และ Reason Master ได้ และแก้ไข/ปิดใช้งานบัญชี System Admin คนอื่นได้',
   warehouse_manager: 'กำกับดูแลภาพรวม ไม่ทำงานปฏิบัติการหน้างาน — จัดการ User Management (สร้าง/แก้ไข/Deactivate ยกเว้นบัญชี System Admin), Picker Management และประเภทการจ้างงานได้ · ดู Dashboard, รายงาน, Location Master, Configuration, Audit Trail ได้ แต่แก้ Location/ค่าระบบไม่ได้',
-  supervisor: 'คุมงานปฏิบัติการเต็มรูปแบบ — Import Order, Matching, Work Assignment, Pick Completion, Admin Verification, Cancel/Unassign Order, Print & Reprint, Picker Management · ไม่เข้าหน้าผู้ดูแลระบบ (User Management, Location Master, Configuration, Audit Trail)',
+  supervisor: 'คุมงานฝั่ง Pick เต็มรูปแบบ — Import Order, Matching, Work Assignment, Pick Completion, Admin Verification, Cancel/Unassign Order, Print & Reprint, Picker Management · ไม่เข้าหน้าผู้ดูแลระบบ (User Management, Location Master, Configuration, Audit Trail) และไม่เห็นเมนูฝั่ง Pack',
+  pack_supervisor: 'คุมงานฝั่ง Pack เท่านั้น — Admin Pack Verify (ยืนยันการแพ็กหลังทำใน WMS), Pack Settings (Station และรายการปัญหา) · ไม่เห็นเมนูฝั่ง Pick / Consolidation และหน้าผู้ดูแลระบบ',
   zone_controller: 'จำกัดเฉพาะโซนที่รับผิดชอบ (ดู Scope) ทำ action ได้แค่บันทึก Pick Completion แทนพนักงาน ที่เหลือดูได้อย่างเดียว',
   viewer: 'ดูรายงาน/dashboard ได้เท่านั้น ทำ action ใดๆ ในระบบไม่ได้เลย',
 }

@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Spinner } from '../Spinner'
 import { HANDHELD_BUSY_ATTR } from '../handheld/HandheldNav'
+import { RISK_COLOR } from '../../lib/alertColors'
+
+/** Each scan step has its own highlight colour so a packer sees at a glance that a scan went through
+ * and the screen moved on (scanners are fast). Deliberately not green/yellow/red -- those mean time. */
+const STEP_COLOR: Record<1 | 2 | 3, string> = { 1: '#2563EB', 2: '#7C3AED', 3: '#DB2777' }
 
 interface Station {
   station_code: string
@@ -346,7 +351,12 @@ export function PackHandheldBoard() {
     setIssues((prev) => prev.filter((d) => issueKey(d) !== key))
   }
 
-  const stepNo = step === 'station' ? 1 : step === 'picker' ? 2 : 3
+  const stepNo: 1 | 2 | 3 = step === 'station' ? 1 : step === 'picker' ? 2 : 3
+  const stepColor = STEP_COLOR[stepNo]
+  // Same time bands as Packing Dashboard: < 30 min green, 30-60 yellow, >= 60 red.
+  const timing = (step === 'packing' || step === 'finish') && !!session
+  const elapsedMin = elapsedSec / 60
+  const timeColor = elapsedMin >= 60 ? RISK_COLOR.red : elapsedMin >= 30 ? RISK_COLOR.yellow : RISK_COLOR.green
   const prompt =
     step === 'station'
       ? { title: 'Scan Station', th: 'สแกนบาร์โค้ด Station ที่ทำงาน' }
@@ -365,7 +375,7 @@ export function PackHandheldBoard() {
       {error && <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger-dark)', border: '1px solid var(--color-danger-border)', borderRadius: 10, padding: '12px 14px', fontSize: 16, fontWeight: 600 }}>{error}</div>}
 
       {(station || picker) && (
-        <div className="card" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 14, padding: '10px 14px' }}>
+        <div className="card" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 14, padding: '10px 14px', ...(timing ? { borderLeft: `10px solid ${timeColor}` } : {}) }}>
           <span>
             Station: <b>{station?.station_code ?? '—'}</b> {station?.name && <span style={{ color: 'var(--color-text-secondary)' }}>· {station.name}</span>}
           </span>
@@ -377,11 +387,16 @@ export function PackHandheldBoard() {
 
       {(step === 'station' || step === 'picker' || step === 'order') && (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>ขั้นที่ {stepNo}/3</div>
-          <div style={big}>{prompt.title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            ขั้นที่ {stepNo}/3
+            {([1, 2, 3] as const).map((n) => (
+              <span key={n} style={{ width: 28, height: 6, borderRadius: 3, background: n <= stepNo ? STEP_COLOR[n] : 'var(--color-border)' }} />
+            ))}
+          </div>
+          <div style={{ ...big, background: stepColor, color: '#fff', borderRadius: 10, padding: '10px 14px' }}>{prompt.title}</div>
           <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>{prompt.th}</div>
           <form onSubmit={onScan}>
-            <input ref={inputRef} value={scan} onChange={(e) => setScan(e.target.value)} style={scanBox} autoComplete="off" autoCapitalize="characters" disabled={busy} placeholder="scan หรือพิมพ์แล้วกด Enter" />
+            <input ref={inputRef} value={scan} onChange={(e) => setScan(e.target.value)} style={{ ...scanBox, borderColor: stepColor }} autoComplete="off" autoCapitalize="characters" disabled={busy} placeholder="scan หรือพิมพ์แล้วกด Enter" />
           </form>
           {busy && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--color-text-secondary)' }}>

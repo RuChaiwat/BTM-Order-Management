@@ -51,6 +51,30 @@ async function loadPicker(db: Db, raw: string | undefined | null, stationWarehou
   return { picker: { picker_id: picker.picker_id, name: picker.name_th || picker.name_en } }
 }
 
+/**
+ * One packer per Pack Station at a time (client rule, 1 station : 1 person). Returns an error
+ * message when this packer may not work at this station right now:
+ *   - someone else has an open order at the station, or
+ *   - this packer has an open order at a different station (go back and finish it there).
+ * The same packer coming back to the same station is fine -- they resume their own order.
+ * Migration 0038 also enforces one open session per station in the database.
+ */
+async function stationConflict(db: Db, stationCode: string, pickerId: string): Promise<string | null> {
+  const { data: open } = await db.from('pack_sessions').select('picker_id, station_code, order_id').is('finished_at', null).or(`station_code.eq.${stationCode},picker_id.eq.${pickerId}`).limit(5)
+  const other = (open ?? []).find((s) => s.station_code === stationCode && s.picker_id !== pickerId)
+  const mineElsewhere = (open ?? []).find((s) => s.picker_id === pickerId && s.station_code !== stationCode)
+  const orderNo = async (orderId: string) => (await db.from('orders').select('order_no').eq('order_id', orderId).maybeSingle()).data?.order_no ?? ''
+  if (other) {
+    const { data: p } = await db.from('pickers').select('name_en, name_th').eq('picker_id', other.picker_id).maybeSingle()
+    const who = p ? p.name_th || p.name_en : other.picker_id
+    return `Station ${stationCode} กำลังใช้งานโดย ${who} (order ${await orderNo(other.order_id)}) — 1 Station แพ็กได้ทีละ 1 คน ต้องปิดงานนั้นก่อน หรือให้ Supervisor ยกเลิก · Station in use`
+  }
+  if (mineElsewhere) {
+    return `คุณมีงานค้างอยู่ที่ Station ${mineElsewhere.station_code} (order ${await orderNo(mineElsewhere.order_id)}) — กลับไปปิดงานที่ Station นั้นก่อน · You have an open order at another station`
+  }
+  return null
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const db = createAdminClient()
@@ -60,6 +84,10 @@ export async function GET(request: Request) {
   if (!searchParams.has('picker')) return NextResponse.json({ station })
   const p = await loadPicker(db, searchParams.get('picker'), s.station.warehouse_code)
   if (!p.picker) return err(p.error!, 404)
+  // Clear yesterday's leftovers first so a forgotten order can't lock a station into a new day.
+  await cancelStalePackSessions(db)
+  const conflict = await stationConflict(db, s.station.station_code, p.picker.picker_id)
+  if (conflict) return err(conflict, 409)
   return NextResponse.json({ station, picker: p.picker })
 }
 
@@ -90,6 +118,9 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
   if (!orderNo) return err('กรุณา scan เลข order · Order number is required')
   // No packing carries over to a new day: clear yesterday's open sessions before anything else.
   await cancelStalePackSessions(db)
+  // 1 station : 1 packer -- checked again here, the screen may have sat on this step a while.
+  const conflict = await stationConflict(db, station.station_code, picker.picker_id)
+  if (conflict) return err(conflict, 409)
 
   let q = db.from('orders').select('order_id, order_no, store_code, status, pack_status, warehouse_code, original_order_date').eq('order_no', orderNo)
   if (station.warehouse_code) q = q.eq('warehouse_code', station.warehouse_code)
@@ -140,7 +171,7 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
     .insert({ order_id: order.order_id, picker_id: picker.picker_id, station_code: station.station_code, warehouse_code: order.warehouse_code, pieces })
     .select('session_id, started_at')
     .single()
-  if (insErr || !session) return err('order นี้เพิ่งถูกเริ่มแพ็กจากอีกเครื่อง ลอง scan ใหม่ · Just started elsewhere, scan again', 409)
+  if (insErr || !session) return err('order นี้หรือ Station นี้เพิ่งถูกเริ่มแพ็กจากอีกเครื่อง ลอง scan ใหม่ · Just started elsewhere, scan again', 409)
 
   const { data: flipped } = await db.from('orders').update({ pack_status: 'packing' }).eq('order_id', order.order_id).eq('pack_status', 'pending').select('order_id').maybeSingle()
   if (!flipped) {

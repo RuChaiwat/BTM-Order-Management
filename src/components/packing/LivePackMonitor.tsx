@@ -19,19 +19,34 @@ function elapsed(fromIso: string, now: number) {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
 
-type Filter = 'all' | PackTimeBand | 'idle'
+type Filter = 'all' | PackTimeBand | 'idle' | 'issue'
+
+/** Corner mark on a station that still has a reported problem not closed. */
+function IssueMark() {
+  return (
+    <span
+      title="มีการแจ้งปัญหาที่ยังไม่ปิด · Open pack issue"
+      style={{ position: 'absolute', top: 10, right: 4, width: 20, height: 20, borderRadius: '50%', background: '#DC2626', color: '#fff', fontSize: 12, fontWeight: 700, lineHeight: '20px', textAlign: 'center', boxShadow: '0 0 0 2px #fff' }}
+    >
+      !
+    </span>
+  )
+}
 
 /**
  * Live Packing Monitor as one floor map: every active Pack Station in station order, 10 per row,
  * so a station keeps its place whatever its state. A packing station shows a header coloured by
  * how long its order has been open (Configuration > Packing: green / yellow / red), the station,
  * the packer's Thai name, the running time and the order no.; an idle station is a plain grey tile.
+ * The colour of a tile's header strip alone says the band (the chips on top are the legend); a red
+ * "!" in the corner marks a station with a reported problem not closed yet (Pack Issue
+ * Investigation), gone once all its issues are closed.
  * The chips on top count each state and dim the rest of the map when clicked. Cancelling is behind
  * a click on the tile (details + reason), so it can't be hit by accident; Warehouse Manager sees the
  * map read-only. Sessions left open from a previous day are cancelled by the system (midnight cron,
  * and again whenever this page loads).
  */
-export function LivePackMonitor({ live, idleStations, bands, canCancel }: { live: LiveSession[]; idleStations: { station_code: string; name: string }[]; bands: PackTimeBands; canCancel: boolean }) {
+export function LivePackMonitor({ live, idleStations, bands, issueStations, canCancel }: { live: LiveSession[]; idleStations: { station_code: string; name: string }[]; bands: PackTimeBands; issueStations: string[]; canCancel: boolean }) {
   const router = useRouter()
   const [isRefreshing, startRefresh] = useTransition()
   const [now, setNow] = useState(Date.now())
@@ -56,9 +71,10 @@ export function LivePackMonitor({ live, idleStations, bands, canCancel }: { live
       const cur = byStation.get(s.station_code)
       if (!cur || s.started_at < cur.started_at) byStation.set(s.station_code, s)
     }
-    const codes = new Set([...idleStations.map((s) => s.station_code), ...byStation.keys()])
+    const codes = new Set([...idleStations.map((s) => s.station_code), ...byStation.keys(), ...issueStations])
     return [...codes].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map((code) => ({ code, session: byStation.get(code) ?? null }))
-  }, [live, idleStations])
+  }, [live, idleStations, issueStations])
+  const hasIssue = useMemo(() => new Set(issueStations), [issueStations])
 
   const counts = { green: 0, yellow: 0, red: 0, idle: 0 }
   for (const t of tiles) {
@@ -92,6 +108,7 @@ export function LivePackMonitor({ live, idleStations, bands, canCancel }: { live
     { key: 'yellow', color: RISK_COLOR.yellow, text: `${Y}–${R - 1} นาที`, n: counts.yellow },
     { key: 'red', color: RISK_COLOR.red, text: `≥ ${R} นาที`, n: counts.red },
     { key: 'idle', color: IDLE_COLOR, text: 'ว่าง', n: counts.idle },
+    { key: 'issue', text: 'มีปัญหายังไม่ปิด', n: tiles.filter((t) => hasIssue.has(t.code)).length },
   ]
 
   return (
@@ -126,6 +143,7 @@ export function LivePackMonitor({ live, idleStations, bands, canCancel }: { live
               }}
             >
               {c.color && <span style={{ width: 9, height: 9, borderRadius: '50%', background: c.color }} />}
+              {c.key === 'issue' && <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#DC2626', color: '#fff', fontSize: 10, fontWeight: 700, lineHeight: '15px', textAlign: 'center' }}>!</span>}
               {c.text} <b>{c.n.toLocaleString()}</b> (Station)
             </button>
           ))}
@@ -134,13 +152,15 @@ export function LivePackMonitor({ live, idleStations, bands, canCancel }: { live
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PER_ROW}, minmax(0, 1fr))`, gap: 6 }}>
           {tiles.map(({ code, session: s }) => {
             const band = s ? bandOf(s) : null
-            const dim = filter !== 'all' && (filter === 'idle' ? !!s : band !== filter)
+            const flagged = hasIssue.has(code)
+            const dim = filter !== 'all' && (filter === 'issue' ? !flagged : filter === 'idle' ? !!s : band !== filter)
             if (!s) {
               return (
                 <div
                   key={code}
-                  style={{ opacity: dim ? 0.25 : 1, minHeight: 92, borderRadius: 8, border: '1px dashed #D1D5DB', background: '#F3F4F6', color: '#6B7280', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}
+                  style={{ position: 'relative', opacity: dim ? 0.25 : 1, minHeight: 92, borderRadius: 8, border: '1px dashed #D1D5DB', background: '#F3F4F6', color: '#6B7280', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}
                 >
+                  {flagged && <IssueMark />}
                   <div style={{ fontWeight: 700, fontSize: 13.5 }}>{code}</div>
                   <div>ว่าง</div>
                 </div>
@@ -157,9 +177,10 @@ export function LivePackMonitor({ live, idleStations, bands, canCancel }: { live
                   setSelected(s)
                 }}
                 title={`${s.pickerName} · ${s.order_no}`}
-                style={{ opacity: dim ? 0.25 : 1, minHeight: 92, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface, #fff)', padding: 0, overflow: 'hidden', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit', color: 'inherit' }}
+                style={{ position: 'relative', opacity: dim ? 0.25 : 1, minHeight: 92, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface, #fff)', padding: 0, overflow: 'hidden', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit', color: 'inherit' }}
               >
-                <div style={{ background: color, color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '2px 0' }}>{s.carriedOver ? 'ค้างข้ามวัน' : band === 'green' ? `< ${Y} นาที` : band === 'yellow' ? `${Y}–${R - 1} นาที` : `≥ ${R} นาที`}</div>
+                <div style={{ background: color, height: 8 }} />
+                {flagged && <IssueMark />}
                 <div style={{ fontWeight: 700, fontSize: 13.5, marginTop: 3 }}>{code}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 4px' }}>{s.pickerName}</div>
                 <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: band === 'green' ? undefined : color }}>{elapsed(s.started_at, now)}</div>

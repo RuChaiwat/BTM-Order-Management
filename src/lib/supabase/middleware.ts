@@ -34,7 +34,11 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === '/login' ||
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/handheld') ||
-    request.nextUrl.pathname.startsWith('/api/handheld')
+    request.nextUrl.pathname.startsWith('/api/handheld') ||
+    // Vercel Cron calls carry no login session, only `Authorization: Bearer CRON_SECRET`, which the
+    // route itself checks. Only this one cron is let through: the older crons (weekly export,
+    // productivity, purge) stay behind the login gate until they are reviewed for unattended runs.
+    request.nextUrl.pathname === '/api/cron/pack-auto-cancel'
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()

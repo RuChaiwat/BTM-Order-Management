@@ -1,4 +1,5 @@
 import { TopBar } from '@/components/TopBar'
+import { HandheldNav } from '@/components/handheld/HandheldNav'
 import { PickCompletionBoard } from '@/components/pickCompletion/PickCompletionBoard'
 
 /**
@@ -17,7 +18,9 @@ export default function HandheldPickCompletionPage() {
   return (
     <div className="app-shell">
       <div className="app-main">
-        <TopBar title="Pick Completion" subtitle="ปิดงานหยิบของฉัน · สแกนรหัส Picker ของตัวเอง" />
+        <TopBar title="Pick Completion" subtitle="ปิดงานหยิบของฉัน · สแกนรหัส Picker ของตัวเอง">
+          <HandheldNav />
+        </TopBar>
         <PickCompletionBoard apiBase="/api/handheld/picker-completions" showReprint={false} showUnassign={false} />
       </div>
     </div>

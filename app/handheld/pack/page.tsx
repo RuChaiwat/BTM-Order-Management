@@ -1,4 +1,5 @@
 import { TopBar } from '@/components/TopBar'
+import { HandheldNav } from '@/components/handheld/HandheldNav'
 import { PackHandheldBoard } from '@/components/packing/PackHandheldBoard'
 
 /**
@@ -12,7 +13,9 @@ export default function HandheldPackPage() {
   return (
     <div className="app-shell">
       <div className="app-main">
-        <TopBar title="Packing" subtitle="บันทึกเวลาแพ็กสินค้า · Scan Station → รหัสพนักงาน → Order" />
+        <TopBar title="Packing" subtitle="บันทึกเวลาแพ็กสินค้า · Scan Station → รหัสพนักงาน → Order">
+          <HandheldNav />
+        </TopBar>
         <PackHandheldBoard />
       </div>
     </div>

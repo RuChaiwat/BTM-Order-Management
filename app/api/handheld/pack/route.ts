@@ -122,7 +122,11 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
     if (open && open.picker_id === picker.picker_id) {
       return NextResponse.json({ session: { session_id: open.session_id, started_at: open.started_at }, order: orderOut, min_minutes: minMinutes, bands: { yellow: bands.yellowMinutes, red: bands.redMinutes }, server_now: new Date().toISOString(), resumed: true })
     }
-    return err(open ? `order นี้กำลังแพ็กโดย ${open.picker_id} ที่ Station ${open.station_code} · Being packed by someone else` : 'order นี้กำลังแพ็กอยู่ · Already being packed', 409)
+    if (!open) return err('order นี้กำลังแพ็กอยู่ · Already being packed', 409)
+    // Show who by name -- packers know each other by name, not by employee ID.
+    const { data: other } = await db.from('pickers').select('name_en, name_th').eq('picker_id', open.picker_id).maybeSingle()
+    const who = other ? other.name_th || other.name_en : open.picker_id
+    return err(`order นี้กำลังแพ็กโดย ${who} ที่ Station ${open.station_code} · Being packed by someone else`, 409)
   }
 
   // pending

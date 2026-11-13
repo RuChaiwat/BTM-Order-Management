@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Spinner } from '../Spinner'
+import { HANDHELD_BUSY_ATTR } from '../handheld/HandheldNav'
 
 interface Station {
   station_code: string
@@ -155,6 +156,14 @@ export function PackHandheldBoard() {
     const r = order?.reasons.find((x) => x.reason_code === code)
     return r ? r.label_th || r.label_en : code
   }
+
+  // While the timer runs, the Handheld idle guard must not send this screen back to the menu.
+  useEffect(() => {
+    const timing = step === 'packing' || step === 'finish'
+    if (timing) document.documentElement.setAttribute(HANDHELD_BUSY_ATTR, '1')
+    else document.documentElement.removeAttribute(HANDHELD_BUSY_ATTR)
+    return () => document.documentElement.removeAttribute(HANDHELD_BUSY_ATTR)
+  }, [step])
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)

@@ -1,5 +1,10 @@
 import { TopBar } from '@/components/TopBar'
 import { HandheldNav } from '@/components/handheld/HandheldNav'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getHandheldIdleMinutes } from '@/lib/handheld'
+
+// Reads Configuration > Handheld on every load.
+export const dynamic = 'force-dynamic'
 import { PickCompletionBoard } from '@/components/pickCompletion/PickCompletionBoard'
 
 /**
@@ -14,12 +19,13 @@ import { PickCompletionBoard } from '@/components/pickCompletion/PickCompletionB
  * A device is set up ONCE to always open this exact URL (bookmark/kiosk shortcut) -- the same
  * "configure the device once" pattern as Work Assignment's Chrome --kiosk-printing shortcut.
  */
-export default function HandheldPickCompletionPage() {
+export default async function HandheldPickCompletionPage() {
+  const idleMinutes = await getHandheldIdleMinutes(createAdminClient())
   return (
     <div className="app-shell">
       <div className="app-main">
         <TopBar title="Pick Completion" subtitle="ปิดงานหยิบของฉัน · สแกนรหัส Picker ของตัวเอง">
-          <HandheldNav />
+          <HandheldNav idleMinutes={idleMinutes} />
         </TopBar>
         <PickCompletionBoard apiBase="/api/handheld/picker-completions" showReprint={false} showUnassign={false} />
       </div>

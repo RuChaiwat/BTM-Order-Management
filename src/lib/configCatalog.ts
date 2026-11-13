@@ -65,7 +65,13 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
   { id: 'printing', labelEn: 'Printing', labelTh: 'การพิมพ์เอกสาร' },
   { id: 'auto_refresh', labelEn: 'Dashboard Auto-Refresh', labelTh: 'รีเฟรชข้อมูลอัตโนมัติของแดชบอร์ด' },
   { id: 'packing', labelEn: 'Packing', labelTh: 'งานแพ็กสินค้า' },
+  { id: 'handheld', labelEn: 'Handheld', labelTh: 'เครื่อง Handheld' },
 ]
+
+/** Handheld: minutes without a tap or scan before a Pick/Pack screen goes back to the Handheld
+ * menu (0 = never). Not while a pack timer is running. */
+export const HANDHELD_IDLE_KEY = 'handheld.idle_return_minutes'
+export const HANDHELD_IDLE_DEFAULT = 60
 
 /** Packing: shortest time (minutes) allowed between the start scan and finishing an order on the
  * Pack Handheld, for both Completed and Completed with Short. Read by /api/handheld/pack. */
@@ -421,6 +427,21 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     min: 0,
     max: 120,
     defaultValue: String(5),
+  },
+  {
+    key: HANDHELD_IDLE_KEY,
+    category: 'handheld',
+    labelEn: 'Return to menu when idle for',
+    labelTh: 'กลับหน้าเมนูเมื่อไม่มีการใช้งานนาน',
+    descriptionEn:
+      'A Pick or Pack screen on a Handheld that has had no tap or scan for this long goes back to the Handheld menu, so the next person to pick up the device starts from the menu and scans their own ID. Never while a pack timer is running. 0 = off. (Screens also go back to the menu on a new day.)',
+    descriptionTh:
+      'หน้า Pick หรือ Pack บนเครื่อง Handheld ที่ไม่มีการแตะหรือ scan นานเท่านี้ จะกลับไปหน้าเมนูเอง คนที่มารับเครื่องต่อจะเริ่มจากเมนูและ scan รหัสของตัวเอง — ไม่กลับระหว่างกำลังจับเวลาแพ็ก · 0 = ปิด (ข้ามวันก็กลับเมนูเช่นกัน)',
+    kind: 'integer',
+    unit: 'min',
+    min: 0,
+    max: 480,
+    defaultValue: String(HANDHELD_IDLE_DEFAULT),
   },
   {
     key: PACKING_LONG_SESSION_KEY,

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
-import { getPackMinDurationMinutes, getPackOrderLines, issueDeductPieces } from '@/lib/packing'
+import { cancelStalePackSessions, getPackMinDurationMinutes, getPackOrderLines, getPackingSettings, issueDeductPieces } from '@/lib/packing'
 
 /**
  * Public, unauthenticated API behind the Pack Handheld (/handheld/pack) -- same trust model as
@@ -88,6 +88,8 @@ export async function POST(request: Request) {
 async function scanOrder(db: Db, station: { station_code: string; warehouse_code: string | null }, picker: { picker_id: string; name: string }, rawOrderNo: string) {
   const orderNo = rawOrderNo.trim()
   if (!orderNo) return err('กรุณา scan เลข order · Order number is required')
+  // No packing carries over to a new day: clear yesterday's open sessions before anything else.
+  await cancelStalePackSessions(db)
 
   let q = db.from('orders').select('order_id, order_no, store_code, status, pack_status, warehouse_code, original_order_date').eq('order_no', orderNo)
   if (station.warehouse_code) q = q.eq('warehouse_code', station.warehouse_code)
@@ -104,8 +106,9 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
   }
   if (PACK_STATUS_ERROR[order.pack_status]) return err(PACK_STATUS_ERROR[order.pack_status], 409)
 
-  const [minMinutes, { lines, pieces }, { data: reasons }] = await Promise.all([
+  const [minMinutes, bands, { lines, pieces }, { data: reasons }] = await Promise.all([
     getPackMinDurationMinutes(db),
+    getPackingSettings(db),
     getPackOrderLines(db, order.order_id, { includeZero: true }),
     db.from('pack_issue_reasons').select('reason_code, label_en, label_th').eq('active', true).order('sort_order'),
   ])
@@ -117,7 +120,7 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
   if (order.pack_status === 'packing') {
     const { data: open } = await db.from('pack_sessions').select('session_id, picker_id, station_code, started_at').eq('order_id', order.order_id).is('finished_at', null).maybeSingle()
     if (open && open.picker_id === picker.picker_id) {
-      return NextResponse.json({ session: { session_id: open.session_id, started_at: open.started_at }, order: orderOut, min_minutes: minMinutes, server_now: new Date().toISOString(), resumed: true })
+      return NextResponse.json({ session: { session_id: open.session_id, started_at: open.started_at }, order: orderOut, min_minutes: minMinutes, bands: { yellow: bands.yellowMinutes, red: bands.redMinutes }, server_now: new Date().toISOString(), resumed: true })
     }
     return err(open ? `order นี้กำลังแพ็กโดย ${open.picker_id} ที่ Station ${open.station_code} · Being packed by someone else` : 'order นี้กำลังแพ็กอยู่ · Already being packed', 409)
   }
@@ -142,7 +145,7 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
   }
 
   await writeStatusHistory(db, { entityType: 'order_pack', entityId: order.order_id, oldStatus: 'pending', newStatus: 'packing', changedBy: null, reason: `${picker.picker_id} @ ${station.station_code}` })
-  return NextResponse.json({ session, order: orderOut, min_minutes: minMinutes, server_now: new Date().toISOString(), resumed: false }, { status: 201 })
+  return NextResponse.json({ session, order: orderOut, min_minutes: minMinutes, bands: { yellow: bands.yellowMinutes, red: bands.redMinutes }, server_now: new Date().toISOString(), resumed: false }, { status: 201 })
 }
 
 interface IssueLineInput {

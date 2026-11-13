@@ -78,8 +78,13 @@ export const HANDHELD_IDLE_DEFAULT = 60
 export const PACKING_MIN_DURATION_KEY = 'packing.min_duration_minutes'
 export const PACKING_MIN_DURATION_DEFAULT = 5
 /** Live Packing Monitor flags an order still being packed after this many minutes (red). */
+/** Packing time bands used everywhere a pack timer is coloured (Packing Dashboard, Live Packing
+ * Monitor, Pack Handheld): green below the yellow threshold, yellow from it, red from the red
+ * threshold. The yellow key keeps its original name ("long session") so values already set apply. */
 export const PACKING_LONG_SESSION_KEY = 'packing.long_session_minutes'
 export const PACKING_LONG_SESSION_DEFAULT = 30
+export const PACKING_RED_KEY = 'packing.red_minutes'
+export const PACKING_RED_DEFAULT = 60
 /** Packing Productivity: one target speed (pieces per hour) for every packer. */
 export const PACKING_TARGET_KEY = 'packing.target_pcs_per_hour'
 export const PACKING_TARGET_DEFAULT = 100
@@ -446,15 +451,28 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
   {
     key: PACKING_LONG_SESSION_KEY,
     category: 'packing',
-    labelEn: 'Packing taking too long after',
-    labelTh: 'แพ็กนานผิดปกติเมื่อเกิน',
-    descriptionEn: 'Live Packing Monitor highlights an order in red once it has been open (scanned to start, not finished) longer than this.',
-    descriptionTh: 'หน้า Live Packing Monitor จะแสดงสีแดงเมื่อ order ถูกเปิดงาน (scan เริ่มแล้วยังไม่ปิด) นานเกินเวลานี้',
+    labelEn: 'Packing time turns yellow at',
+    labelTh: 'เวลาแพ็กเริ่มเป็นสีเหลืองเมื่อ',
+    descriptionEn: 'Green below this, yellow from this. Used on Packing Dashboard, Live Packing Monitor and the Pack Handheld timer.',
+    descriptionTh: 'ต่ำกว่าค่านี้ = สีเขียว · ตั้งแต่ค่านี้ = สีเหลือง · ใช้กับ Packing Dashboard, Live Packing Monitor และแถบเวลาบน Handheld',
     kind: 'integer',
     unit: 'min',
     min: 1,
     max: 480,
-    defaultValue: String(30),
+    defaultValue: String(PACKING_LONG_SESSION_DEFAULT),
+  },
+  {
+    key: PACKING_RED_KEY,
+    category: 'packing',
+    labelEn: 'Packing time turns red at',
+    labelTh: 'เวลาแพ็กเริ่มเป็นสีแดงเมื่อ',
+    descriptionEn: 'Red from this. Must be more than the yellow threshold.',
+    descriptionTh: 'ตั้งแต่ค่านี้ = สีแดง · ต้องมากกว่าค่าสีเหลือง',
+    kind: 'integer',
+    unit: 'min',
+    min: 2,
+    max: 1440,
+    defaultValue: String(PACKING_RED_DEFAULT),
   },
   {
     key: PACKING_TARGET_KEY,

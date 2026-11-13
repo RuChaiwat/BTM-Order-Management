@@ -1,11 +1,16 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal, ModalFooter } from '../Modal'
 import { Spinner } from '../Spinner'
 import { apiFetch } from '../../lib/apiFetch'
+import { RISK_COLOR } from '../../lib/alertColors'
+import { packTimeBand, type PackTimeBand, type PackTimeBands } from '../../lib/packTimeBand'
 import type { LiveSession } from '../../lib/queries/packing'
+
+const PER_ROW = 10
+const IDLE_COLOR = '#9CA3AF'
 
 function elapsed(fromIso: string, now: number) {
   const s = Math.max(0, Math.floor((now - new Date(fromIso).getTime()) / 1000))
@@ -14,15 +19,24 @@ function elapsed(fromIso: string, now: number) {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
 
-/** Who is packing what right now, at which station, for how long. Red = open longer than
- * Configuration > Packing > "Packing taking too long after"; amber = started on a previous day
- * (should be checked and cancelled at end of day). Cancel is for the Pack Supervisor only --
- * Warehouse Manager sees this screen read-only. */
-export function LivePackMonitor({ live, idleStations, longMinutes, canCancel }: { live: LiveSession[]; idleStations: { station_code: string; name: string }[]; longMinutes: number; canCancel: boolean }) {
+type Filter = 'all' | PackTimeBand | 'idle'
+
+/**
+ * Live Packing Monitor as one floor map: every active Pack Station in station order, 10 per row,
+ * so a station keeps its place whatever its state. A packing station shows a header coloured by
+ * how long its order has been open (Configuration > Packing: green / yellow / red), the station,
+ * the packer's Thai name, the running time and the order no.; an idle station is a plain grey tile.
+ * The chips on top count each state and dim the rest of the map when clicked. Cancelling is behind
+ * a click on the tile (details + reason), so it can't be hit by accident; Warehouse Manager sees the
+ * map read-only. Sessions left open from a previous day are cancelled by the system (midnight cron,
+ * and again whenever this page loads).
+ */
+export function LivePackMonitor({ live, idleStations, bands, canCancel }: { live: LiveSession[]; idleStations: { station_code: string; name: string }[]; bands: PackTimeBands; canCancel: boolean }) {
   const router = useRouter()
   const [isRefreshing, startRefresh] = useTransition()
   const [now, setNow] = useState(Date.now())
-  const [cancelling, setCancelling] = useState<LiveSession | null>(null)
+  const [filter, setFilter] = useState<Filter>('all')
+  const [selected, setSelected] = useState<LiveSession | null>(null)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -32,19 +46,35 @@ export function LivePackMonitor({ live, idleStations, longMinutes, canCancel }: 
     return () => clearInterval(t)
   }, [])
 
-  const isLong = (s: LiveSession) => now - new Date(s.started_at).getTime() > longMinutes * 60_000
-  const longCount = live.filter(isLong).length
-  const carriedCount = live.filter((s) => s.carriedOver).length
+  const bandOf = (s: LiveSession): PackTimeBand => packTimeBand((now - new Date(s.started_at).getTime()) / 60000, bands)
+
+  // Every station on the floor, natural order (PK2 before PK10); a station with an open session
+  // that is no longer in the active list still shows so the session can be seen and cancelled.
+  const tiles = useMemo(() => {
+    const byStation = new Map<string, LiveSession>()
+    for (const s of live) {
+      const cur = byStation.get(s.station_code)
+      if (!cur || s.started_at < cur.started_at) byStation.set(s.station_code, s)
+    }
+    const codes = new Set([...idleStations.map((s) => s.station_code), ...byStation.keys()])
+    return [...codes].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map((code) => ({ code, session: byStation.get(code) ?? null }))
+  }, [live, idleStations])
+
+  const counts = { green: 0, yellow: 0, red: 0, idle: 0 }
+  for (const t of tiles) {
+    if (t.session) counts[bandOf(t.session)]++
+    else counts.idle++
+  }
 
   async function doCancel() {
-    if (!cancelling) return
+    if (!selected) return
     setBusy(true)
     setError(null)
     try {
-      const res = await apiFetch('/api/pack-sessions/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: cancelling.session_id, reason }) })
+      const res = await apiFetch('/api/pack-sessions/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: selected.session_id, reason }) })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error)
-      setCancelling(null)
+      setSelected(null)
       setReason('')
       startRefresh(() => router.refresh())
     } catch (e) {
@@ -54,133 +84,134 @@ export function LivePackMonitor({ live, idleStations, longMinutes, canCancel }: 
     }
   }
 
-  const kpi = (label: string, th: string, value: number, color?: string) => (
-    <div className="kpi-card" style={{ padding: 14 }}>
-      <div className="kpi-label">{label}</div>
-      <div className="kpi-label-th">{th}</div>
-      <div className="kpi-value compact" style={color ? { color } : undefined}>
-        {value.toLocaleString()}
-      </div>
-    </div>
-  )
+  const Y = bands.yellowMinutes
+  const R = bands.redMinutes
+  const chips: { key: Filter; color?: string; text: string; n: number }[] = [
+    { key: 'all', text: 'ทั้งหมด', n: tiles.length },
+    { key: 'green', color: RISK_COLOR.green, text: `< ${Y} นาที`, n: counts.green },
+    { key: 'yellow', color: RISK_COLOR.yellow, text: `${Y}–${R - 1} นาที`, n: counts.yellow },
+    { key: 'red', color: RISK_COLOR.red, text: `≥ ${R} นาที`, n: counts.red },
+    { key: 'idle', color: IDLE_COLOR, text: 'ว่าง', n: counts.idle },
+  ]
 
   return (
     <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        {kpi('PACKING NOW', 'กำลังแพ็ก', live.length)}
-        {kpi('TOO LONG', `เกิน ${longMinutes} นาที`, longCount, longCount ? 'var(--color-danger)' : undefined)}
-        {kpi('CARRIED OVER', 'ค้างจากวันก่อน', carriedCount, carriedCount ? 'var(--color-warning-dark)' : undefined)}
-        {kpi('IDLE STATIONS', 'Station ว่าง', idleStations.length)}
-      </div>
-
       <div className="card">
-        <div className="card-title">Active packing</div>
-        <div className="card-subtitle" style={{ marginBottom: 10 }}>
-          งานที่ scan เริ่มแล้วยังไม่ปิด · สีแดง = นานเกินกำหนด · สีส้ม = ค้างข้ามวัน ต้องตรวจสอบและยกเลิก
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+          <span className="card-title">Pack stations</span>
+          <span className="card-subtitle">
+            กำลังแพ็ก {(tiles.length - counts.idle).toLocaleString()} (Station) · ว่าง {counts.idle.toLocaleString()} (Station) · เรียงตามรหัส Station แถวละ {PER_ROW}
+            {canCancel ? ' · กดที่กล่องเพื่อดูรายละเอียด / ยกเลิกงาน' : ''}
+          </span>
         </div>
-        {error && <div style={{ marginBottom: 8, fontSize: 12.5, color: 'var(--color-danger)' }}>{error}</div>}
-        <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
-          <colgroup>
-            <col style={{ width: '16%' }} />
-            <col style={{ width: '28%' }} />
-            <col style={{ width: '18%' }} />
-            <col style={{ width: '8%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '16%' }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>STATION</th>
-              <th>PACKER</th>
-              <th>ORDER</th>
-              <th>PCS</th>
-              <th>ELAPSED</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {live.map((s) => {
-              const long = isLong(s)
-              const bg = s.carriedOver ? 'var(--color-warning-bg)' : long ? 'var(--color-danger-bg)' : undefined
-              const fg = s.carriedOver ? 'var(--color-warning-dark)' : long ? 'var(--color-danger-dark)' : undefined
-              return (
-                <tr key={s.session_id} style={{ background: bg, color: fg }}>
-                  <td style={{ fontWeight: 700 }}>
-                    {s.station_code}
-                    {s.stationName && <div style={{ fontSize: 11, fontWeight: 400 }}>{s.stationName}</div>}
-                  </td>
-                  <td style={{ overflowWrap: 'break-word' }}>
-                    {s.pickerName}
-                    <div style={{ fontSize: 11 }}>{s.picker_id}</div>
-                  </td>
-                  <td style={{ fontWeight: 700 }}>{s.order_no}</td>
-                  <td>{s.pieces.toLocaleString()}</td>
-                  <td style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                    {elapsed(s.started_at, now)}
-                    {s.carriedOver && <div style={{ fontSize: 11, fontWeight: 400 }}>เริ่ม {new Date(s.started_at).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>}
-                  </td>
-                  <td>
-                    {canCancel && (
-                      <button className="btn btn-danger-outline btn-sm" disabled={busy || isRefreshing} onClick={() => setCancelling(s)}>
-                        ยกเลิกงาน
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-            {live.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
-                  ตอนนี้ไม่มีใครกำลังแพ็ก · Nobody is packing right now.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
 
-      <div className="card">
-        <div className="card-title">Idle stations</div>
-        <div className="card-subtitle" style={{ marginBottom: 10 }}>
-          Station ที่ Active แต่ไม่มีงานเปิดอยู่
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {idleStations.map((s) => (
-            <span key={s.station_code} className="badge badge-neutral" style={{ fontSize: 12, padding: '4px 10px' }}>
-              {s.station_code} · {s.name}
-            </span>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0 12px' }}>
+          {chips.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => setFilter(c.key)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 12.5,
+                padding: '5px 12px',
+                borderRadius: 999,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                border: `1px solid ${filter === c.key ? 'var(--color-text)' : 'var(--color-border)'}`,
+                background: filter === c.key ? 'var(--color-bg-subtle, #F3F4F6)' : 'transparent',
+                fontWeight: filter === c.key ? 700 : 500,
+              }}
+            >
+              {c.color && <span style={{ width: 9, height: 9, borderRadius: '50%', background: c.color }} />}
+              {c.text} <b>{c.n.toLocaleString()}</b> (Station)
+            </button>
           ))}
-          {idleStations.length === 0 && <span style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>—</span>}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PER_ROW}, minmax(0, 1fr))`, gap: 6 }}>
+          {tiles.map(({ code, session: s }) => {
+            const band = s ? bandOf(s) : null
+            const dim = filter !== 'all' && (filter === 'idle' ? !!s : band !== filter)
+            if (!s) {
+              return (
+                <div
+                  key={code}
+                  style={{ opacity: dim ? 0.25 : 1, minHeight: 92, borderRadius: 8, border: '1px dashed #D1D5DB', background: '#F3F4F6', color: '#6B7280', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{code}</div>
+                  <div>ว่าง</div>
+                </div>
+              )
+            }
+            const color = RISK_COLOR[band!]
+            return (
+              <button
+                key={code}
+                type="button"
+                onClick={() => {
+                  setError(null)
+                  setReason('')
+                  setSelected(s)
+                }}
+                title={`${s.pickerName} · ${s.order_no}`}
+                style={{ opacity: dim ? 0.25 : 1, minHeight: 92, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface, #fff)', padding: 0, overflow: 'hidden', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit', color: 'inherit' }}
+              >
+                <div style={{ background: color, color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '2px 0' }}>{s.carriedOver ? 'ค้างข้ามวัน' : band === 'green' ? `< ${Y} นาที` : band === 'yellow' ? `${Y}–${R - 1} นาที` : `≥ ${R} นาที`}</div>
+                <div style={{ fontWeight: 700, fontSize: 13.5, marginTop: 3 }}>{code}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 4px' }}>{s.pickerName}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: band === 'green' ? undefined : color }}>{elapsed(s.started_at, now)}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 4px 4px' }}>{s.order_no}</div>
+              </button>
+            )
+          })}
+          {tiles.length === 0 && <div style={{ gridColumn: '1 / -1', color: 'var(--color-text-secondary)', fontSize: 13 }}>ยังไม่มี Pack Station ที่ Active · ตั้งค่าได้ที่ Pack Settings</div>}
         </div>
       </div>
 
-      {cancelling && (
-        <Modal title={`Cancel packing ${cancelling.order_no}?`} subtitle="ยกเลิกงานที่เปิดค้าง · order กลับไปรอแพ็ก" onSubmit={doCancel}>
-          <div className="modal-body">
-            งานของ <strong>{cancelling.pickerName}</strong> ที่ Station <strong>{cancelling.station_code}</strong> จะถูกยกเลิก ไม่นับเป็น Productivity และ order จะกลับไปที่สถานะ <strong>รอแพ็ก</strong>
+      {selected && (
+        <Modal title={`Station ${selected.station_code} · ${selected.order_no}`} subtitle="รายละเอียดงานที่กำลังแพ็ก" onSubmit={doCancel}>
+          <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '120px 1fr', rowGap: 6, fontSize: 13.5 }}>
+            <span style={{ color: 'var(--color-text-secondary)' }}>Packer</span>
+            <span>
+              <b>{selected.pickerName}</b> ({selected.picker_id})
+            </span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>Order</span>
+            <span>
+              <b>{selected.order_no}</b> · {selected.pieces.toLocaleString()} ชิ้น
+            </span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>เริ่มแพ็ก</span>
+            <span>{new Date(selected.started_at).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>เวลาที่ใช้</span>
+            <span style={{ fontWeight: 700, color: bandOf(selected) === 'green' ? undefined : RISK_COLOR[bandOf(selected)] }}>{elapsed(selected.started_at, now)}</span>
           </div>
-          <div style={{ padding: '12px 24px 0' }}>
-            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>
-              เหตุผล <span style={{ color: '#DC2626' }}>*</span>
+          {canCancel && (
+            <div style={{ padding: '12px 24px 0' }}>
+              <div style={{ fontSize: 12.5, marginBottom: 8, color: 'var(--color-text-secondary)' }}>ยกเลิกงาน: ไม่นับเป็น Productivity และ order จะกลับไปที่สถานะ รอแพ็ก</div>
+              <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>
+                เหตุผล <span style={{ color: '#DC2626' }}>*</span>
+              </div>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="เช่น scan order ผิด / พนักงานออกกะโดยไม่ปิดงาน"
+                style={{ width: '100%', minHeight: 64, border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 13.5, fontFamily: 'inherit' }}
+              />
+              {error && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
             </div>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="เช่น scan order ผิด / พนักงานออกกะโดยไม่ปิดงาน"
-              style={{ width: '100%', minHeight: 70, border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 13.5, fontFamily: 'inherit' }}
-              autoFocus
-            />
-            {error && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
-          </div>
+          )}
           <ModalFooter>
-            <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setCancelling(null)}>
+            <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setSelected(null)}>
               Close
             </button>
-            <button type="submit" className="modal-footer-btn btn-danger" style={{ minWidth: 150, border: 0 }} disabled={!reason.trim() || busy}>
-              {busy && <Spinner />}
-              ยกเลิกงาน
-            </button>
+            {canCancel && (
+              <button type="submit" className="modal-footer-btn btn-danger" style={{ minWidth: 150, border: 0 }} disabled={!reason.trim() || busy || isRefreshing}>
+                {busy && <Spinner />}
+                ยกเลิกงาน
+              </button>
+            )}
           </ModalFooter>
         </Modal>
       )}

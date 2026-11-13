@@ -116,6 +116,7 @@ export function PackHandheldBoard() {
   const [order, setOrder] = useState<PackOrder | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [minMinutes, setMinMinutes] = useState(5)
+  const [bands, setBands] = useState({ yellow: 30, red: 60 })
   const [clockOffset, setClockOffset] = useState(0) // server time - device time, ms
   const [now, setNow] = useState(Date.now())
   const [scan, setScan] = useState('')
@@ -256,6 +257,7 @@ export function PackHandheldBoard() {
         setOrder(body.order)
         setSession(body.session)
         setMinMinutes(body.min_minutes)
+        if (body.bands) setBands(body.bands)
         setClockOffset(new Date(body.server_now).getTime() - Date.now())
         setNow(Date.now())
         setNotice(body.resumed ? 'กลับมาทำงานที่เปิดค้างไว้ต่อ · Resumed your open order' : null)
@@ -353,10 +355,10 @@ export function PackHandheldBoard() {
 
   const stepNo: 1 | 2 | 3 = step === 'station' ? 1 : step === 'picker' ? 2 : 3
   const stepColor = STEP_COLOR[stepNo]
-  // Same time bands as Packing Dashboard: < 30 min green, 30-60 yellow, >= 60 red.
+  // Same time bands as Packing Dashboard and Live Packing Monitor (Configuration > Packing).
   const timing = (step === 'packing' || step === 'finish') && !!session
   const elapsedMin = elapsedSec / 60
-  const timeColor = elapsedMin >= 60 ? RISK_COLOR.red : elapsedMin >= 30 ? RISK_COLOR.yellow : RISK_COLOR.green
+  const timeColor = elapsedMin >= bands.red ? RISK_COLOR.red : elapsedMin >= bands.yellow ? RISK_COLOR.yellow : RISK_COLOR.green
   const prompt =
     step === 'station'
       ? { title: 'Scan Station', th: 'สแกนบาร์โค้ด Station ที่ทำงาน' }

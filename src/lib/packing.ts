@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getActiveConfig } from './queries/config'
-import { PACKING_LONG_SESSION_DEFAULT, PACKING_LONG_SESSION_KEY, PACKING_MIN_DURATION_DEFAULT, PACKING_MIN_DURATION_KEY, PACKING_TARGET_DEFAULT, PACKING_TARGET_KEY } from './configCatalog'
+import { PACKING_LONG_SESSION_DEFAULT, PACKING_LONG_SESSION_KEY, PACKING_MIN_DURATION_DEFAULT, PACKING_MIN_DURATION_KEY, PACKING_RED_DEFAULT, PACKING_RED_KEY, PACKING_TARGET_DEFAULT, PACKING_TARGET_KEY } from './configCatalog'
+import { bangkokDateKey, bangkokDayRange } from './formatDate'
+import { writeAudit, writeStatusHistory } from './audit'
 
 /** orders.pack_status values (migration 0035). NULL = the order never entered packing. */
 export type PackStatus = 'pending' | 'packing' | 'packed' | 'issue' | 'confirmed'
@@ -19,15 +21,54 @@ export async function getPackMinDurationMinutes(db: SupabaseClient): Promise<num
   return Number.isFinite(raw) && raw >= 0 ? Math.min(120, Math.round(raw)) : PACKING_MIN_DURATION_DEFAULT
 }
 
-/** The other two Packing settings: long-running threshold (minutes) and target pcs/hr. */
-export async function getPackingSettings(db: SupabaseClient) {
-  const cfg = await getActiveConfig(db, [PACKING_LONG_SESSION_KEY, PACKING_TARGET_KEY])
-  const long = Number(cfg.value(PACKING_LONG_SESSION_KEY))
-  const target = Number(cfg.value(PACKING_TARGET_KEY))
-  return {
-    longSessionMinutes: Number.isFinite(long) && long > 0 ? Math.round(long) : PACKING_LONG_SESSION_DEFAULT,
-    targetPcsPerHour: Number.isFinite(target) && target >= 0 ? Math.round(target) : PACKING_TARGET_DEFAULT,
+import type { PackTimeBands } from './packTimeBand'
+export { packTimeBand, type PackTimeBand, type PackTimeBands } from './packTimeBand'
+
+/** Packing settings: the green/yellow/red time bands and the target pcs/hr. */
+export async function getPackingSettings(db: SupabaseClient): Promise<PackTimeBands & { targetPcsPerHour: number }> {
+  const cfg = await getActiveConfig(db, [PACKING_LONG_SESSION_KEY, PACKING_RED_KEY, PACKING_TARGET_KEY])
+  const num = (key: string) => {
+    const raw = cfg.value(key)
+    const n = Number(raw)
+    return raw === undefined || raw === null || raw === '' || !Number.isFinite(n) ? null : n
   }
+  const yellow = num(PACKING_LONG_SESSION_KEY)
+  const red = num(PACKING_RED_KEY)
+  const target = num(PACKING_TARGET_KEY)
+  const yellowMinutes = yellow !== null && yellow > 0 ? Math.round(yellow) : PACKING_LONG_SESSION_DEFAULT
+  let redMinutes = red !== null && red > 0 ? Math.round(red) : PACKING_RED_DEFAULT
+  if (redMinutes <= yellowMinutes) redMinutes = yellowMinutes + 1 // never overlapping bands
+  return { yellowMinutes, redMinutes, targetPcsPerHour: target !== null && target >= 0 ? Math.round(target) : PACKING_TARGET_DEFAULT }
+}
+
+/**
+ * No packing carries over to the next day (client rule): every pack session still open that
+ * started before today (Bangkok) is cancelled -- never counted in productivity -- and its order
+ * goes back to waiting to pack. Run by the daily cron just after midnight and, as a safety net
+ * for the cron's loose timing, whenever Live Packing Monitor loads or a packer scans an order.
+ * Returns how many sessions were cancelled.
+ */
+export async function cancelStalePackSessions(db: SupabaseClient): Promise<number> {
+  const { sinceIso: todayStart } = bangkokDayRange(bangkokDateKey(new Date())!)
+  const { data: stale } = await db.from('pack_sessions').select('session_id').is('finished_at', null).lt('started_at', todayStart).limit(500)
+  if (!stale || stale.length === 0) return 0
+  const reason = 'ระบบยกเลิกอัตโนมัติ: ค้างข้ามวัน · Auto-cancelled, carried over to a new day'
+  let n = 0
+  for (const { session_id } of stale) {
+    const { data: s } = await db
+      .from('pack_sessions')
+      .update({ finished_at: new Date().toISOString(), result: 'cancelled', cancelled_by: null, cancel_reason: reason })
+      .eq('session_id', session_id)
+      .is('finished_at', null)
+      .select('session_id, order_id, picker_id, station_code, started_at')
+      .maybeSingle()
+    if (!s) continue // finished or cancelled meanwhile
+    n++
+    await db.from('orders').update({ pack_status: 'pending' }).eq('order_id', s.order_id).eq('pack_status', 'packing')
+    await writeStatusHistory(db, { entityType: 'order_pack', entityId: s.order_id, oldStatus: 'packing', newStatus: 'pending', changedBy: null, reason })
+    await writeAudit(db, { userId: null, action: 'pack.auto_cancel_session', entityType: 'orders', entityId: s.order_id, after: { ...s, reason } })
+  }
+  return n
 }
 
 /** Pieces a finished pack session earns for productivity: the order's pieces minus the pieces the

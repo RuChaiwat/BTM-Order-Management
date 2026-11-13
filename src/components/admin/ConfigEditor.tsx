@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CONFIG_CATEGORIES, CONFIG_FIELDS, CONFIG_FIELD_BY_KEY, toDisplayValue, fromDisplayValue } from '@/lib/configCatalog'
+import { CONFIG_CATEGORIES, CONFIG_FIELDS, CONFIG_FIELD_BY_KEY, PACKING_LONG_SESSION_KEY, PACKING_RED_KEY, toDisplayValue, fromDisplayValue } from '@/lib/configCatalog'
 
 interface ConfigRow {
   key: string
@@ -164,9 +164,35 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
                 )
               })}
             </div>
+            {cat.id === 'packing' && <PackBandPreview yellow={Number(displayFor(PACKING_LONG_SESSION_KEY))} red={Number(displayFor(PACKING_RED_KEY))} />}
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** What the two Packing time thresholds mean, shown as the three colour bands (follows unsaved edits). */
+function PackBandPreview({ yellow, red }: { yellow: number; red: number }) {
+  const ok = Number.isFinite(yellow) && Number.isFinite(red) && yellow > 0 && red > yellow
+  const chip = (color: string, text: string) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginRight: 14 }}>
+      <span style={{ width: 12, height: 12, borderRadius: 3, background: color }} />
+      {text}
+    </span>
+  )
+  return (
+    <div style={{ fontSize: 12.5, marginTop: 8, padding: '8px 12px', border: '1px dashed var(--color-border)', borderRadius: 8 }}>
+      <b>สีเวลาแพ็ก:</b>{' '}
+      {ok ? (
+        <>
+          {chip('#16A34A', `0 – ${yellow - 1} นาที`)}
+          {chip('#F59E0B', `${yellow} – ${red - 1} นาที`)}
+          {chip('#DC2626', `${red} นาทีขึ้นไป`)}
+        </>
+      ) : (
+        <span style={{ color: 'var(--color-danger)' }}>ค่าสีแดงต้องมากกว่าค่าสีเหลือง</span>
+      )}
     </div>
   )
 }

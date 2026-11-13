@@ -11,6 +11,7 @@ import { canAccessMenuItem } from '@/lib/roles'
 import { getLiveMonitorData, getPackIssueList, getPackingDashboardData } from '@/lib/queries/packing'
 import { getPackVerifyQueue } from '@/lib/queries/packVerification'
 import { RISK_COLOR } from '@/lib/alertColors'
+import { getPackingSettings, packTimeBand } from '@/lib/packing'
 import { getRefreshIntervalMs } from '@/lib/queries/config'
 import { AUTO_REFRESH_KEYS } from '@/lib/configCatalog'
 
@@ -22,12 +23,7 @@ function hm(minutes: number) {
 
 const minsSince = (iso: string | null) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : 0)
 
-/** Stations packing right now, by how long their current order has been open (client thresholds). */
-const TIME_BUCKETS = [
-  { key: 'green', label: 'PACKING < 30 MIN', th: 'ใช้เวลาแพ็กน้อยกว่า 30 นาที (Station)', test: (m: number) => m < 30 },
-  { key: 'yellow', label: 'PACKING 30–60 MIN', th: 'ใช้เวลาแพ็ก 30–60 นาที (Station)', test: (m: number) => m >= 30 && m < 60 },
-  { key: 'red', label: 'PACKING ≥ 60 MIN', th: 'ใช้เวลาแพ็ก 60 นาทีขึ้นไป (Station)', test: (m: number) => m >= 60 },
-] as const
+
 
 export default async function PackingDashboardPage() {
   const user = await getSessionUser()
@@ -35,21 +31,33 @@ export default async function PackingDashboardPage() {
   requireMenuAccess(user.role, 21)
   const admin = createAdminClient()
   const warehouseCode = user.warehouse_code ?? 'DC002'
-  const [d, refreshMs, monitor, issueList, verifyQueue] = await Promise.all([
+  const [d, refreshMs, monitor, issueList, verifyQueue, bands] = await Promise.all([
     getPackingDashboardData(admin, warehouseCode),
     getRefreshIntervalMs(admin, AUTO_REFRESH_KEYS.packingDashboard),
     getLiveMonitorData(admin, warehouseCode),
     // resolvedSince = now -> open/investigating issues only
     getPackIssueList(admin, warehouseCode, new Date().toISOString()),
     getPackVerifyQueue(admin, warehouseCode),
+    getPackingSettings(admin),
   ])
+  const { yellowMinutes: Y, redMinutes: R } = bands
+  // Stations packing right now, by how long their current order has been open (Configuration > Packing).
+  const TIME_BUCKETS = [
+    { key: 'green', label: `PACKING < ${Y} MIN`, th: `ใช้เวลาแพ็กน้อยกว่า ${Y} นาที (Station)` },
+    { key: 'yellow', label: `PACKING ${Y}–${R - 1} MIN`, th: `ใช้เวลาแพ็ก ${Y}–${R - 1} นาที (Station)` },
+    { key: 'red', label: `PACKING ≥ ${R} MIN`, th: `ใช้เวลาแพ็ก ${R} นาทีขึ้นไป (Station)` },
+  ] as const
+  const timeColor = (m: number) => {
+    const b = packTimeBand(m, bands)
+    return b === 'green' ? undefined : RISK_COLOR[b]
+  }
 
   // One open session per station is the norm; if a station somehow has two, its longest one counts.
   const stationMinutes = new Map<string, number>()
   for (const s of monitor.live) stationMinutes.set(s.station_code, Math.max(stationMinutes.get(s.station_code) ?? 0, minsSince(s.started_at)))
   const activeStations = stationMinutes.size
   const buckets = TIME_BUCKETS.map((b) => {
-    const codes = [...stationMinutes].filter(([, m]) => b.test(m)).map(([code]) => code)
+    const codes = [...stationMinutes].filter(([, m]) => packTimeBand(m, bands) === b.key).map(([code]) => code)
     return { ...b, codes }
   })
   const topIssues = issueList
@@ -184,7 +192,7 @@ export default async function PackingDashboardPage() {
                     <td>{i.station_code ?? '—'}</td>
                     <td style={{ overflowWrap: 'break-word' }}>{i.reasons.join(', ') || '—'}</td>
                     <td>{i.pieces.toLocaleString()}</td>
-                    <td style={{ fontWeight: 700, color: minsSince(i.reported_at) >= 60 ? RISK_COLOR.red : minsSince(i.reported_at) >= 30 ? RISK_COLOR.yellow : undefined }}>{hm(minsSince(i.reported_at))}</td>
+                    <td style={{ fontWeight: 700, color: timeColor(minsSince(i.reported_at)) }}>{hm(minsSince(i.reported_at))}</td>
                     <td>
                       <span className={`badge ${i.status === 'open' ? 'badge-danger' : 'badge-warning'}`} style={{ fontSize: 10 }}>
                         {i.status === 'open' ? 'ยังไม่รับเรื่อง' : 'กำลังตรวจสอบ'}
@@ -240,7 +248,7 @@ export default async function PackingDashboardPage() {
                     <td style={{ overflowWrap: 'break-word' }}>{o.store_code}</td>
                     <td style={{ overflowWrap: 'break-word' }}>{o.packerName}</td>
                     <td>{o.pieces.toLocaleString()}</td>
-                    <td style={{ fontWeight: 700, color: o.waitMinutes >= 60 ? RISK_COLOR.red : o.waitMinutes >= 30 ? RISK_COLOR.yellow : undefined }}>{hm(o.waitMinutes)}</td>
+                    <td style={{ fontWeight: 700, color: timeColor(o.waitMinutes) }}>{hm(o.waitMinutes)}</td>
                     <td>
                       <span className={`badge ${o.isShort ? 'badge-warning' : o.hadIssue ? 'badge-danger' : 'badge-success'}`} style={{ fontSize: 10 }}>
                         {o.isShort ? 'Short' : o.hadIssue ? 'เคยมีปัญหา' : 'ครบ'}

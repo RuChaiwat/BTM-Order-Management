@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
+import { PACKING_LONG_SESSION_DEFAULT, PACKING_LONG_SESSION_KEY, PACKING_RED_DEFAULT, PACKING_RED_KEY } from '@/lib/configCatalog'
 
 /**
  * §17 governance: a config change creates a new version rather than mutating the active row —
@@ -24,6 +25,18 @@ export async function PATCH(request: Request) {
 
   const admin = createAdminClient()
   const effectiveScope = scope ?? 'global'
+
+  // Packing time bands: red must start after yellow, so the three colours never overlap or leave a gap.
+  if (key === PACKING_LONG_SESSION_KEY || key === PACKING_RED_KEY) {
+    const otherKey = key === PACKING_RED_KEY ? PACKING_LONG_SESSION_KEY : PACKING_RED_KEY
+    const { data: other } = await admin.from('configuration').select('value').eq('key', otherKey).eq('scope', effectiveScope).eq('active', true).maybeSingle()
+    const otherVal = Number(other?.value ?? (otherKey === PACKING_RED_KEY ? PACKING_RED_DEFAULT : PACKING_LONG_SESSION_DEFAULT))
+    const yellow = key === PACKING_LONG_SESSION_KEY ? Number(value) : otherVal
+    const red = key === PACKING_RED_KEY ? Number(value) : otherVal
+    if (!(red > yellow)) {
+      return NextResponse.json({ error: `สีแดง (${red} นาที) ต้องมากกว่าสีเหลือง (${yellow} นาที) · Red must be more than yellow` }, { status: 400 })
+    }
+  }
   const reason = change_reason || 'Updated from Configuration settings'
 
   const { data: current } = await admin

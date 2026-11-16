@@ -96,7 +96,8 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
   useEffect(() => {
     if (initialIssueId) {
       setSelectedId(initialIssueId)
-      setFilter('all')
+      // Stay on "ยังไม่ปิด" (new and open issues); only a closed issue needs the wider list.
+      setFilter(issues.find((i) => i.issue_id === initialIssueId)?.status === 'resolved' ? 'all' : 'unresolved')
       setStation('')
     }
   }, [initialIssueId])
@@ -125,10 +126,16 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
     }
   }, [])
 
+  // Reload the detail when the selected issue changes on the server too (e.g. รับเรื่อง from the
+  // pop-up while it is already open here), so the panel never lags behind the list.
+  const selectedStamp = (() => {
+    const i = issues.find((x) => x.issue_id === effectiveId)
+    return i ? `${i.status}|${i.acknowledgedBy ?? ''}` : ''
+  })()
   useEffect(() => {
     if (effectiveId) load(effectiveId)
     else setDetail(null)
-  }, [effectiveId, load])
+  }, [effectiveId, selectedStamp, load])
 
   async function act(payload: Record<string, unknown>) {
     if (!detail) return

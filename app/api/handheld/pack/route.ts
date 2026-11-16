@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
-import { cancelStalePackSessions, getPackMinDurationMinutes, getPackOrderLines, getPackingSettings, issueDeductPieces, packCarryFor, previousPackIssue } from '@/lib/packing'
+import { PACK_ROOT_CAUSES, cancelStalePackSessions, getPackMinDurationMinutes, getPackOrderLines, getPackingSettings, issueDeductPieces, packCarryFor, previousPackIssue } from '@/lib/packing'
 
 /**
  * Public, unauthenticated API behind the Pack Handheld (/handheld/pack) -- same trust model as
@@ -75,20 +75,60 @@ async function stationConflict(db: Db, stationCode: string, pickerId: string): P
   return null
 }
 
+/**
+ * Orders Admin fixed and sent back to pack (Pack Issue Investigation -> ส่งกลับไปรอแพ็ก) that
+ * nobody has picked up yet -- listed on the Handheld once the Station is scanned so packers know
+ * to continue them. This station's own orders first, then oldest sent back first.
+ */
+async function returnedOrders(db: Db, warehouseCode: string | null, stationCode: string) {
+  let q = db
+    .from('pack_issues')
+    .select('order_id, station_code, picker_id, root_cause, resolution_note, resolved_at')
+    .eq('status', 'resolved')
+    .eq('resolution', 'returned_to_pack')
+    .order('resolved_at', { ascending: false })
+    .limit(300)
+  if (warehouseCode) q = q.eq('warehouse_code', warehouseCode)
+  const { data: issues } = await q
+  const latest = new Map<string, NonNullable<typeof issues>[number]>()
+  for (const i of issues ?? []) if (!latest.has(i.order_id)) latest.set(i.order_id, i)
+  if (latest.size === 0) return []
+  const { data: orders } = await db.from('orders').select('order_id, order_no, pack_status').in('order_id', [...latest.keys()]).eq('pack_status', 'pending')
+  if (!orders || orders.length === 0) return []
+  const pickerIds = [...new Set(orders.map((o) => latest.get(o.order_id)!.picker_id).filter(Boolean))] as string[]
+  const { data: pickers } = pickerIds.length ? await db.from('pickers').select('picker_id, name_en, name_th').in('picker_id', pickerIds) : { data: [] }
+  const nameOf = new Map((pickers ?? []).map((p) => [p.picker_id, p.name_th || p.name_en]))
+  return orders
+    .map((o) => {
+      const i = latest.get(o.order_id)!
+      return {
+        order_no: o.order_no,
+        station_code: i.station_code,
+        here: i.station_code === stationCode,
+        reported_by: i.picker_id ? nameOf.get(i.picker_id) ?? i.picker_id : null,
+        root_cause: PACK_ROOT_CAUSES.find((r) => r.code === i.root_cause)?.th ?? i.root_cause ?? null,
+        note: i.resolution_note ?? null,
+        returned_at: i.resolved_at as string,
+      }
+    })
+    .sort((a, b) => Number(b.here) - Number(a.here) || a.returned_at.localeCompare(b.returned_at))
+    .slice(0, 20)
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const db = createAdminClient()
   const s = await loadStation(db, searchParams.get('station'))
   if (!s.station) return err(s.error!, 404)
   const station = { station_code: s.station.station_code, name: s.station.name }
-  if (!searchParams.has('picker')) return NextResponse.json({ station })
+  if (!searchParams.has('picker')) return NextResponse.json({ station, returned_orders: await returnedOrders(db, s.station.warehouse_code, s.station.station_code) })
   const p = await loadPicker(db, searchParams.get('picker'), s.station.warehouse_code)
   if (!p.picker) return err(p.error!, 404)
   // Clear yesterday's leftovers first so a forgotten order can't lock a station into a new day.
   await cancelStalePackSessions(db)
   const conflict = await stationConflict(db, s.station.station_code, p.picker.picker_id)
   if (conflict) return err(conflict, 409)
-  return NextResponse.json({ station, picker: p.picker })
+  return NextResponse.json({ station, picker: p.picker, returned_orders: await returnedOrders(db, s.station.warehouse_code, s.station.station_code) })
 }
 
 const PACK_STATUS_ERROR: Record<string, string> = {

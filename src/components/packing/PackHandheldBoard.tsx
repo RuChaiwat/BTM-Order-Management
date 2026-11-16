@@ -47,6 +47,16 @@ interface Session {
   /** seconds carried over from an earlier attempt paused by a reported problem */
   carried_seconds?: number
 }
+/** An order Admin fixed and sent back to pack, not picked up yet. */
+interface ReturnedOrder {
+  order_no: string
+  station_code: string | null
+  here: boolean
+  reported_by: string | null
+  root_cause: string | null
+  note: string | null
+  returned_at: string
+}
 /** What an earlier attempt of this order reported, and what Admin found, before sending it back. */
 interface PreviousIssue {
   root_cause: string | null
@@ -124,6 +134,7 @@ export function PackHandheldBoard() {
   const [order, setOrder] = useState<PackOrder | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [prevIssue, setPrevIssue] = useState<PreviousIssue | null>(null)
+  const [returned, setReturned] = useState<ReturnedOrder[]>([])
   const [minMinutes, setMinMinutes] = useState(5)
   const [bands, setBands] = useState({ yellow: 30, red: 60 })
   const [clockOffset, setClockOffset] = useState(0) // server time - device time, ms
@@ -215,6 +226,7 @@ export function PackHandheldBoard() {
     setOrder(null)
     setSession(null)
     setPrevIssue(null)
+    setReturned([])
     setIssues([])
     setScan('')
     setError(null)
@@ -256,11 +268,13 @@ export function PackHandheldBoard() {
       if (step === 'station') {
         const body = await call('GET', undefined, `station=${encodeURIComponent(value)}`)
         setStation(body.station)
+        setReturned(body.returned_orders ?? [])
         setNotice(null)
         setStep('picker')
       } else if (step === 'picker' && station) {
         const body = await call('GET', undefined, `station=${encodeURIComponent(station.station_code)}&picker=${encodeURIComponent(value)}`)
         setPicker(body.picker)
+        if (body.returned_orders) setReturned(body.returned_orders)
         setStep('order')
       } else if (step === 'order' && station && picker) {
         const body = await call('POST', { action: 'scan_order', station: station.station_code, picker: picker.picker_id, order_no: value })
@@ -421,6 +435,26 @@ export function PackHandheldBoard() {
               เริ่มใหม่ (scan Station ใหม่)
             </button>
           )}
+        </div>
+      )}
+
+      {(step === 'picker' || step === 'order') && returned.length > 0 && (
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8, borderLeft: '6px solid var(--color-warning)' }}>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>Admin แก้ไขแล้ว · รอแพ็กต่อ ({returned.length} order)</div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>scan order เหล่านี้เพื่อแพ็กต่อ เวลาจะนับต่อจากเดิม</div>
+          {returned.map((r) => (
+            <div key={r.order_no} style={{ border: '1px solid var(--color-border)', background: r.here ? 'var(--color-warning-bg)' : undefined, borderRadius: 8, padding: '8px 10px', fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+                <b style={{ fontSize: 16 }}>{r.order_no}</b>
+                {r.here && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-warning-dark)' }}>Station นี้</span>}
+              </div>
+              <div style={{ color: 'var(--color-text-secondary)' }}>
+                แจ้งจาก Station {r.station_code ?? '—'}
+                {r.reported_by && ` โดย ${r.reported_by}`} · ส่งกลับ {new Date(r.returned_at).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              </div>
+              {(r.root_cause || r.note) && <div>Admin: {[r.root_cause, r.note].filter(Boolean).join(' · ')}</div>}
+            </div>
+          ))}
         </div>
       )}
 

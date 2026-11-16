@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { ISSUE_RESULTS, sessionSeconds } from '../packing'
 
 export interface PackVerifyQueueItem {
   order_id: string
@@ -26,10 +27,10 @@ export async function getPackVerifyQueue(db: SupabaseClient, warehouseCode: stri
   if (list.length === 0) return []
 
   // Chunked so a long queue never builds an over-long ?order_id=in.(...) URL.
-  const sessions: { order_id: string; picker_id: string; station_code: string; started_at: string; finished_at: string | null; result: string | null; pieces: number }[] = []
+  const sessions: { order_id: string; picker_id: string; station_code: string; started_at: string; finished_at: string | null; result: string | null; pieces: number; carried_seconds: number | null }[] = []
   for (let i = 0; i < list.length; i += 150) {
     const ids = list.slice(i, i + 150).map((o) => o.order_id)
-    const { data } = await db.from('pack_sessions').select('order_id, picker_id, station_code, started_at, finished_at, result, pieces').in('order_id', ids).not('finished_at', 'is', null).neq('result', 'cancelled')
+    const { data } = await db.from('pack_sessions').select('order_id, picker_id, station_code, started_at, finished_at, result, pieces, carried_seconds').in('order_id', ids).not('finished_at', 'is', null).neq('result', 'cancelled')
     sessions.push(...(data ?? []))
   }
   const latestByOrder = new Map<string, (typeof sessions)[number]>()
@@ -55,8 +56,8 @@ export async function getPackVerifyQueue(db: SupabaseClient, warehouseCode: stri
         packerName: s ? nameById.get(s.picker_id) ?? s.picker_id : '—',
         stationCode: s?.station_code ?? null,
         packedAt,
-        packSeconds: s?.finished_at ? Math.round((new Date(s.finished_at).getTime() - new Date(s.started_at).getTime()) / 1000) : null,
-        hadIssue: s?.result === 'issue',
+        packSeconds: s?.finished_at ? Math.round(sessionSeconds(s)) : null,
+        hadIssue: ISSUE_RESULTS.has(s?.result ?? ''),
         isShort: s?.result === 'completed_short',
         waitMinutes: packedAt ? Math.max(0, Math.round((Date.now() - new Date(packedAt).getTime()) / 60000)) : 0,
       }

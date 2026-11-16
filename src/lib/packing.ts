@@ -73,9 +73,61 @@ export async function cancelStalePackSessions(db: SupabaseClient): Promise<numbe
 
 /** Pieces a finished pack session earns for productivity: the order's pieces minus the pieces the
  * packer reported as a problem (แจ้งปัญหา) and minus the pieces Admin Pack Verify recorded as short
- * (client rules), never below 0. */
-export function creditedPieces(s: { pieces: number; issue_pieces: number; short_pieces?: number | null }) {
-  return Math.max(0, Number(s.pieces) - Number(s.issue_pieces) - Number(s.short_pieces ?? 0))
+ * (client rules), never below 0. When Admin closed a reported problem himself, the reported items
+ * are usually the ones verify records as short, so only the larger of the two comes off. */
+export function creditedPieces(s: { pieces: number; issue_pieces: number; short_pieces?: number | null; result?: string | null }) {
+  const issue = Number(s.issue_pieces)
+  const short = Number(s.short_pieces ?? 0)
+  return Math.max(0, Number(s.pieces) - (s.result === 'issue_closed' ? Math.max(issue, short) : issue + short))
+}
+
+/** Session results that count toward packing productivity (migration 0039). 'issue' = paused,
+ * waiting for Admin; 'issue_returned' = its time went into the next session of the order. */
+export const CREDITED_RESULTS = ['completed', 'completed_short', 'issue_closed']
+/** Session results where the packer reported a problem. */
+export const ISSUE_RESULTS = new Set(['issue', 'issue_closed', 'issue_returned'])
+
+/** Working seconds of a finished session, including the time carried over from a paused attempt. */
+export function sessionSeconds(s: { started_at: string; finished_at: string | null; carried_seconds?: number | null }) {
+  if (!s.finished_at) return 0
+  return Math.max(0, (new Date(s.finished_at).getTime() - new Date(s.started_at).getTime()) / 1000) + Number(s.carried_seconds ?? 0)
+}
+
+/**
+ * Timer a new pack session of this order starts from (client rule): when the order's last attempt
+ * reported a problem that Admin sent back to pack, the clock continues where it stopped -- the
+ * paused time never counts. A cancelled attempt in between passes that carry along unchanged.
+ */
+export async function packCarryFor(db: SupabaseClient, orderId: string): Promise<{ carriedSeconds: number; resumedFrom: string | null }> {
+  const { data: last } = await db
+    .from('pack_sessions')
+    .select('session_id, started_at, finished_at, result, carried_seconds, resumed_from')
+    .eq('order_id', orderId)
+    .not('finished_at', 'is', null)
+    .order('finished_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (last?.result === 'issue_returned') return { carriedSeconds: Math.round(sessionSeconds(last)), resumedFrom: last.session_id }
+  if (last?.result === 'cancelled' && last.resumed_from) return { carriedSeconds: Number(last.carried_seconds ?? 0), resumedFrom: last.resumed_from }
+  return { carriedSeconds: 0, resumedFrom: null }
+}
+
+/** What the paused attempt reported and what Admin found -- shown on the Handheld when the order
+ * is scanned again, so whoever continues knows what to look at. */
+export async function previousPackIssue(db: SupabaseClient, pausedSessionId: string | null) {
+  if (!pausedSessionId) return null
+  const { data: issue } = await db.from('pack_issues').select('issue_id, root_cause, resolution_note').eq('session_id', pausedSessionId).limit(1).maybeSingle()
+  if (!issue) return null
+  const [{ data: lines }, { data: reasons }] = await Promise.all([
+    db.from('pack_issue_lines').select('barcode, sku, item_description, reason_code, qty').eq('issue_id', issue.issue_id),
+    db.from('pack_issue_reasons').select('reason_code, label_en, label_th'),
+  ])
+  const label = new Map((reasons ?? []).map((r) => [r.reason_code, r.label_th || r.label_en]))
+  return {
+    root_cause: PACK_ROOT_CAUSES.find((r) => r.code === issue.root_cause)?.th ?? issue.root_cause ?? null,
+    note: issue.resolution_note ?? null,
+    lines: (lines ?? []).map((l) => ({ barcode: l.barcode || l.sku, description: l.item_description, reason: label.get(l.reason_code) ?? l.reason_code, qty: Number(l.qty) })),
+  }
 }
 
 /** Problems that put extra stock in the box: the extra pieces were never in the order's pieces, so

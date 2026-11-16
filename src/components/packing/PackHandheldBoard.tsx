@@ -44,6 +44,14 @@ interface PackOrder {
 interface Session {
   session_id: string
   started_at: string
+  /** seconds carried over from an earlier attempt paused by a reported problem */
+  carried_seconds?: number
+}
+/** What an earlier attempt of this order reported, and what Admin found, before sending it back. */
+interface PreviousIssue {
+  root_cause: string | null
+  note: string | null
+  lines: { barcode: string; description: string | null; reason: string; qty: number }[]
 }
 /** One reported problem -- one per barcode (choosing the same barcode again edits it). */
 interface IssueDraft {
@@ -115,6 +123,7 @@ export function PackHandheldBoard() {
   const [picker, setPicker] = useState<Picker | null>(null)
   const [order, setOrder] = useState<PackOrder | null>(null)
   const [session, setSession] = useState<Session | null>(null)
+  const [prevIssue, setPrevIssue] = useState<PreviousIssue | null>(null)
   const [minMinutes, setMinMinutes] = useState(5)
   const [bands, setBands] = useState({ yellow: 30, red: 60 })
   const [clockOffset, setClockOffset] = useState(0) // server time - device time, ms
@@ -182,7 +191,7 @@ export function PackHandheldBoard() {
     if (step === 'station' || step === 'picker' || step === 'order' || step === 'packing') inputRef.current?.focus()
   }, [step, busy, form, issues.length])
 
-  const elapsedSec = session ? (now + clockOffset - new Date(session.started_at).getTime()) / 1000 : 0
+  const elapsedSec = session ? (now + clockOffset - new Date(session.started_at).getTime()) / 1000 + (session.carried_seconds ?? 0) : 0
   const minSec = minMinutes * 60
   const canFinish = elapsedSec >= minSec
 
@@ -205,6 +214,7 @@ export function PackHandheldBoard() {
     setPicker(null)
     setOrder(null)
     setSession(null)
+    setPrevIssue(null)
     setIssues([])
     setScan('')
     setError(null)
@@ -256,6 +266,7 @@ export function PackHandheldBoard() {
         const body = await call('POST', { action: 'scan_order', station: station.station_code, picker: picker.picker_id, order_no: value })
         setOrder(body.order)
         setSession(body.session)
+        setPrevIssue(body.previous_issue ?? null)
         setMinMinutes(body.min_minutes)
         if (body.bands) setBands(body.bands)
         setClockOffset(new Date(body.server_now).getTime() - Date.now())
@@ -423,6 +434,23 @@ export function PackHandheldBoard() {
           <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--color-text-secondary)' }}>
             {canFinish ? 'ครบเวลาขั้นต่ำแล้ว ปิดงานได้' : `ขั้นต่ำ ${mmss(minSec)} · ยังปิดงานไม่ได้`} · {order.lines.length} รายการ · {order.pieces.toLocaleString()} ชิ้น
           </div>
+
+          {prevIssue && (
+            <div style={{ border: '1px solid var(--color-warning-border, #F59E0B)', background: 'var(--color-warning-bg, #FFFBEB)', borderRadius: 10, padding: 10, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontWeight: 700 }}>order นี้เคยแจ้งปัญหา · เวลานับต่อจากเดิม {mmss(session?.carried_seconds ?? 0)}</div>
+              {prevIssue.lines.map((l, i) => (
+                <div key={i}>
+                  • {l.barcode} — {l.reason} × {l.qty}
+                  {l.description && <span style={{ color: 'var(--color-text-secondary)' }}> ({l.description})</span>}
+                </div>
+              ))}
+              {(prevIssue.root_cause || prevIssue.note) && (
+                <div>
+                  Admin: {[prevIssue.root_cause, prevIssue.note].filter(Boolean).join(' · ')}
+                </div>
+              )}
+            </div>
+          )}
 
           {step === 'packing' && issues.length === 0 && (
             <>

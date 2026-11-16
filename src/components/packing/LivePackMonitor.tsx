@@ -61,7 +61,7 @@ export function LivePackMonitor({ live, idleStations, bands, issueStations, canC
     return () => clearInterval(t)
   }, [])
 
-  const bandOf = (s: LiveSession): PackTimeBand => packTimeBand((now - new Date(s.started_at).getTime()) / 60000, bands)
+  const bandOf = (s: LiveSession): PackTimeBand => packTimeBand((now - new Date(s.timer_from).getTime()) / 60000, bands)
 
   // Every station on the floor, natural order (PK2 before PK10); a station with an open session
   // that is no longer in the active list still shows so the session can be seen and cancelled.
@@ -183,7 +183,7 @@ export function LivePackMonitor({ live, idleStations, bands, issueStations, canC
                 {flagged && <IssueMark />}
                 <div style={{ fontWeight: 700, fontSize: 13.5, marginTop: 3 }}>{code}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 4px' }}>{s.pickerName}</div>
-                <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: band === 'green' ? undefined : color }}>{elapsed(s.started_at, now)}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: band === 'green' ? undefined : color }}>{elapsed(s.timer_from, now)}</div>
                 <div style={{ fontSize: 10.5, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 4px 4px' }}>{s.order_no}</div>
               </button>
             )
@@ -206,7 +206,7 @@ export function LivePackMonitor({ live, idleStations, bands, issueStations, canC
             <span style={{ color: 'var(--color-text-secondary)' }}>เริ่มแพ็ก</span>
             <span>{new Date(selected.started_at).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
             <span style={{ color: 'var(--color-text-secondary)' }}>เวลาที่ใช้</span>
-            <span style={{ fontWeight: 700, color: bandOf(selected) === 'green' ? undefined : RISK_COLOR[bandOf(selected)] }}>{elapsed(selected.started_at, now)}</span>
+            <span style={{ fontWeight: 700, color: bandOf(selected) === 'green' ? undefined : RISK_COLOR[bandOf(selected)] }}>{elapsed(selected.timer_from, now)}</span>
           </div>
           {canCancel && (
             <div style={{ padding: '12px 24px 0' }}>

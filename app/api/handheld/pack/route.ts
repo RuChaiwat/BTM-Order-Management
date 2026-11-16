@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
-import { cancelStalePackSessions, getPackMinDurationMinutes, getPackOrderLines, getPackingSettings, issueDeductPieces } from '@/lib/packing'
+import { cancelStalePackSessions, getPackMinDurationMinutes, getPackOrderLines, getPackingSettings, issueDeductPieces, packCarryFor, previousPackIssue } from '@/lib/packing'
 
 /**
  * Public, unauthenticated API behind the Pack Handheld (/handheld/pack) -- same trust model as
@@ -149,9 +149,17 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
   const { data: mine } = await db.from('pack_sessions').select('session_id, order_id, started_at').eq('picker_id', picker.picker_id).is('finished_at', null).maybeSingle()
 
   if (order.pack_status === 'packing') {
-    const { data: open } = await db.from('pack_sessions').select('session_id, picker_id, station_code, started_at').eq('order_id', order.order_id).is('finished_at', null).maybeSingle()
+    const { data: open } = await db.from('pack_sessions').select('session_id, picker_id, station_code, started_at, carried_seconds, resumed_from').eq('order_id', order.order_id).is('finished_at', null).maybeSingle()
     if (open && open.picker_id === picker.picker_id) {
-      return NextResponse.json({ session: { session_id: open.session_id, started_at: open.started_at }, order: orderOut, min_minutes: minMinutes, bands: { yellow: bands.yellowMinutes, red: bands.redMinutes }, server_now: new Date().toISOString(), resumed: true })
+      return NextResponse.json({
+        session: { session_id: open.session_id, started_at: open.started_at, carried_seconds: open.carried_seconds ?? 0 },
+        order: orderOut,
+        min_minutes: minMinutes,
+        bands: { yellow: bands.yellowMinutes, red: bands.redMinutes },
+        server_now: new Date().toISOString(),
+        resumed: true,
+        previous_issue: await previousPackIssue(db, open.resumed_from ?? null),
+      })
     }
     if (!open) return err('order นี้กำลังแพ็กอยู่ · Already being packed', 409)
     // Show who by name -- packers know each other by name, not by employee ID.
@@ -166,10 +174,12 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
     return err(`คุณมีงานค้างอยู่: order ${other?.order_no ?? ''} — scan order นั้นเพื่อปิดงานก่อน · Finish your open order first`, 409)
   }
 
+  // An order Admin sent back after a reported problem continues its clock from where it stopped.
+  const carry = await packCarryFor(db, order.order_id)
   const { data: session, error: insErr } = await db
     .from('pack_sessions')
-    .insert({ order_id: order.order_id, picker_id: picker.picker_id, station_code: station.station_code, warehouse_code: order.warehouse_code, pieces })
-    .select('session_id, started_at')
+    .insert({ order_id: order.order_id, picker_id: picker.picker_id, station_code: station.station_code, warehouse_code: order.warehouse_code, pieces, carried_seconds: carry.carriedSeconds, resumed_from: carry.resumedFrom })
+    .select('session_id, started_at, carried_seconds')
     .single()
   if (insErr || !session) return err('order นี้หรือ Station นี้เพิ่งถูกเริ่มแพ็กจากอีกเครื่อง ลอง scan ใหม่ · Just started elsewhere, scan again', 409)
 
@@ -180,7 +190,18 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
   }
 
   await writeStatusHistory(db, { entityType: 'order_pack', entityId: order.order_id, oldStatus: 'pending', newStatus: 'packing', changedBy: null, reason: `${picker.picker_id} @ ${station.station_code}` })
-  return NextResponse.json({ session, order: orderOut, min_minutes: minMinutes, bands: { yellow: bands.yellowMinutes, red: bands.redMinutes }, server_now: new Date().toISOString(), resumed: false }, { status: 201 })
+  return NextResponse.json(
+    {
+      session,
+      order: orderOut,
+      min_minutes: minMinutes,
+      bands: { yellow: bands.yellowMinutes, red: bands.redMinutes },
+      server_now: new Date().toISOString(),
+      resumed: false,
+      previous_issue: await previousPackIssue(db, carry.resumedFrom),
+    },
+    { status: 201 },
+  )
 }
 
 interface IssueLineInput {
@@ -198,13 +219,14 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
   const result = body.result
   if (!body.session_id || (result !== 'completed' && result !== 'completed_short' && result !== 'issue')) return err("session_id and result ('completed' | 'completed_short' | 'issue') are required")
 
-  const { data: session } = await db.from('pack_sessions').select('session_id, order_id, picker_id, station_code, warehouse_code, started_at, finished_at, pieces').eq('session_id', body.session_id).maybeSingle()
+  const { data: session } = await db.from('pack_sessions').select('session_id, order_id, picker_id, station_code, warehouse_code, started_at, finished_at, pieces, carried_seconds').eq('session_id', body.session_id).maybeSingle()
   if (!session) return err('ไม่พบงานแพ็กนี้ · Packing session not found', 404)
   if (session.finished_at) return err('งานนี้ถูกปิดไปแล้ว · Already finished', 409)
   if (session.picker_id !== picker.picker_id) return err('งานนี้เป็นของพนักงานคนอื่น · Not your packing session', 403)
 
   const minMinutes = await getPackMinDurationMinutes(db)
-  const elapsedMs = Date.now() - new Date(session.started_at).getTime()
+  // Includes time carried over from a paused attempt (problem reported, sent back by Admin).
+  const elapsedMs = Date.now() - new Date(session.started_at).getTime() + Number(session.carried_seconds ?? 0) * 1000
   // A problem can be found the moment the box is opened, so reporting one is never held back.
   if (result !== 'issue' && elapsedMs < minMinutes * 60_000) {
     const left = Math.ceil((minMinutes * 60_000 - elapsedMs) / 1000)

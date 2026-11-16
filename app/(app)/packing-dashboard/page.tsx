@@ -54,7 +54,7 @@ export default async function PackingDashboardPage() {
 
   // One open session per station is the norm; if a station somehow has two, its longest one counts.
   const stationMinutes = new Map<string, number>()
-  for (const s of monitor.live) stationMinutes.set(s.station_code, Math.max(stationMinutes.get(s.station_code) ?? 0, minsSince(s.started_at)))
+  for (const s of monitor.live) stationMinutes.set(s.station_code, Math.max(stationMinutes.get(s.station_code) ?? 0, minsSince(s.timer_from)))
   const activeStations = stationMinutes.size
   const buckets = TIME_BUCKETS.map((b) => {
     const codes = [...stationMinutes].filter(([, m]) => packTimeBand(m, bands) === b.key).map(([code]) => code)
@@ -103,7 +103,14 @@ export default async function PackingDashboardPage() {
             labelTh="ปัญหายังไม่ปิด (issue)"
             value={d.counts.openIssues.toLocaleString()}
             valueColor={d.counts.openIssues ? '#DC2626' : undefined}
-            sub={link(24, '/pack-issues', 'ตรวจสอบปัญหา') ?? `${d.counts.issue.toLocaleString()} order`}
+            sub={
+              <>
+                {link(24, '/pack-issues', 'ตรวจสอบปัญหา') ?? `${d.counts.issue.toLocaleString()} order`}
+                <div style={{ marginTop: 2 }}>
+                  ปิดวันนี้ {d.issueFix.resolved.toLocaleString()} issue · ใช้เวลาแก้เฉลี่ย {d.issueFix.avgMinutes === null ? '—' : hm(d.issueFix.avgMinutes)}
+                </div>
+              </>
+            }
             compact
             style={{ padding: 14 }}
           />

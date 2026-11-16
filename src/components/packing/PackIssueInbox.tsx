@@ -47,7 +47,20 @@ const STATUS_BADGE: Record<string, { cls: string; th: string }> = {
   investigating: { cls: 'badge-warning', th: 'กำลังตรวจสอบ' },
   resolved: { cls: 'badge-success', th: 'ปิดแล้ว' },
 }
-const RESULT_TH: Record<string, string> = { completed: 'Completed', completed_short: 'Completed with Short', issue: 'แจ้งปัญหา', cancelled: 'ยกเลิก' }
+const RESULT_TH: Record<string, string> = {
+  completed: 'Completed',
+  completed_short: 'Completed with Short',
+  issue: 'แจ้งปัญหา · หยุดเวลารอ Admin',
+  issue_closed: 'แจ้งปัญหา → Admin ปิดเอง',
+  issue_returned: 'แจ้งปัญหา → ส่งกลับไปแพ็ก (เวลานับต่อ)',
+  cancelled: 'ยกเลิก',
+}
+
+/** Minutes between two timestamps as "X ชม. Y นาที". */
+function span(fromIso: string, toIso: string | null) {
+  const m = Math.max(0, Math.round(((toIso ? new Date(toIso).getTime() : Date.now()) - new Date(fromIso).getTime()) / 60000))
+  return m >= 60 ? `${Math.floor(m / 60)} ชม. ${m % 60} นาที` : `${m} นาที`
+}
 
 function dt(iso: string | null) {
   return iso ? new Date(iso).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
@@ -362,7 +375,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                   <div>การปิดเรื่อง: <b>{detail.issue.resolution === 'closed_by_admin' ? 'Admin ปิดเอง → ส่งไป Admin Pack Verify' : 'ส่งกลับไปรอแพ็ก'}</b></div>
                   {detail.issue.resolution_note && <div>หมายเหตุ: {detail.issue.resolution_note}</div>}
                   <div style={{ color: 'var(--color-text-secondary)' }}>
-                    ปิดโดย {detail.issue.resolvedByName} · {dt(detail.issue.resolved_at)}
+                    ปิดโดย {detail.issue.resolvedByName} · {dt(detail.issue.resolved_at)} · ใช้เวลาแก้ {span(detail.issue.reported_at, detail.issue.resolved_at)}
                   </div>
                 </div>
               ) : (
@@ -378,11 +391,11 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13 }}>
                     <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
                       <input type="radio" checked={resolution === 'closed_by_admin'} onChange={() => setResolution('closed_by_admin')} />
-                      Admin ปิดเอง → ส่งไป Admin Pack Verify
+                      Admin ปิดเอง → ส่งไป Admin Pack Verify (นับเวลาแพ็กถึงตอนแจ้งปัญหา)
                     </label>
                     <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
                       <input type="radio" checked={resolution === 'returned_to_pack'} onChange={() => setResolution('returned_to_pack')} />
-                      ส่งกลับไปรอแพ็ก (ใครก็ได้ scan แพ็กใหม่)
+                      ส่งกลับไปรอแพ็ก (ใครก็ได้ scan แพ็กต่อ · เวลานับต่อจากเดิม)
                     </label>
                   </div>
                   <textarea

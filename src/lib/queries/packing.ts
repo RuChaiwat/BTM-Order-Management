@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { bangkokDateKey, bangkokDayRange } from '../formatDate'
-import { creditedPieces } from '../packing'
+import { CREDITED_RESULTS, ISSUE_RESULTS, creditedPieces, sessionSeconds } from '../packing'
 
 /* Read side of the Packing module (migration 0035) -- Live Packing Monitor, Packing Dashboard,
  * Packing Productivity, Pack Issue Investigation and Pack Issue Dashboard. Everything is scoped to
@@ -43,12 +43,14 @@ export interface LiveSession {
   order_no: string
   pieces: number
   started_at: string
+  /** where the timer counts from: started_at minus time carried over from a paused attempt */
+  timer_from: string
   carriedOver: boolean
 }
 
 export async function getLiveMonitorData(db: SupabaseClient, warehouseCode: string) {
   const [{ data: sessions }, { data: stations }] = await Promise.all([
-    db.from('pack_sessions').select('session_id, order_id, picker_id, station_code, started_at, pieces').eq('warehouse_code', warehouseCode).is('finished_at', null).order('started_at'),
+    db.from('pack_sessions').select('session_id, order_id, picker_id, station_code, started_at, pieces, carried_seconds').eq('warehouse_code', warehouseCode).is('finished_at', null).order('started_at'),
     db.from('pack_stations').select('station_code, name, active, warehouse_code').eq('active', true).order('station_code'),
   ])
   const open = sessions ?? []
@@ -73,6 +75,7 @@ export async function getLiveMonitorData(db: SupabaseClient, warehouseCode: stri
     order_no: orderNo.get(s.order_id) ?? '—',
     pieces: s.pieces,
     started_at: s.started_at,
+    timer_from: new Date(new Date(s.started_at).getTime() - Number(s.carried_seconds ?? 0) * 1000).toISOString(),
     carriedOver: bangkokDateKey(s.started_at) !== today,
   }))
   const busyStations = new Set(live.map((s) => s.station_code))
@@ -93,16 +96,20 @@ const AGE_BUCKETS = [
 export async function getPackingDashboardData(db: SupabaseClient, warehouseCode: string) {
   const count = (status: string) => db.from('orders').select('order_id', { count: 'exact', head: true }).eq('warehouse_code', warehouseCode).eq('pack_status', status)
   const { sinceIso, untilIso } = bangkokDayRange(todayKey())
-  const [pending, packing, packed, issue, openIssues, pendingAges, todaySessions, confirmedToday] = await Promise.all([
+  const [pending, packing, packed, issue, openIssues, pendingAges, todaySessions, confirmedToday, fixedToday] = await Promise.all([
     count('pending'),
     count('packing'),
     count('packed'),
     count('issue'),
     db.from('pack_issues').select('issue_id', { count: 'exact', head: true }).eq('warehouse_code', warehouseCode).in('status', ['open', 'investigating']),
     db.from('orders').select('pack_ready_at').eq('warehouse_code', warehouseCode).eq('pack_status', 'pending').limit(10000),
-    db.from('pack_sessions').select('picker_id, finished_at, result, pieces, issue_pieces, short_pieces').eq('warehouse_code', warehouseCode).gte('finished_at', sinceIso).lt('finished_at', untilIso).neq('result', 'cancelled').limit(20000),
+    db.from('pack_sessions').select('picker_id, finished_at, result, pieces, issue_pieces, short_pieces').eq('warehouse_code', warehouseCode).gte('finished_at', sinceIso).lt('finished_at', untilIso).in('result', CREDITED_RESULTS).limit(20000),
     db.from('pack_verifications').select('order_id', { count: 'exact', head: true }).gte('verified_time', sinceIso).lt('verified_time', untilIso),
+    // Admin's time to fix a reported problem (reported -> resolved), kept apart from packer productivity.
+    db.from('pack_issues').select('reported_at, resolved_at').eq('warehouse_code', warehouseCode).eq('status', 'resolved').gte('resolved_at', sinceIso).lt('resolved_at', untilIso).limit(5000),
   ])
+  const fixed = fixedToday.data ?? []
+  const fixMinutes = fixed.reduce((sum, i) => sum + Math.max(0, (new Date(i.resolved_at!).getTime() - new Date(i.reported_at).getTime()) / 60000), 0)
 
   const now = Date.now()
   const aging = AGE_BUCKETS.map((b) => ({ label: b.label, count: 0 }))
@@ -128,6 +135,7 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
   return {
     counts: { pending: pending.count ?? 0, packing: packing.count ?? 0, packed: packed.count ?? 0, issue: issue.count ?? 0, openIssues: openIssues.count ?? 0 },
     today: { orders: (todaySessions.data ?? []).length, pieces: piecesToday, packers: packers.size, confirmed: confirmedToday.count ?? 0 },
+    issueFix: { resolved: fixed.length, avgMinutes: fixed.length ? Math.round(fixMinutes / fixed.length) : null },
     aging,
     oldestMinutes: Math.round(oldestMinutes),
     hourly,
@@ -153,7 +161,7 @@ export async function getPackingProductivity(db: SupabaseClient, warehouseCode: 
   const { sinceIso, untilIso } = bangkokDayRange(dateKey)
   const { data } = await db
     .from('pack_sessions')
-    .select('picker_id, station_code, started_at, finished_at, result, pieces, issue_pieces, short_pieces')
+    .select('picker_id, station_code, started_at, finished_at, result, pieces, issue_pieces, short_pieces, carried_seconds')
     .eq('warehouse_code', warehouseCode)
     .gte('finished_at', sinceIso)
     .lt('finished_at', untilIso)
@@ -172,22 +180,29 @@ export async function getPackingProductivity(db: SupabaseClient, warehouseCode: 
   const hourly = Array.from({ length: 24 }, () => ({ orders: 0, pieces: 0 }))
   const total = blank()
   for (const s of sessions) {
-    const secs = Math.max(0, (new Date(s.finished_at!).getTime() - new Date(s.started_at).getTime()) / 1000)
-    const pcs = creditedPieces(s)
+    // A reported problem pauses the order: that attempt counts only once Admin closes it himself
+    // ('issue_closed'); while waiting ('issue') or sent back ('issue_returned') it adds nothing --
+    // its time is carried into the session that finishes the order (migration 0039).
+    const credited = CREDITED_RESULTS.includes(s.result ?? '')
+    const secs = credited ? sessionSeconds(s) : 0
+    const pcs = credited ? creditedPieces(s) : 0
     for (const acc of [
       byPacker.get(s.picker_id) ?? byPacker.set(s.picker_id, blank()).get(s.picker_id)!,
       byStation.get(s.station_code) ?? byStation.set(s.station_code, blank()).get(s.station_code)!,
       total,
     ]) {
-      acc.orders++
-      acc.pieces += pcs
-      acc.seconds += secs
+      if (credited) {
+        acc.orders++
+        acc.pieces += pcs
+        acc.seconds += secs
+      }
       acc.stations.add(s.station_code)
-      if (s.result === 'issue') {
+      if (ISSUE_RESULTS.has(s.result ?? '')) {
         acc.issues++
-        acc.issuePieces += Number(s.issue_pieces)
+        if (s.result === 'issue_closed') acc.issuePieces += Number(s.issue_pieces)
       }
     }
+    if (!credited) continue
     const h = Number(new Date(s.finished_at!).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false }).slice(0, 2)) % 24
     hourly[h].orders++
     hourly[h].pieces += pcs

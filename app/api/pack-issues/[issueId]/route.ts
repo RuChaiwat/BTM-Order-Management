@@ -84,10 +84,16 @@ export async function POST(request: Request, { params }: { params: { issueId: st
       admin.from('pack_issue_lines').select('line_id, reason_code, qty').eq('issue_id', issue.issue_id),
       getPackOrderLines(admin, issue.order_id, { includeZero: true }),
     ])
+    // The paused session now counts (Admin closed it: its time up to the report) or hands its time
+    // to the next pack session of the order (sent back to pack) -- migration 0039.
     await admin
       .from('pack_sessions')
-      .update({ issue_pieces: issueDeductPieces(fresh ?? [], new Map(packLines.map((l) => [l.line_id, l.qty]))) })
+      .update({
+        issue_pieces: issueDeductPieces(fresh ?? [], new Map(packLines.map((l) => [l.line_id, l.qty]))),
+        result: body.resolution === 'closed_by_admin' ? 'issue_closed' : 'issue_returned',
+      })
       .eq('session_id', issue.session_id)
+      .eq('result', 'issue')
   }
 
   const now = new Date().toISOString()

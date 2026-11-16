@@ -35,35 +35,31 @@ function duration(sec: number | null) {
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m ${String(s).padStart(2, '0')}s`
 }
 
-function timeOf(iso: string | null) {
-  return iso ? new Date(iso).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
-}
-
 /**
- * Admin Pack Verify -- same shape as Admin Verification on the Pick side. Queue on the left (oldest
- * packed first); the selected order's lines on the right, where the Pack Supervisor ticks the
- * short lines and enters the actual packed qty + Short Pick reason while confirming in WMS. An
- * order the packer finished with "Completed with Short" must be confirmed this way, one at a time;
- * orders packed in full can also be ticked and confirmed together. No reject.
+ * Admin Pack Verify -- same layout and flow as Admin Verification on the Pick side:
+ *   left   the queue (oldest packed first) + "Confirm All Completed" for orders packed in full;
+ *   middle the selected order's lines -- tick a short line, pick the Short Pick reason, enter the
+ *          qty actually packed, checking against WMS;
+ *   right  the summary and Confirm Pack.
+ * An order the packer finished with "Completed with Short" is never part of Confirm All -- it must
+ * be opened and checked -- but Admin may still confirm it in full (the packer can be wrong). No reject.
  */
 export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
   const router = useRouter()
   const [isRefreshing, startRefresh] = useTransition()
   const [selectedId, setSelectedId] = useState(queue[0]?.order_id ?? '')
-  const [checked, setChecked] = useState<Set<string>>(new Set())
   const [lines, setLines] = useState<Line[] | null>(null)
   const [reasons, setReasons] = useState<Reason[]>([])
   const [lineState, setLineState] = useState<Record<string, LineState>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [bulkIds, setBulkIds] = useState<string[] | null>(null)
+  const [showConfirmAll, setShowConfirmAll] = useState(false)
   const [confirmOne, setConfirmOne] = useState(false)
   const working = busy || isRefreshing
 
   const selected = queue.find((o) => o.order_id === selectedId) ?? queue[0]
-  const bulkable = queue.filter((o) => !o.isShort)
-  const visibleChecked = bulkable.filter((o) => checked.has(o.order_id)).map((o) => o.order_id)
-  const allChecked = bulkable.length > 0 && visibleChecked.length === bulkable.length
+  // Confirm All covers only orders the packer finished as Completed; a Short one must be opened first.
+  const fullyPacked = queue.filter((o) => !o.isShort)
 
   useEffect(() => {
     if (!selected) return
@@ -84,14 +80,6 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
     }
   }, [selected])
 
-  function toggle(id: string) {
-    setChecked((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
   function toggleShort(l: Line) {
     setLineState((prev) => {
       const cur = prev[l.line_id]
@@ -114,7 +102,8 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
     const st = lineState[l.line_id]
     return s + (st?.isShort ? Number(st.packedQty || 0) : l.qty)
   }, 0)
-  const needsShortEntry = selected?.isShort && shortLines.length === 0
+  // Packer said Short but Admin is confirming every line in full -- allowed, just made explicit.
+  const overridingShort = !!selected?.isShort && shortLines.length === 0
 
   async function post(payload: Record<string, unknown>) {
     const res = await apiFetch('/api/pack-verifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -144,15 +133,13 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
     }
   }
 
-  async function doConfirmBulk() {
-    if (!bulkIds) return
+  async function doConfirmAll() {
     setBusy(true)
     setError(null)
     try {
-      const body = await post({ order_ids: bulkIds })
+      const body = await post({ order_ids: fullyPacked.map((o) => o.order_id) })
       if (body.failed?.length) setError(`ยืนยันไม่ได้: ${body.failed.join(', ')}`)
-      setChecked(new Set())
-      setBulkIds(null)
+      setShowConfirmAll(false)
       setBusy(false)
       startRefresh(() => router.refresh())
     } catch (e) {
@@ -161,209 +148,205 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
     }
   }
 
-  const checkbox = (on: boolean, onClick: () => void, disabled?: boolean, title?: string) => (
-    <button className={`checkbox-box${on ? ' checked' : ''}`} style={{ border: on ? 'none' : undefined, cursor: disabled ? 'not-allowed' : 'pointer', padding: 0, opacity: disabled ? 0.35 : 1 }} onClick={onClick} disabled={disabled} title={title}>
-      {on ? '✓' : ''}
-    </button>
+  const tile = (label: string, value: React.ReactNode, color?: string) => (
+    <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
+      <span style={{ color: '#6B7280', fontSize: 11 }}>{label}</span>
+      <div style={{ fontWeight: 700, fontSize: 15, color, overflowWrap: 'break-word' }}>{value}</div>
+    </div>
   )
 
   return (
-    <div className="page-body" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
-          <div>
-            <div className="card-title">Packed orders</div>
-            <div className="card-subtitle">คิวรอยืนยันการแพ็ก · เรียงตามเวลาที่แพ็กเสร็จ · order แบบ Short ต้องเปิดยืนยันทีละ order</div>
+    <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="page-body" style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16, alignItems: 'start' }}>
+        {/* ---- left: queue */}
+        <div className="card">
+          <div className="card-title">Pack verify queue</div>
+          <div className="card-subtitle" style={{ marginBottom: 10 }}>
+            คิวรอยืนยันการแพ็ก · เรียงตามเวลาที่แพ็กเสร็จ
           </div>
-          <button className="btn btn-success btn-sm" style={{ marginLeft: 'auto' }} disabled={visibleChecked.length === 0 || working} onClick={() => setBulkIds(visibleChecked)}>
-            Confirm selected ({visibleChecked.length})
+          <button className="btn btn-success btn-sm btn-block" style={{ marginBottom: 10 }} disabled={fullyPacked.length === 0 || working} onClick={() => setShowConfirmAll(true)}>
+            Confirm All Completed ({fullyPacked.length})
           </button>
-        </div>
-        {error && !confirmOne && <div style={{ marginBottom: 10, fontSize: 12.5, color: 'var(--color-danger)' }}>{error}</div>}
-        <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
-          <colgroup>
-            <col style={{ width: 36 }} />
-            <col style={{ width: '24%' }} />
-            <col style={{ width: '26%' }} />
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '9%' }} />
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '17%' }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>{checkbox(allChecked, () => setChecked(allChecked ? new Set() : new Set(bulkable.map((o) => o.order_id))), bulkable.length === 0, 'เลือกทุก order ที่แพ็กครบ')}</th>
-              <th>ORDER</th>
-              <th>PACKER</th>
-              <th>STATION</th>
-              <th>PCS</th>
-              <th>
-                PACK
-                <br />
-                TIME
-              </th>
-              <th>
-                PACKED
-                <br />
-                AT
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+          {error && !confirmOne && !showConfirmAll && <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 560, overflowY: 'auto' }}>
             {queue.map((o) => (
-              <tr key={o.order_id} onClick={() => setSelectedId(o.order_id)} style={{ cursor: 'pointer', background: o.order_id === selected?.order_id ? 'var(--color-info-bg)' : undefined }}>
-                <td onClick={(e) => e.stopPropagation()}>{checkbox(checked.has(o.order_id), () => toggle(o.order_id), o.isShort, o.isShort ? 'order แบบ Short ต้องเปิดยืนยันทีละ order' : undefined)}</td>
-                <td style={{ overflowWrap: 'break-word' }}>
-                  <span className="link" style={{ fontWeight: 700 }}>
+              <button
+                key={o.order_id}
+                onClick={() => {
+                  setSelectedId(o.order_id)
+                  setError(null)
+                }}
+                style={{
+                  textAlign: 'left',
+                  border: o.order_id === selected?.order_id ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  borderRadius: 8,
+                  padding: '8px 10px',
+                  background: 'var(--color-surface)',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                  <span className="link" style={{ fontWeight: 700, fontSize: 12.5 }}>
                     {o.order_no}
                   </span>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{o.store_code}</div>
-                  {o.isShort && (
-                    <span className="badge badge-warning" style={{ fontSize: 10 }}>
-                      Short
-                    </span>
-                  )}
-                  {o.hadIssue && (
-                    <span className="badge badge-neutral" style={{ fontSize: 10 }}>
-                      เคยแจ้งปัญหา
-                    </span>
-                  )}
-                </td>
-                <td style={{ overflowWrap: 'break-word' }}>
-                  {o.packerName}
-                  {o.packerId && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{o.packerId}</div>}
-                </td>
-                <td>{o.stationCode ?? '—'}</td>
-                <td style={{ fontWeight: 700 }}>{o.pieces.toLocaleString()}</td>
-                <td>{duration(o.packSeconds)}</td>
-                <td style={{ fontSize: 12 }}>
-                  {timeOf(o.packedAt)}
-                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>รอ {o.waitMinutes.toLocaleString()} นาที</div>
-                </td>
-              </tr>
-            ))}
-            {queue.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ color: 'var(--color-text-secondary)' }}>
-                  ไม่มี order รอยืนยันการแพ็ก · Nothing waiting for pack confirmation.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card">
-        {selected ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <div>
-                <div className="card-title">
-                  {selected.order_no}{' '}
-                  <span className={`badge ${selected.isShort ? 'badge-warning' : 'badge-success'}`}>{selected.isShort ? 'Completed with Short' : 'Completed'}</span>
+                  <span className={`badge badge-${o.isShort ? 'warning' : 'success'}`} style={{ fontSize: 10 }}>
+                    {o.isShort ? 'Short' : 'Completed'}
+                  </span>
                 </div>
-                <div className="card-subtitle">
-                  {selected.store_code} · แพ็กโดย {selected.packerName} · Station {selected.stationCode ?? '—'} · {duration(selected.packSeconds)}
+                <div style={{ fontSize: 11, color: '#6B7280' }}>
+                  {o.packerName} · {o.stationCode ?? '—'} · รอ {o.waitMinutes.toLocaleString()} นาที
                 </div>
-              </div>
-            </div>
-            <div className="card-subtitle" style={{ margin: '10px 0' }}>
-              ติ๊กรายการที่แพ็กขาด แล้วระบุเหตุผลและจำนวนที่แพ็กจริง · ตรวจสอบกับระบบ WMS ก่อนกดยืนยัน
-            </div>
-            <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
-              <colgroup>
-                <col style={{ width: 28 }} />
-                <col style={{ width: '34%' }} />
-                <col style={{ width: '16%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '22%' }} />
-                <col style={{ width: '16%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th />
-                  <th>BARCODE</th>
-                  <th>BIN</th>
-                  <th>QTY</th>
-                  <th>REASON</th>
-                  <th>
-                    PACKED
-                    <br />
-                    QTY
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines === null && (
-                  <tr>
-                    <td colSpan={6}>
-                      <Spinner dark />
-                    </td>
-                  </tr>
+                {o.hadIssue && (
+                  <span className="badge badge-neutral" style={{ fontSize: 10, marginTop: 3 }}>
+                    เคยแจ้งปัญหา
+                  </span>
                 )}
-                {lines?.map((l) => {
-                  const st = lineState[l.line_id]
-                  if (!st) return null
-                  return (
-                    <tr key={l.line_id} className={st.isShort ? 'row-flag' : undefined}>
-                      <td>{checkbox(st.isShort, () => toggleShort(l), false, 'แพ็กขาด?')}</td>
-                      <td style={{ overflowWrap: 'break-word' }}>
-                        {l.sku_barcode || `SKU ${l.sku}`}
-                        {l.item_description && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{l.item_description}</div>}
-                      </td>
-                      <td>{formatLocationDisplay(l.bin_code)}</td>
-                      <td style={{ fontWeight: 700 }}>{l.qty}</td>
-                      <td>
-                        {st.isShort ? (
-                          <select className="control" value={st.reasonCode} onChange={(e) => updateLine(l.line_id, { reasonCode: e.target.value })} style={{ width: '100%' }}>
-                            <option value="">— เลือก —</option>
-                            {reasons.map((r) => (
-                              <option key={r.reason_code} value={r.reason_code}>
-                                {r.label_th || r.label_en}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span style={{ color: 'var(--color-text-muted)' }}>—</span>
-                        )}
-                      </td>
-                      <td>
-                        {st.isShort ? (
-                          <input className="control" type="number" min={0} max={l.qty - 1} value={st.packedQty} onChange={(e) => updateLine(l.line_id, { packedQty: e.target.value })} style={{ width: '100%' }} />
-                        ) : (
-                          l.qty
-                        )}
+              </button>
+            ))}
+            {queue.length === 0 && <span style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>ไม่มี order รอยืนยันการแพ็ก · Nothing waiting.</span>}
+          </div>
+        </div>
+
+        {/* ---- middle: lines */}
+        <div className="card">
+          {selected ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                <div>
+                  <span className="card-title">{selected.order_no}</span>
+                  <span className="card-subtitle" style={{ marginLeft: 8 }}>
+                    {selected.store_code}
+                  </span>
+                </div>
+                <span className={`badge badge-${selected.isShort ? 'warning' : 'success'}`} style={{ marginLeft: 'auto' }}>
+                  {selected.isShort ? 'Packer Completed with Short' : 'Packer Completed'}
+                </span>
+              </div>
+              <div className="card-subtitle" style={{ marginBottom: 12 }}>
+                ติ๊กรายการที่แพ็กขาด แล้วระบุเหตุผลและจำนวนที่แพ็กจริง · ตรวจสอบกับระบบ WMS
+              </div>
+              <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                <colgroup>
+                  <col style={{ width: 28 }} />
+                  <col style={{ width: '32%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '24%' }} />
+                  <col style={{ width: '15%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th />
+                    <th>BARCODE</th>
+                    <th>BIN</th>
+                    <th>QTY</th>
+                    <th>REASON</th>
+                    <th>
+                      PACKED
+                      <br />
+                      QTY
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines === null && (
+                    <tr>
+                      <td colSpan={6}>
+                        <Spinner dark />
                       </td>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 12, flexWrap: 'wrap', fontSize: 13 }}>
-              <span>
-                ชิ้นที่ต้องแพ็ก <b>{totalExpected.toLocaleString()}</b>
-              </span>
-              <span>
-                แพ็กจริง <b style={{ color: totalPacked < totalExpected ? 'var(--color-warning-dark)' : 'var(--color-success-dark)' }}>{totalPacked.toLocaleString()}</b>
-              </span>
+                  )}
+                  {lines?.map((l) => {
+                    const st = lineState[l.line_id]
+                    if (!st) return null
+                    return (
+                      <tr key={l.line_id} className={st.isShort ? 'row-flag' : undefined}>
+                        <td>
+                          <button onClick={() => toggleShort(l)} className={`checkbox-box${st.isShort ? ' checked' : ''}`} style={{ border: st.isShort ? 'none' : undefined, cursor: 'pointer', padding: 0 }} title="แพ็กขาด?">
+                            {st.isShort ? '✓' : ''}
+                          </button>
+                        </td>
+                        <td style={{ overflowWrap: 'break-word' }}>
+                          {l.sku_barcode || `SKU ${l.sku}`}
+                          {l.item_description && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{l.item_description}</div>}
+                        </td>
+                        <td>{formatLocationDisplay(l.bin_code)}</td>
+                        <td style={{ fontWeight: 700 }}>{l.qty}</td>
+                        <td>
+                          {st.isShort ? (
+                            <select className="control" value={st.reasonCode} onChange={(e) => updateLine(l.line_id, { reasonCode: e.target.value })} style={{ width: '100%' }}>
+                              <option value="">— เลือก —</option>
+                              {reasons.map((r) => (
+                                <option key={r.reason_code} value={r.reason_code}>
+                                  {r.label_th || r.label_en}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span style={{ color: '#9CA3AF' }}>—</span>
+                          )}
+                        </td>
+                        <td>{st.isShort ? <input className="control" type="number" min={0} max={l.qty - 1} value={st.packedQty} onChange={(e) => updateLine(l.line_id, { packedQty: e.target.value })} style={{ width: '100%' }} /> : l.qty}</td>
+                      </tr>
+                    )
+                  })}
+                  {lines?.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
+                        ไม่พบรายการสินค้าของ order นี้
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <span style={{ color: 'var(--color-text-secondary)' }}>เลือก order จากคิวด้านซ้าย</span>
+          )}
+        </div>
+
+        {/* ---- right: summary */}
+        <div className="card">
+          <div className="card-title">Pack Verify Summary</div>
+          <div className="card-subtitle" style={{ marginBottom: 14 }}>
+            สรุปผลตรวจสอบการแพ็ก
+          </div>
+          {selected ? (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5, marginBottom: 14 }}>
+                {tile('ต้องแพ็ก (ชิ้น)', totalExpected.toLocaleString())}
+                {tile('แพ็กจริง (ชิ้น)', totalPacked.toLocaleString(), totalPacked < totalExpected ? '#F59E0B' : '#16A34A')}
+                {tile('Packer', selected.packerName)}
+                {tile('Station', selected.stationCode ?? '—')}
+                {tile('เวลาแพ็ก', duration(selected.packSeconds))}
+                {tile('รอยืนยัน', `${selected.waitMinutes.toLocaleString()} นาที`)}
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <span className={`badge badge-${shortLines.length > 0 ? 'warning' : 'success'}`}>{shortLines.length > 0 ? `แพ็กขาด ${shortLines.length} รายการ` : 'แพ็กครบ 100%'}</span>
+              </div>
+              {overridingShort && (
+                <div style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--color-warning-dark)', background: 'var(--color-warning-bg)', borderRadius: 8, padding: '8px 10px' }}>
+                  พนักงานแจ้ง <b>Completed with Short</b> — ถ้าตรวจใน WMS แล้วครบ กดยืนยันเต็มจำนวนได้ ถ้าขาดจริง ให้ติ๊กรายการที่ขาดตรงกลาง
+                </div>
+              )}
+              {lineErrors.length > 0 && <div style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--color-danger)' }}>รายการที่ติ๊กขาด ต้องเลือกเหตุผล และจำนวนต้องน้อยกว่าจำนวนที่ต้องแพ็ก</div>}
               <button
-                className="btn btn-success"
-                style={{ marginLeft: 'auto', minWidth: 150 }}
-                disabled={working || !lines || lineErrors.length > 0 || needsShortEntry}
+                className="btn btn-success btn-block"
+                disabled={working || !lines || lines.length === 0 || lineErrors.length > 0}
                 onClick={() => {
                   setError(null)
                   setConfirmOne(true)
                 }}
               >
-                Confirm Pack
+                {working && <Spinner />}
+                {working ? 'Working…' : 'Confirm Pack'}
               </button>
-            </div>
-            {needsShortEntry && <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--color-warning-dark)' }}>พนักงานแจ้ง Completed with Short — ติ๊กรายการที่ขาดอย่างน้อย 1 รายการ พร้อมเหตุผลและจำนวน</div>}
-            {lineErrors.length > 0 && <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--color-danger)' }}>รายการที่ติ๊กขาด ต้องเลือกเหตุผล และจำนวนต้องน้อยกว่าจำนวนที่ต้องแพ็ก</div>}
-          </>
-        ) : (
-          <span style={{ color: 'var(--color-text-secondary)' }}>เลือก order จากคิวด้านซ้าย</span>
-        )}
+            </>
+          ) : (
+            <span style={{ color: 'var(--color-text-secondary)' }}>—</span>
+          )}
+        </div>
       </div>
 
       {confirmOne && selected && (
@@ -372,6 +355,10 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
             {shortLines.length > 0 ? (
               <>
                 บันทึกว่าแพ็กขาด <strong>{shortLines.length} รายการ</strong> รวม <strong>{(totalExpected - totalPacked).toLocaleString()} ชิ้น</strong> — ตรวจให้ตรงกับที่ Confirm ใน WMS · ย้อนกลับไม่ได้
+              </>
+            ) : overridingShort ? (
+              <>
+                พนักงานแจ้ง <strong>Short</strong> แต่จะบันทึกว่า <strong>แพ็กครบทุกรายการ</strong> — ยืนยันว่าตรวจใน WMS แล้วครบจริง · ย้อนกลับไม่ได้
               </>
             ) : (
               'แพ็กครบทุกรายการ · ย้อนกลับไม่ได้'
@@ -390,16 +377,19 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
         </Modal>
       )}
 
-      {bulkIds && (
-        <Modal title={`Confirm ${bulkIds.length} packed orders?`} subtitle="ยืนยันเฉพาะ order ที่แพ็กครบ (Completed)" onSubmit={doConfirmBulk}>
-          <div className="modal-body">order ทั้ง {bulkIds.length} รายการ จะถูกบันทึกเป็น <strong>ยืนยันแพ็กแล้ว ครบทุกรายการ</strong> · ย้อนกลับไม่ได้</div>
+      {showConfirmAll && (
+        <Modal title={`Confirm all ${fullyPacked.length} completed orders?`} subtitle="ยืนยันเฉพาะ order ที่พนักงานปิดงาน Completed" onSubmit={doConfirmAll}>
+          <div className="modal-body">
+            order ทั้ง {fullyPacked.length} รายการที่พนักงานแพ็กครบ จะถูกบันทึกเป็น <strong>ยืนยันแพ็กแล้ว ครบทุกรายการ</strong> · order ที่แจ้ง Short ไม่รวมอยู่ด้วย ต้องเปิดตรวจทีละ order · ย้อนกลับไม่ได้
+            {error && <div style={{ marginTop: 8, color: 'var(--color-danger)' }}>{error}</div>}
+          </div>
           <ModalFooter>
-            <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setBulkIds(null)}>
+            <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setShowConfirmAll(false)}>
               Cancel
             </button>
-            <button type="submit" className="modal-footer-btn btn-success" style={{ minWidth: 150, border: 0 }} disabled={working} autoFocus>
+            <button type="submit" className="modal-footer-btn btn-success" style={{ minWidth: 170, border: 0 }} disabled={working} autoFocus>
               {working && <Spinner />}
-              {working ? 'Confirming…' : 'Confirm'}
+              {working ? 'Confirming…' : `Confirm all ${fullyPacked.length}`}
             </button>
           </ModalFooter>
         </Modal>

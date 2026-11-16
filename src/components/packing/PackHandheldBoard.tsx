@@ -440,14 +440,11 @@ export function PackHandheldBoard() {
 
       {(step === 'picker' || step === 'order') && returned.length > 0 && (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8, borderLeft: '6px solid var(--color-warning)' }}>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>Admin แก้ไขแล้ว · รอแพ็กต่อ ({returned.length} order)</div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>Admin แก้ไขแล้ว · รอแพ็กต่อที่ Station นี้ ({returned.length} order)</div>
           <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>scan order เหล่านี้เพื่อแพ็กต่อ เวลาจะนับต่อจากเดิม</div>
           {returned.map((r) => (
-            <div key={r.order_no} style={{ border: '1px solid var(--color-border)', background: r.here ? 'var(--color-warning-bg)' : undefined, borderRadius: 8, padding: '8px 10px', fontSize: 13 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
-                <b style={{ fontSize: 16 }}>{r.order_no}</b>
-                {r.here && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-warning-dark)' }}>Station นี้</span>}
-              </div>
+            <div key={r.order_no} style={{ border: '1px solid var(--color-border)', background: 'var(--color-warning-bg)', borderRadius: 8, padding: '8px 10px', fontSize: 13 }}>
+              <b style={{ fontSize: 16 }}>{r.order_no}</b>
               <div style={{ color: 'var(--color-text-secondary)' }}>
                 แจ้งจาก Station {r.station_code ?? '—'}
                 {r.reported_by && ` โดย ${r.reported_by}`} · ส่งกลับ {new Date(r.returned_at).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}

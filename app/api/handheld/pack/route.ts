@@ -78,7 +78,7 @@ async function stationConflict(db: Db, stationCode: string, pickerId: string): P
 /**
  * Orders Admin fixed and sent back to pack (Pack Issue Investigation -> ส่งกลับไปรอแพ็ก) that
  * nobody has picked up yet -- listed on the Handheld once the Station is scanned so packers know
- * to continue them. This station's own orders first, then oldest sent back first.
+ * to continue them. Only orders reported from this station (client rule), oldest sent back first.
  */
 async function returnedOrders(db: Db, warehouseCode: string | null, stationCode: string) {
   let q = db
@@ -86,6 +86,7 @@ async function returnedOrders(db: Db, warehouseCode: string | null, stationCode:
     .select('order_id, station_code, picker_id, root_cause, resolution_note, resolved_at')
     .eq('status', 'resolved')
     .eq('resolution', 'returned_to_pack')
+    .eq('station_code', stationCode)
     .order('resolved_at', { ascending: false })
     .limit(300)
   if (warehouseCode) q = q.eq('warehouse_code', warehouseCode)
@@ -111,7 +112,7 @@ async function returnedOrders(db: Db, warehouseCode: string | null, stationCode:
         returned_at: i.resolved_at as string,
       }
     })
-    .sort((a, b) => Number(b.here) - Number(a.here) || a.returned_at.localeCompare(b.returned_at))
+    .sort((a, b) => a.returned_at.localeCompare(b.returned_at))
     .slice(0, 20)
 }
 

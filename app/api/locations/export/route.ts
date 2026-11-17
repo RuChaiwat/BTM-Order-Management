@@ -12,7 +12,7 @@ import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
  * the one place a filtered search SHOULD be able to return more than one screen's worth. */
 export async function GET(request: Request) {
   const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
   const warehouse = searchParams.get('warehouse')

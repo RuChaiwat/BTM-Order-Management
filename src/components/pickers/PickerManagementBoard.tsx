@@ -144,7 +144,7 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
 
   async function remove() {
     if (!selected) return
-    if (!confirm(`Remove ${selected.name_th || selected.name_en} (${selected.picker_id})? This can't be undone.`)) return
+    if (!confirm(`ลบ ${selected.name_th || selected.name_en} (${selected.picker_id}) ใช่หรือไม่? ลบแล้วกู้คืนไม่ได้`)) return
     setBusy(true)
     setError(null)
     const res = await fetch('/api/pickers', {

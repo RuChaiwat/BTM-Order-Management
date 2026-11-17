@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
   const orderId = new URL(request.url).searchParams.get('order_id')
-  if (!orderId) return NextResponse.json({ error: 'order_id is required' }, { status: 400 })
+  if (!orderId) return NextResponse.json({ error: 'ข้อมูลไม่ครบ: ต้องระบุ Order' }, { status: 400 })
   const admin = createAdminClient()
   const [{ lines, pieces }, { data: reasons }] = await Promise.all([
     getPackOrderLines(admin, orderId),
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
     const orderId = body.order_id
     const input = Array.isArray(body.lines) ? body.lines : []
     const { lines: expected } = await getPackOrderLines(admin, orderId)
-    if (expected.length === 0) return NextResponse.json({ error: 'Order has no lines to verify' }, { status: 409 })
+    if (expected.length === 0) return NextResponse.json({ error: 'Order นี้ไม่มีรายการสินค้าให้ตรวจสอบ' }, { status: 409 })
     const expectedById = new Map(expected.map((l) => [l.line_id, l.qty]))
     const { data: reasons } = await admin.from('reason_master').select('reason_code').eq('reason_type', 'short_pick').eq('active', true)
     const validReasons = new Set((reasons ?? []).map((r) => r.reason_code))
@@ -80,23 +81,23 @@ export async function POST(request: Request) {
     const rows: { line_id: string; expected_qty: number; packed_qty: number; is_short: boolean; short_reason_code: string | null; remark: string | null }[] = []
     for (const l of input) {
       const exp = expectedById.get(l.line_id)
-      if (exp === undefined) return NextResponse.json({ error: `Line ${l.line_id} is not on this order` }, { status: 400 })
+      if (exp === undefined) return NextResponse.json({ error: 'มีรายการสินค้าที่ไม่อยู่ใน Order นี้ กรุณารีเฟรชแล้วลองใหม่' }, { status: 400 })
       const packed = Number(l.packed_qty)
       if (!Number.isFinite(packed) || packed < 0 || packed > exp) return NextResponse.json({ error: `จำนวนที่แพ็กต้องอยู่ระหว่าง 0 ถึง ${exp}` }, { status: 400 })
       const isShort = packed < exp
-      if (isShort && (!l.short_reason_code || !validReasons.has(l.short_reason_code))) return NextResponse.json({ error: 'ต้องเลือกเหตุผลของรายการที่ขาด · A short reason is required' }, { status: 400 })
+      if (isShort && (!l.short_reason_code || !validReasons.has(l.short_reason_code))) return NextResponse.json({ error: 'ต้องเลือกเหตุผลของรายการที่ขาด' }, { status: 400 })
       rows.push({ line_id: l.line_id, expected_qty: exp, packed_qty: packed, is_short: isShort, short_reason_code: isShort ? l.short_reason_code! : null, remark: isShort ? l.remark?.trim() || null : null })
     }
     if (rows.length !== expected.length || new Set(rows.map((r) => r.line_id)).size !== expected.length) {
-      return NextResponse.json({ error: 'ต้องระบุผลครบทุกรายการ · Every line must be itemized' }, { status: 400 })
+      return NextResponse.json({ error: 'ต้องระบุผลครบทุกรายการ' }, { status: 400 })
     }
 
     const order = await flip(orderId)
-    if (!order) return NextResponse.json({ error: 'order นี้ถูกยืนยันไปแล้ว หรือสถานะเปลี่ยน · Already confirmed or status changed' }, { status: 409 })
+    if (!order) return NextResponse.json({ error: 'order นี้ถูกยืนยันไปแล้ว หรือสถานะเปลี่ยน' }, { status: 409 })
     const { data: ver, error: verErr } = await admin.from('pack_verifications').insert({ order_id: orderId, admin_id: caller.user_id }).select('verification_id').single()
     if (verErr || !ver) return NextResponse.json({ error: verErr?.message ?? 'Could not record verification' }, { status: 500 })
     const { error: linesErr } = await admin.from('pack_verification_lines').insert(rows.map((r) => ({ verification_id: ver.verification_id, ...r })))
-    if (linesErr) return NextResponse.json({ error: linesErr.message }, { status: 500 })
+    if (linesErr) return NextResponse.json({ error: dbErrorTh(linesErr) }, { status: 500 })
 
     const shortPieces = Math.round(rows.reduce((s, r) => s + (r.expected_qty - r.packed_qty), 0))
     const session = await latestSession(admin, orderId)
@@ -109,8 +110,8 @@ export async function POST(request: Request) {
 
   // ---- bulk, packed in full
   const orderIds = body.order_ids
-  if (!Array.isArray(orderIds) || orderIds.length === 0) return NextResponse.json({ error: 'order_id + lines, or order_ids, is required' }, { status: 400 })
-  if (orderIds.length > 500) return NextResponse.json({ error: 'Confirm at most 500 orders at a time' }, { status: 400 })
+  if (!Array.isArray(orderIds) || orderIds.length === 0) return NextResponse.json({ error: 'ข้อมูลไม่ครบ: ต้องเลือก Order' }, { status: 400 })
+  if (orderIds.length > 500) return NextResponse.json({ error: 'ยืนยันได้ครั้งละไม่เกิน 500 Order' }, { status: 400 })
 
   const confirmed: string[] = []
   const failed: string[] = []

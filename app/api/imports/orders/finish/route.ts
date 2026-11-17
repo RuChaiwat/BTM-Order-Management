@@ -17,11 +17,11 @@ export async function POST(request: Request) {
   }
 
   const { import_id, orders_created, orders_updated, orders_locked, lines_upserted } = await request.json()
-  if (!import_id) return NextResponse.json({ error: 'import_id is required' }, { status: 400 })
+  if (!import_id) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 })
 
   const admin = createAdminClient()
   const { data: importBatch } = await admin.from('import_batches').select('total_rows').eq('import_id', import_id).single()
-  if (!importBatch) return NextResponse.json({ error: 'Import batch not found' }, { status: 404 })
+  if (!importBatch) return NextResponse.json({ error: 'ไม่พบรายการ Import นี้' }, { status: 404 })
 
   const { data: errorRows } = await admin.from('import_errors').select('severity').eq('import_id', import_id)
   const blockingCount = (errorRows ?? []).filter((e) => e.severity === 'blocking').length

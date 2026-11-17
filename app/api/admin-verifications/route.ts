@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh, orderStatusTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
@@ -34,17 +35,17 @@ export async function POST(request: Request) {
     reject_reason?: string
   }
   if (!order_id || !['final_close', 'reject'].includes(decision ?? '')) {
-    return NextResponse.json({ error: "order_id and decision ('final_close' | 'reject') are required" }, { status: 400 })
+    return NextResponse.json({ error: 'ข้อมูลไม่ครบ: ต้องระบุ Order และผลการตรวจสอบ' }, { status: 400 })
   }
   if (decision === 'reject' && !reject_reason) {
-    return NextResponse.json({ error: 'reject_reason is required to reject (§12.1, audit trail)' }, { status: 400 })
+    return NextResponse.json({ error: 'กรุณาระบุเหตุผลที่ Reject' }, { status: 400 })
   }
 
   const admin = createAdminClient()
   const { data: order } = await admin.from('orders').select('order_id, status').eq('order_id', order_id).single()
-  if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+  if (!order) return NextResponse.json({ error: 'ไม่พบ Order นี้' }, { status: 404 })
   if (!['picker_completed_100', 'picker_completed_short'].includes(order.status)) {
-    return NextResponse.json({ error: `Order status is '${order.status}' — must be Picker Completed to verify` }, { status: 409 })
+    return NextResponse.json({ error: `Order นี้อยู่ในสถานะ "${orderStatusTh(order.status)}" ตรวจสอบได้เฉพาะ Order ที่ Picker ยืนยันเสร็จแล้ว` }, { status: 409 })
   }
 
   let newStatus: string
@@ -55,31 +56,31 @@ export async function POST(request: Request) {
 
   if (decision === 'final_close') {
     if (!Array.isArray(lines) || lines.length === 0) {
-      return NextResponse.json({ error: 'lines[] itemizing every order line is required to Final Close' }, { status: 400 })
+      return NextResponse.json({ error: 'กรุณาระบุผลทุกรายการสินค้าก่อน Final Close' }, { status: 400 })
     }
     const { data: completion } = await admin.from('picker_completions').select('completion_id').eq('order_id', order_id).maybeSingle()
-    if (!completion) return NextResponse.json({ error: 'No picker completion found for this order' }, { status: 409 })
+    if (!completion) return NextResponse.json({ error: 'ไม่พบข้อมูลการยืนยันหยิบของ Picker สำหรับ Order นี้' }, { status: 409 })
     completionId = completion.completion_id
 
     const { data: orderLines } = await admin.from('order_lines').select('line_id, qty').eq('order_id', order_id)
     const orderedQtyByLine = new Map((orderLines ?? []).map((l) => [l.line_id, Number(l.qty)]))
-    if (orderedQtyByLine.size === 0) return NextResponse.json({ error: 'Order has no lines to verify' }, { status: 409 })
+    if (orderedQtyByLine.size === 0) return NextResponse.json({ error: 'Order นี้ไม่มีรายการสินค้าให้ตรวจสอบ' }, { status: 409 })
 
     for (const line of lines) {
       const orderedQty = orderedQtyByLine.get(line.line_id)
-      if (orderedQty === undefined) return NextResponse.json({ error: `Line ${line.line_id} does not belong to this order` }, { status: 400 })
+      if (orderedQty === undefined) return NextResponse.json({ error: 'มีรายการสินค้าที่ไม่อยู่ใน Order นี้ กรุณารีเฟรชแล้วลองใหม่' }, { status: 400 })
       const pickedQty = Number(line.picked_qty)
       if (!Number.isFinite(pickedQty) || pickedQty < 0 || pickedQty > orderedQty) {
-        return NextResponse.json({ error: `Picked quantity for line ${line.line_id} must be between 0 and the ordered quantity (${orderedQty})` }, { status: 400 })
+        return NextResponse.json({ error: `จำนวนที่หยิบต้องอยู่ระหว่าง 0 ถึง ${orderedQty} (จำนวนที่สั่ง)` }, { status: 400 })
       }
       const isShort = pickedQty < orderedQty
       if (isShort && !line.short_reason_code) {
-        return NextResponse.json({ error: `A short-pick reason is required for line ${line.line_id}` }, { status: 400 })
+        return NextResponse.json({ error: 'กรุณาเลือกเหตุผลของรายการที่หยิบขาด' }, { status: 400 })
       }
       completionLines.push({ line_id: line.line_id, ordered_qty: orderedQty, picked_qty: pickedQty, is_short: isShort, short_reason_code: isShort ? line.short_reason_code! : null, remark: line.remark ?? null })
     }
     if (completionLines.length !== orderedQtyByLine.size) {
-      return NextResponse.json({ error: 'All order lines must be itemized to Final Close' }, { status: 400 })
+      return NextResponse.json({ error: 'กรุณาระบุผลทุกรายการสินค้าก่อน Final Close' }, { status: 400 })
     }
 
     actualPieces = completionLines.reduce((s, l) => s + l.picked_qty, 0)
@@ -99,13 +100,13 @@ export async function POST(request: Request) {
   const orderPatch = decision === 'final_close' ? { status: newStatus, pack_status: 'pending', pack_ready_at: new Date().toISOString() } : { status: newStatus }
   const { data: updatedOrder } = await admin.from('orders').update(orderPatch).eq('order_id', order_id).eq('status', order.status).select('order_id').maybeSingle()
   if (!updatedOrder) {
-    return NextResponse.json({ error: 'This order was just verified elsewhere — refresh and try again' }, { status: 409 })
+    return NextResponse.json({ error: 'Order นี้เพิ่งถูกตรวจสอบจากเครื่องอื่น กรุณารีเฟรชแล้วลองใหม่' }, { status: 409 })
   }
 
   if (decision === 'final_close' && completionId) {
     await admin.from('picker_completion_lines').delete().eq('completion_id', completionId)
     const { error: linesError } = await admin.from('picker_completion_lines').insert(completionLines.map((l) => ({ completion_id: completionId, ...l })))
-    if (linesError) return NextResponse.json({ error: linesError.message }, { status: 400 })
+    if (linesError) return NextResponse.json({ error: dbErrorTh(linesError) }, { status: 400 })
 
     await admin.from('picker_completions').update({ actual_pieces: actualPieces, result }).eq('completion_id', completionId)
   }
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
     decision,
     reject_reason: decision === 'reject' ? reject_reason : null,
   })
-  if (verificationError) return NextResponse.json({ error: verificationError.message }, { status: 400 })
+  if (verificationError) return NextResponse.json({ error: dbErrorTh(verificationError) }, { status: 400 })
 
   await writeStatusHistory(admin, { entityType: 'orders', entityId: order_id, oldStatus: order.status, newStatus, changedBy: caller.user_id, reason: reject_reason })
   await writeAudit(admin, { userId: caller.user_id, action: `admin_verification.${decision}`, entityType: 'orders', entityId: order_id, after: { newStatus, reject_reason } })

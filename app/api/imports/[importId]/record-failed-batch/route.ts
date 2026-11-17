@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -20,14 +21,14 @@ export async function POST(request: Request, { params }: { params: { importId: s
 
   const { rows, reason } = (await request.json()) as { rows?: { rowNumber: number; data: Record<string, string> }[]; reason?: string }
   if (!Array.isArray(rows) || !reason) {
-    return NextResponse.json({ error: 'rows[] and reason are required' }, { status: 400 })
+    return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 })
   }
 
   const admin = createAdminClient()
   const { error } = await admin.from('import_errors').insert(
     rows.map((r) => ({ import_id: params.importId, row_number: r.rowNumber, raw_data: r.data, error_reason: reason, severity: 'blocking' as const })),
   )
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: dbErrorTh(error) }, { status: 500 })
 
   return NextResponse.json({ ok: true })
 }

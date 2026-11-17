@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
 
   const { warehouse_code, order_date } = await request.json()
   if (!warehouse_code || !order_date) {
-    return NextResponse.json({ error: 'warehouse_code and order_date are required' }, { status: 400 })
+    return NextResponse.json({ error: 'กรุณาเลือกคลังและวันที่ Order' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
       .eq('original_order_date', order_date)
       .neq('status', 'cancelled'),
   ])
-  if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 400 })
+  if (ordersError) return NextResponse.json({ error: dbErrorTh(ordersError) }, { status: 400 })
   const alreadyAssignedOrConsolidated = (totalForDate ?? 0) - (orders?.length ?? 0)
   if (!orders || orders.length === 0) {
     return NextResponse.json({

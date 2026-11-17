@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { orderStatusTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
@@ -33,15 +34,15 @@ export async function POST(request: Request, { params }: { params: { orderId: st
 
   const admin = createAdminClient()
   const { data: order } = await admin.from('orders').select('order_id, status, assignment_batch_id, consolidation_batch_id').eq('order_id', params.orderId).single()
-  if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+  if (!order) return NextResponse.json({ error: 'ไม่พบ Order นี้' }, { status: 404 })
   if (!['assigned', 'in_progress', 'correction_in_progress'].includes(order.status)) {
-    return NextResponse.json({ error: `Order status is '${order.status}' — can only unassign while Assigned, In Progress, or Returned for correction` }, { status: 409 })
+    return NextResponse.json({ error: `Order นี้อยู่ในสถานะ "${orderStatusTh(order.status)}" ยกเลิกการมอบหมายได้เฉพาะ Order ที่มอบหมายแล้ว กำลังหยิบ หรือส่งกลับแก้ไข` }, { status: 409 })
   }
 
   await releaseFromPendingConsolidationBatch(admin, params.orderId, caller.user_id)
   const { data: recheck } = await admin.from('orders').select('consolidation_batch_id').eq('order_id', params.orderId).single()
   if (recheck?.consolidation_batch_id) {
-    return NextResponse.json({ error: 'This order is part of a Consolidation Batch — unassign it from Consolidation Pick Report instead' }, { status: 409 })
+    return NextResponse.json({ error: 'Order นี้อยู่ใน Consolidation Batch ให้ยกเลิกการมอบหมายที่หน้า Consolidation Pick Report แทน' }, { status: 409 })
   }
 
   if (order.assignment_batch_id) {
@@ -58,7 +59,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     .select('order_id')
     .maybeSingle()
   if (!updatedOrder) {
-    return NextResponse.json({ error: 'This order was just updated elsewhere (e.g. the picker just completed it) — refresh and try again' }, { status: 409 })
+    return NextResponse.json({ error: 'Order นี้เพิ่งถูกอัปเดตจากที่อื่น (เช่น Picker เพิ่งยืนยันเสร็จ) กรุณารีเฟรชแล้วลองใหม่' }, { status: 409 })
   }
   await writeStatusHistory(admin, { entityType: 'orders', entityId: params.orderId, oldStatus: order.status, newStatus: 'new', changedBy: caller.user_id, reason: 'Unassigned by admin from Pick Completion' })
   await writeAudit(admin, { userId: caller.user_id, action: 'order.unassign', entityType: 'orders', entityId: params.orderId, before: { status: order.status, assignment_batch_id: order.assignment_batch_id } })

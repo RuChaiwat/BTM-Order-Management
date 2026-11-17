@@ -19,10 +19,10 @@ export async function GET(request: Request, { params }: { params: { jobId: strin
 
   const admin = createAdminClient()
   const { data: job } = await admin.from('export_jobs').select('status, control_totals').eq('id', params.jobId).maybeSingle()
-  if (!job || job.status !== 'success') return NextResponse.json({ error: 'Export not found or not successful' }, { status: 404 })
+  if (!job || job.status !== 'success') return NextResponse.json({ error: 'ไม่พบไฟล์ Export หรือ Export ไม่สำเร็จ' }, { status: 404 })
 
   const storagePath = (job.control_totals as { storagePath?: string } | null)?.storagePath
-  if (!storagePath) return NextResponse.json({ error: 'This export has no file on record' }, { status: 404 })
+  if (!storagePath) return NextResponse.json({ error: 'Export นี้ไม่มีไฟล์ให้ดาวน์โหลด' }, { status: 404 })
 
   const { data: signed, error } = await admin.storage.from('exports').createSignedUrl(storagePath, 60)
   if (error || !signed) return NextResponse.json({ error: error?.message ?? 'Could not create a download link' }, { status: 500 })

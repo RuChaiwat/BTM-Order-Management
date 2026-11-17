@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
@@ -29,10 +30,10 @@ export async function POST(request: Request) {
   const { warehouse_code, zone_code, picker_id, order_ids, assignment_method, linked_consolidation_batch_id } = await request.json()
 
   if (!warehouse_code || !zone_code || !picker_id || !Array.isArray(order_ids) || order_ids.length === 0) {
-    return NextResponse.json({ error: 'warehouse_code, zone_code, picker_id and a non-empty order_ids array are required' }, { status: 400 })
+    return NextResponse.json({ error: 'ข้อมูลไม่ครบ: ต้องระบุ Zone, Picker และเลือก Order อย่างน้อย 1 รายการ' }, { status: 400 })
   }
   if (!['list_selection', 'barcode_scan'].includes(assignment_method)) {
-    return NextResponse.json({ error: "assignment_method must be 'list_selection' or 'barcode_scan'" }, { status: 400 })
+    return NextResponse.json({ error: 'วิธีมอบหมายงานไม่ถูกต้อง' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -41,26 +42,26 @@ export async function POST(request: Request) {
   // dropdown of a trusted list -- worth validating server-side now that it's genuinely possible
   // for a stale/garbled scan to reach here. Previously this endpoint trusted picker_id outright.
   const { data: picker, error: pickerError } = await admin.from('pickers').select('picker_id, active, warehouse_code, zone_scope').eq('picker_id', picker_id).maybeSingle()
-  if (pickerError) return NextResponse.json({ error: pickerError.message }, { status: 400 })
+  if (pickerError) return NextResponse.json({ error: dbErrorTh(pickerError) }, { status: 400 })
   if (!picker || !picker.active) {
-    return NextResponse.json({ error: 'Picker not found or inactive — re-scan the badge' }, { status: 400 })
+    return NextResponse.json({ error: 'ไม่พบ Picker หรือถูกปิดใช้งาน กรุณา scan บัตรใหม่' }, { status: 400 })
   }
   if (picker.warehouse_code && picker.warehouse_code !== warehouse_code) {
-    return NextResponse.json({ error: 'This Picker belongs to a different warehouse' }, { status: 400 })
+    return NextResponse.json({ error: 'Picker คนนี้อยู่คลังอื่น' }, { status: 400 })
   }
   if (picker.zone_scope.length > 0 && !picker.zone_scope.includes(zone_code)) {
-    return NextResponse.json({ error: `This Picker is not scoped to Zone ${zone_code}` }, { status: 400 })
+    return NextResponse.json({ error: `Picker คนนี้ไม่ได้รับสิทธิ์ทำงานใน Zone ${zone_code}` }, { status: 400 })
   }
 
   // Friendly pre-check only -- not the actual concurrency guard, see create_assignment_batch.
   const { data: orders, error: ordersError } = await admin.from('orders').select('order_id, status').in('order_id', order_ids)
-  if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 400 })
+  if (ordersError) return NextResponse.json({ error: dbErrorTh(ordersError) }, { status: 400 })
   if (!orders || orders.length !== order_ids.length) {
-    return NextResponse.json({ error: 'One or more order_ids were not found' }, { status: 400 })
+    return NextResponse.json({ error: 'ไม่พบ Order บางรายการ กรุณารีเฟรชแล้วลองใหม่' }, { status: 400 })
   }
   const alreadyAssigned = orders.filter((o) => o.status !== 'new')
   if (alreadyAssigned.length > 0) {
-    return NextResponse.json({ error: `Order(s) not Pending: ${alreadyAssigned.map((o) => o.order_id).join(', ')} (FR-029/FR-032)` }, { status: 409 })
+    return NextResponse.json({ error: `มี ${alreadyAssigned.length} Order ที่ไม่อยู่ในสถานะรอมอบหมายงานแล้ว กรุณารีเฟรชแล้วลองใหม่` }, { status: 409 })
   }
 
   const { data: rpcResult, error: rpcError } = await admin.rpc('create_assignment_batch', {
@@ -74,12 +75,12 @@ export async function POST(request: Request) {
   })
   if (rpcError) {
     if (rpcError.message.includes('ORDER_NOT_AVAILABLE')) {
-      return NextResponse.json({ error: 'One or more of these orders were just assigned by someone else — refresh the pool and try again' }, { status: 409 })
+      return NextResponse.json({ error: 'มี Order บางรายการเพิ่งถูกมอบหมายโดยคนอื่น กรุณารีเฟรชแล้วลองใหม่' }, { status: 409 })
     }
-    return NextResponse.json({ error: rpcError.message }, { status: 400 })
+    return NextResponse.json({ error: dbErrorTh(rpcError) }, { status: 400 })
   }
   const batch = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult
-  if (!batch) return NextResponse.json({ error: 'Failed to create assignment batch' }, { status: 400 })
+  if (!batch) return NextResponse.json({ error: 'สร้างงานมอบหมายไม่สำเร็จ กรุณาลองใหม่' }, { status: 400 })
 
   await Promise.all(
     order_ids.map((orderId: string) =>

@@ -36,14 +36,14 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     if (!isValidUserId(userId)) {
-      setError(`User ID must be 1-${USER_ID_MAX_LENGTH} characters (letters, numbers, - or _)`)
+      setError(`User ID ต้องยาว 1-${USER_ID_MAX_LENGTH} ตัวอักษร (ตัวอักษรอังกฤษ ตัวเลข - หรือ _)`)
       return
     }
     setLoading(true)
     const { error: signInError } = await supabase.auth.signInWithPassword({ email: toAuthEmail(userId), password })
     setLoading(false)
     if (signInError) {
-      setError('Incorrect User ID or password')
+      setError('User ID หรือรหัสผ่านไม่ถูกต้อง')
       return
     }
     router.push('/dashboard')

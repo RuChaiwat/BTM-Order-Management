@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
 import { PENDING_BATCH_STATUSES, cancelPendingConsolidationBatch } from '@/lib/consolidationCleanup'
+import { batchStatusLabel } from '@/lib/matching/batchStatus'
 
 // The lifecycle used to require two clicks (Approve, then Release) before a batch's pick report
 // could be printed. Collapsed into a single "Approve" action that does both at once: it moves the
@@ -27,22 +29,22 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
 
   const { action, picker_id: pickerId, result } = await request.json()
   if (!['approve', 'complete', 'cancel'].includes(action)) {
-    return NextResponse.json({ error: "action must be 'approve', 'complete' or 'cancel'" }, { status: 400 })
+    return NextResponse.json({ error: 'คำสั่งไม่ถูกต้อง' }, { status: 400 })
   }
 
   const admin = createAdminClient()
   const { data: batch } = await admin.from('consolidation_batches').select('*').eq('consol_batch_id', params.batchId).single()
-  if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
+  if (!batch) return NextResponse.json({ error: 'ไม่พบ Batch นี้' }, { status: 404 })
 
   if (action === 'approve') {
-    if (!pickerId) return NextResponse.json({ error: 'picker_id is required to approve a batch' }, { status: 400 })
+    if (!pickerId) return NextResponse.json({ error: 'กรุณา scan Picker ก่อนอนุมัติ Batch' }, { status: 400 })
 
     const warehouseCode = caller.warehouse_code ?? 'DC002'
     const { data: picker, error: pickerError } = await admin.from('pickers').select('picker_id, name_en, active, warehouse_code').eq('picker_id', pickerId).maybeSingle()
-    if (pickerError) return NextResponse.json({ error: pickerError.message }, { status: 400 })
-    if (!picker || !picker.active) return NextResponse.json({ error: 'Picker not found or inactive — re-scan the badge' }, { status: 400 })
+    if (pickerError) return NextResponse.json({ error: dbErrorTh(pickerError) }, { status: 400 })
+    if (!picker || !picker.active) return NextResponse.json({ error: 'ไม่พบ Picker หรือถูกปิดใช้งาน กรุณา scan บัตรใหม่' }, { status: 400 })
     if (picker.warehouse_code && picker.warehouse_code !== warehouseCode) {
-      return NextResponse.json({ error: 'This Picker belongs to a different warehouse' }, { status: 400 })
+      return NextResponse.json({ error: 'Picker คนนี้อยู่คลังอื่น' }, { status: 400 })
     }
 
     const { data: rpcResult, error: rpcError } = await admin.rpc('approve_consolidation_batch', {
@@ -52,12 +54,12 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
     })
     if (rpcError) {
       if (rpcError.message.includes('NO_ORDERS_IN_BATCH')) {
-        return NextResponse.json({ error: 'This batch has no orders left to assign — it may have already been cancelled or reassigned' }, { status: 409 })
+        return NextResponse.json({ error: 'Batch นี้ไม่เหลือ Order ให้มอบหมาย อาจถูกยกเลิกหรือมอบหมายไปแล้ว' }, { status: 409 })
       }
       if (rpcError.message.includes('ORDER_NOT_AVAILABLE')) {
-        return NextResponse.json({ error: 'One or more orders in this batch were just assigned elsewhere — refresh and try again' }, { status: 409 })
+        return NextResponse.json({ error: 'มี Order ใน Batch นี้เพิ่งถูกมอบหมายจากที่อื่น กรุณารีเฟรชแล้วลองใหม่' }, { status: 409 })
       }
-      return NextResponse.json({ error: rpcError.message }, { status: 400 })
+      return NextResponse.json({ error: dbErrorTh(rpcError) }, { status: 400 })
     }
     const assignmentBatch = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult
 
@@ -78,7 +80,7 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
 
   if (action === 'complete') {
     if (!['100_percent', 'short'].includes(result ?? '')) {
-      return NextResponse.json({ error: "result must be '100_percent' or 'short'" }, { status: 400 })
+      return NextResponse.json({ error: 'ผลการหยิบไม่ถูกต้อง' }, { status: 400 })
     }
 
     // Mirrors POST /api/picker-completions: marking a batch "Completed" previously only ever
@@ -124,9 +126,9 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
       .eq('status', batch.status)
       .select()
       .maybeSingle()
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
     if (!updated) {
-      return NextResponse.json({ error: 'This batch was already changed by someone else — refresh and try again' }, { status: 409 })
+      return NextResponse.json({ error: 'Batch นี้เพิ่งถูกแก้ไขโดยคนอื่น กรุณารีเฟรชแล้วลองใหม่' }, { status: 409 })
     }
 
     await writeStatusHistory(admin, { entityType: 'consolidation_batches', entityId: params.batchId, oldStatus: batch.status, newStatus: 'completed', changedBy: caller.user_id })
@@ -146,11 +148,11 @@ export async function PATCH(request: Request, { params }: { params: { batchId: s
   // that's never actually been approved as a group; an already-approved/picking batch has real
   // assignment_batches/picker work behind it and needs Consolidation Pick Report's own flow.
   if (!PENDING_BATCH_STATUSES.includes(batch.status)) {
-    return NextResponse.json({ error: `Batch status is '${batch.status}' — can only cancel a batch still Pending Approval` }, { status: 409 })
+    return NextResponse.json({ error: `Batch นี้อยู่ในสถานะ "${batchStatusLabel(batch.status)}" ยกเลิกได้เฉพาะ Batch ที่รออนุมัติ` }, { status: 409 })
   }
   const cancelled = await cancelPendingConsolidationBatch(admin, params.batchId, batch.status, caller.user_id, 'consolidation_batch.cancel', 'Cancelled by admin')
   if (!cancelled) {
-    return NextResponse.json({ error: 'This batch was already changed by someone else — refresh and try again' }, { status: 409 })
+    return NextResponse.json({ error: 'Batch นี้เพิ่งถูกแก้ไขโดยคนอื่น กรุณารีเฟรชแล้วลองใหม่' }, { status: 409 })
   }
 
   const { data: updated } = await admin.from('consolidation_batches').select('*').eq('consol_batch_id', params.batchId).single()

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { orderStatusTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const orderNo = searchParams.get('order_no')?.trim()
-  if (!orderNo) return NextResponse.json({ error: 'order_no is required' }, { status: 400 })
+  if (!orderNo) return NextResponse.json({ error: 'กรุณากรอกเลข Order' }, { status: 400 })
 
   const admin = createAdminClient()
   const warehouseCode = caller.warehouse_code ?? 'DC002'
@@ -28,9 +29,9 @@ export async function GET(request: Request) {
     .eq('order_no', orderNo)
     .maybeSingle()
 
-  if (!order) return NextResponse.json({ error: `No order '${orderNo}' found in ${warehouseCode}` }, { status: 404 })
+  if (!order) return NextResponse.json({ error: `ไม่พบ Order ${orderNo} ในคลัง ${warehouseCode}` }, { status: 404 })
   if (order.status !== 'new') {
-    return NextResponse.json({ error: `Order ${order.order_no} is '${order.status}' — can only cancel while New/Pending (§8)` }, { status: 409 })
+    return NextResponse.json({ error: `Order ${order.order_no} อยู่ในสถานะ "${orderStatusTh(order.status)}" ยกเลิกได้เฉพาะ Order ที่ยังไม่มอบหมายงาน` }, { status: 409 })
   }
 
   return NextResponse.json({ order })

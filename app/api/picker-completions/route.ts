@@ -17,13 +17,13 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const pickerId = searchParams.get('picker_id')?.trim().toUpperCase()
-  if (!pickerId) return NextResponse.json({ error: 'picker_id is required' }, { status: 400 })
+  if (!pickerId) return NextResponse.json({ error: 'ต้องระบุรหัส Picker' }, { status: 400 })
 
   const admin = createAdminClient()
   const warehouseCode = caller.warehouse_code ?? 'DC002'
   const { data: picker } = await admin.from('pickers').select('picker_id, name_en, name_th, active').eq('picker_id', pickerId).eq('warehouse_code', warehouseCode).maybeSingle()
-  if (!picker) return NextResponse.json({ error: `No picker with ID '${pickerId}' in ${warehouseCode}` }, { status: 404 })
-  if (!picker.active) return NextResponse.json({ error: `${picker.name_th || picker.name_en} (${picker.picker_id}) is inactive` }, { status: 409 })
+  if (!picker) return NextResponse.json({ error: `ไม่พบ Picker รหัส ${pickerId} ในคลัง ${warehouseCode}` }, { status: 404 })
+  if (!picker.active) return NextResponse.json({ error: `${picker.name_th || picker.name_en} (${picker.picker_id}) ถูกปิดใช้งาน` }, { status: 409 })
 
   const orders = await getPickerActiveOrders(admin, warehouseCode, pickerId)
   return NextResponse.json({ picker, orders })
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
   const { order_id, picker_id, result } = (await request.json()) as { order_id?: string; picker_id?: string; result?: '100_percent' | 'short' }
   if (!order_id || !picker_id || !['100_percent', 'short'].includes(result ?? '')) {
-    return NextResponse.json({ error: "order_id, picker_id, and result ('100_percent' | 'short') are required" }, { status: 400 })
+    return NextResponse.json({ error: 'ข้อมูลไม่ครบ: ต้องระบุ Order, Picker และผลการหยิบ' }, { status: 400 })
   }
 
   const admin = createAdminClient()

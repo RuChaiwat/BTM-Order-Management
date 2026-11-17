@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -36,9 +37,9 @@ export async function POST(request: Request) {
   const body = await request.json()
   const rows = (body.rows ?? []) as PickerImportRow[]
   const warehouseCode: string | null = caller.warehouse_code ?? body.warehouse_code ?? null
-  if (rows.length === 0) return NextResponse.json({ error: 'The Pickers sheet has no data rows · ไม่พบข้อมูลในชีต Pickers' }, { status: 400 })
+  if (rows.length === 0) return NextResponse.json({ error: 'ไม่พบข้อมูลในชีต Pickers' }, { status: 400 })
   if (rows.length > PICKER_IMPORT_MAX_ROWS) {
-    return NextResponse.json({ error: `Too many rows (${rows.length}) — max ${PICKER_IMPORT_MAX_ROWS} per upload` }, { status: 400 })
+    return NextResponse.json({ error: `ไฟล์มี ${rows.length} แถว เกินจำนวนสูงสุด ${PICKER_IMPORT_MAX_ROWS} แถวต่อครั้ง` }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
         .select('picker_id, name_en, name_th, employment_type, note, warehouse_code, zone_scope, active, shift_label')
         .in('picker_id', [...new Set(ids)])
     : { data: [] as PickerRecord[], error: null }
-  if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 })
+  if (existingError) return NextResponse.json({ error: dbErrorTh(existingError) }, { status: 500 })
   const existingById = new Map((existingRows ?? []).map((p) => [p.picker_id, p as PickerRecord]))
 
   const errors: PickerImportError[] = []
@@ -73,16 +74,16 @@ export async function POST(request: Request) {
     const note = r.note.trim()
     const typeCode = typeByKey.get(r.employment_type.trim().toLowerCase())
 
-    if (!pickerId) rowErrors.push('Picker ID is required · ต้องกรอก Picker ID')
-    else if (!isValidUserId(pickerId)) rowErrors.push(`Picker ID "${pickerId}" must be 1-${USER_ID_MAX_LENGTH} characters (A-Z, 0-9, - or _)`)
-    else if (seen.has(pickerId)) rowErrors.push(`Picker ID "${pickerId}" appears more than once in the file (also row ${seen.get(pickerId)}) · Picker ID ซ้ำในไฟล์`)
-    if (!nameTh) rowErrors.push('Name (TH) is required · ต้องกรอกชื่อภาษาไทย')
-    if (!r.employment_type.trim()) rowErrors.push('Employment Type is required · ต้องกรอกประเภทการจ้างงาน')
-    else if (!typeCode) rowErrors.push(`Employment Type "${r.employment_type.trim()}" is not in the Employment Types list · ไม่พบประเภทการจ้างงานนี้`)
+    if (!pickerId) rowErrors.push('ต้องกรอก Picker ID')
+    else if (!isValidUserId(pickerId)) rowErrors.push(`Picker ID "${pickerId}" ต้องยาว 1-${USER_ID_MAX_LENGTH} ตัวอักษร (A-Z, 0-9, - หรือ _)`)
+    else if (seen.has(pickerId)) rowErrors.push(`Picker ID "${pickerId}" ซ้ำในไฟล์ (ซ้ำกับแถว ${seen.get(pickerId)})`)
+    if (!nameTh) rowErrors.push('ต้องกรอกชื่อภาษาไทย')
+    if (!r.employment_type.trim()) rowErrors.push('ต้องกรอกประเภทการจ้างงาน')
+    else if (!typeCode) rowErrors.push(`ไม่พบประเภทการจ้างงาน "${r.employment_type.trim()}" ในระบบ`)
 
     const existing = pickerId ? existingById.get(pickerId) : undefined
     if (existing && warehouseCode && existing.warehouse_code && existing.warehouse_code !== warehouseCode) {
-      rowErrors.push(`Picker ID "${pickerId}" belongs to warehouse ${existing.warehouse_code} · พนักงานคนนี้อยู่คลังอื่น`)
+      rowErrors.push(`Picker ID "${pickerId}" อยู่คลัง ${existing.warehouse_code} (คลังอื่น)`)
     }
 
     if (pickerId && !seen.has(pickerId)) seen.set(pickerId, r.rowNumber)
@@ -120,12 +121,12 @@ export async function POST(request: Request) {
   }
 
   if (errors.length > 0) {
-    return NextResponse.json({ error: `${errors.length} row(s) need fixing — nothing was imported · มี ${errors.length} แถวต้องแก้ไข ยังไม่ได้นำเข้าข้อมูลใดๆ`, errors }, { status: 400 })
+    return NextResponse.json({ error: `มี ${errors.length} แถวต้องแก้ไข ยังไม่ได้นำเข้าข้อมูลใดๆ`, errors }, { status: 400 })
   }
 
   // One statement for every row -- either the whole file lands or none of it does.
   const { error: upsertError } = await admin.from('pickers').upsert(upserts, { onConflict: 'picker_id' })
-  if (upsertError) return NextResponse.json({ error: `Import failed, nothing was saved: ${upsertError.message}` }, { status: 400 })
+  if (upsertError) return NextResponse.json({ error: `Import ไม่สำเร็จ ยังไม่มีข้อมูลถูกบันทึก: ${dbErrorTh(upsertError)}` }, { status: 400 })
 
   await writeAudit(admin, {
     userId: caller.user_id,

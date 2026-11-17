@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const pickerId = searchParams.get('picker_id')?.trim().toUpperCase()
-  if (!pickerId) return NextResponse.json({ error: 'picker_id is required' }, { status: 400 })
+  if (!pickerId) return NextResponse.json({ error: 'ต้องระบุรหัส Picker' }, { status: 400 })
 
   const admin = createAdminClient()
   const warehouseCode = caller.warehouse_code ?? 'DC002'

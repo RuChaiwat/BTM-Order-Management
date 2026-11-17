@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
   const formData = await request.formData()
   const file = formData.get('file')
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: 'file is required (multipart/form-data)' }, { status: 400 })
+    return NextResponse.json({ error: 'กรุณาเลือกไฟล์' }, { status: 400 })
   }
 
   const rows = await parseSpreadsheet(file)
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
     .filter((r) => r.bin_code && r.warehouse_code)
 
   if (parsed.length === 0) {
-    return NextResponse.json({ error: 'No valid rows found — required columns: Bin Code, Warehouse Code, Zone Code, Aisle, Side, Bay, Level, Block' }, { status: 400 })
+    return NextResponse.json({ error: 'ไม่พบข้อมูลที่ใช้ได้ในไฟล์ ต้องมีคอลัมน์: Bin Code, Warehouse Code, Zone Code, Aisle, Side, Bay, Level, Block' }, { status: 400 })
   }
 
   const byWarehouse = new Map<string, typeof parsed>()
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
   }
 
   if (records.length === 0) {
-    return NextResponse.json({ error: 'No rows had Aisle, Side, Bay, and Level to compute a Pick Sequence from' }, { status: 400 })
+    return NextResponse.json({ error: 'ไม่มีแถวที่มี Aisle, Side, Bay และ Level ครบ จึงคำนวณ Pick Sequence ไม่ได้' }, { status: 400 })
   }
 
   // Chunked so a full Location Master reload (tens of thousands of bins in one file, per §6's
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
     const chunk = records.slice(i, i + UPSERT_CHUNK_SIZE)
     const { error, count } = await admin.from('locations').upsert(chunk, { onConflict: 'warehouse_code,bin_code', count: 'exact' })
     if (error) {
-      return NextResponse.json({ error: `${error.message} (failed on rows ${i + 1}-${i + chunk.length} of ${records.length}; ${upsertedCount} rows already saved)` }, { status: 400 })
+      return NextResponse.json({ error: `${dbErrorTh(error)} (ผิดพลาดที่แถว ${i + 1}-${i + chunk.length} จาก ${records.length} แถว · บันทึกไปแล้ว ${upsertedCount} แถว)` }, { status: 400 })
     }
     upsertedCount += count ?? chunk.length
   }

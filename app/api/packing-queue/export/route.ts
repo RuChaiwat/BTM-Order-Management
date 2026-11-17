@@ -9,8 +9,8 @@ import { bangkokDateKey, formatDate, formatDateTime } from '@/lib/formatDate'
 /** Orders waiting to pack -- Export to Excel (same rows as /packing-dashboard/queue). */
 export async function GET() {
   const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!canAccessMenuItem(user.role, 21)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
+  if (!canAccessMenuItem(user.role, 21)) return NextResponse.json({ error: 'คุณไม่มีสิทธิ์ทำรายการนี้' }, { status: 403 })
 
   const rows = await getPackQueue(createAdminClient(), user.warehouse_code ?? 'DC002')
   const header = ['Order No', 'Store', 'Shipment Date', 'Pick Result', 'Items', 'Pieces', 'Verified At', 'Waiting (min)']

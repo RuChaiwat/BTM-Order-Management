@@ -78,12 +78,12 @@ export function UploadForm({ endpoint, label, hint }: UploadFormProps) {
         setInputKey((k) => k + 1)
         router.refresh()
       } else {
-        setError(body?.error ?? `Upload failed (HTTP ${xhr.status})`)
+        setError(body?.error ?? `Upload ไม่สำเร็จ (รหัส ${xhr.status}) กรุณาลองใหม่`)
         setPhase('error')
       }
     }
     xhr.onerror = () => {
-      setError('Upload failed — check your connection and try again')
+      setError('Upload ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่')
       setPhase('error')
     }
     xhr.send(formData)

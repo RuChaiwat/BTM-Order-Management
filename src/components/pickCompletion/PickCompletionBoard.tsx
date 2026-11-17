@@ -187,7 +187,7 @@ export function PickCompletionBoard({
     await refreshOrders()
     setUnassigning(false)
     setShowUnassignAll(false)
-    if (failures.length > 0) setSubmitError(`Unassign failed for ${failures.length} order(s) — ${failures.join('; ')}`)
+    if (failures.length > 0) setSubmitError(`ยกเลิกการมอบหมายไม่สำเร็จ ${failures.length} Order — ${failures.join('; ')}`)
     router.refresh()
   }
 

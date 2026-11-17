@@ -14,7 +14,7 @@ export async function GET(_request: Request, { params }: { params: { issueId: st
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
   const detail = await getPackIssueDetail(createAdminClient(), params.issueId)
-  if (!detail) return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
+  if (!detail) return NextResponse.json({ error: 'ไม่พบเรื่องนี้' }, { status: 404 })
   return NextResponse.json(detail, { headers: { 'Cache-Control': 'no-store' } })
 }
 
@@ -42,9 +42,9 @@ export async function POST(request: Request, { params }: { params: { issueId: st
   }
   const admin = createAdminClient()
   const { data: issue } = await admin.from('pack_issues').select('*').eq('issue_id', params.issueId).maybeSingle()
-  if (!issue) return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
+  if (!issue) return NextResponse.json({ error: 'ไม่พบเรื่องนี้' }, { status: 404 })
   if (caller.warehouse_code && issue.warehouse_code && issue.warehouse_code !== caller.warehouse_code) {
-    return NextResponse.json({ error: 'This issue belongs to another warehouse' }, { status: 403 })
+    return NextResponse.json({ error: 'เรื่องนี้เป็นของคลังอื่น' }, { status: 403 })
   }
 
   if (body.action === 'acknowledge') {
@@ -55,28 +55,28 @@ export async function POST(request: Request, { params }: { params: { issueId: st
       .eq('status', 'open')
       .select('issue_id')
       .maybeSingle()
-    if (!row) return NextResponse.json({ error: 'มีคนรับเรื่องนี้ไปแล้ว · Already taken by someone else' }, { status: 409 })
+    if (!row) return NextResponse.json({ error: 'มีคนรับเรื่องนี้ไปแล้ว' }, { status: 409 })
     await writeAudit(admin, { userId: caller.user_id, action: 'pack_issue.acknowledge', entityType: 'pack_issues', entityId: issue.issue_id })
     return NextResponse.json({ ok: true })
   }
 
-  if (body.action !== 'resolve') return NextResponse.json({ error: "action must be 'acknowledge' or 'resolve'" }, { status: 400 })
-  if (issue.status === 'resolved') return NextResponse.json({ error: 'เรื่องนี้ปิดไปแล้ว · Already resolved' }, { status: 409 })
-  if (!body.root_cause || !PACK_ROOT_CAUSES.some((r) => r.code === body.root_cause)) return NextResponse.json({ error: 'เลือกสาเหตุจริง · Choose a root cause' }, { status: 400 })
-  if (body.resolution !== 'closed_by_admin' && body.resolution !== 'returned_to_pack') return NextResponse.json({ error: 'resolution is required' }, { status: 400 })
+  if (body.action !== 'resolve') return NextResponse.json({ error: 'คำสั่งไม่ถูกต้อง' }, { status: 400 })
+  if (issue.status === 'resolved') return NextResponse.json({ error: 'เรื่องนี้ปิดไปแล้ว' }, { status: 409 })
+  if (!body.root_cause || !PACK_ROOT_CAUSES.some((r) => r.code === body.root_cause)) return NextResponse.json({ error: 'เลือกสาเหตุจริง' }, { status: 400 })
+  if (body.resolution !== 'closed_by_admin' && body.resolution !== 'returned_to_pack') return NextResponse.json({ error: 'กรุณาเลือกผลการตรวจสอบ' }, { status: 400 })
 
   // Optional quantity corrections, validated before anything is written.
   const corrections = Object.entries(body.line_qty ?? {})
   const { data: lines } = await admin.from('pack_issue_lines').select('id, qty').eq('issue_id', issue.issue_id)
   const lineIds = new Set((lines ?? []).map((l) => l.id))
   for (const [id, qty] of corrections) {
-    if (!lineIds.has(id)) return NextResponse.json({ error: 'Unknown issue line' }, { status: 400 })
+    if (!lineIds.has(id)) return NextResponse.json({ error: 'ไม่พบรายการสินค้าในเรื่องนี้ กรุณารีเฟรชแล้วลองใหม่' }, { status: 400 })
     if (!Number.isInteger(qty) || qty < 1) return NextResponse.json({ error: 'จำนวนที่มีปัญหาต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป' }, { status: 400 })
   }
 
   const newPackStatus = body.resolution === 'closed_by_admin' ? 'packed' : 'pending'
   const { data: flipped } = await admin.from('orders').update({ pack_status: newPackStatus }).eq('order_id', issue.order_id).eq('pack_status', 'issue').select('order_id').maybeSingle()
-  if (!flipped) return NextResponse.json({ error: 'สถานะ order เปลี่ยนไปแล้ว รีเฟรชแล้วลองใหม่ · Order status changed' }, { status: 409 })
+  if (!flipped) return NextResponse.json({ error: 'สถานะ order เปลี่ยนไปแล้ว รีเฟรชแล้วลองใหม่' }, { status: 409 })
 
   for (const [id, qty] of corrections) await admin.from('pack_issue_lines').update({ qty }).eq('id', id)
   if (issue.session_id) {

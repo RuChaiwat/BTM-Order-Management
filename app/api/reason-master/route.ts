@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -14,10 +15,10 @@ export async function POST(request: Request) {
 
   const { reason_code, reason_type, label_en, label_th } = await request.json()
   if (!reason_code || !reason_type || !label_en) {
-    return NextResponse.json({ error: 'reason_code, reason_type and label_en are required' }, { status: 400 })
+    return NextResponse.json({ error: 'กรุณากรอกรหัส ประเภท และชื่อเหตุผล' }, { status: 400 })
   }
   if (!['short_pick', 'cancel'].includes(reason_type)) {
-    return NextResponse.json({ error: "reason_type must be 'short_pick' or 'cancel'" }, { status: 400 })
+    return NextResponse.json({ error: 'ประเภทเหตุผลไม่ถูกต้อง' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
 
   await writeAudit(admin, { userId: caller.user_id, action: 'reason_master.create', entityType: 'reason_master', entityId: data.reason_code, after: data })
   return NextResponse.json({ reason: data }, { status: 201 })
@@ -43,7 +44,7 @@ export async function PATCH(request: Request) {
   }
 
   const { reason_code, label_en, label_th, active } = await request.json()
-  if (!reason_code) return NextResponse.json({ error: 'reason_code is required' }, { status: 400 })
+  if (!reason_code) return NextResponse.json({ error: 'กรุณากรอกรหัสเหตุผล' }, { status: 400 })
 
   const admin = createAdminClient()
   const { data: before } = await admin.from('reason_master').select('*').eq('reason_code', reason_code).single()
@@ -54,7 +55,7 @@ export async function PATCH(request: Request) {
   if (active !== undefined) patch.active = active
 
   const { data: after, error } = await admin.from('reason_master').update(patch).eq('reason_code', reason_code).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
 
   await writeAudit(admin, { userId: caller.user_id, action: 'reason_master.update', entityType: 'reason_master', entityId: reason_code, before, after })
   return NextResponse.json({ reason: after })

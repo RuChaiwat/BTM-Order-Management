@@ -31,7 +31,7 @@ export async function getSessionUser(): Promise<AppUser | null> {
 export async function requireRole(roles: string[]): Promise<AppUser> {
   const user = await getSessionUser()
   if (!user || !roles.includes(user.role)) {
-    throw new Error(user ? `Role '${user.role}' is not permitted for this action` : 'Not signed in')
+    throw new Error(user ? 'คุณไม่มีสิทธิ์ทำรายการนี้' : 'กรุณาเข้าสู่ระบบใหม่')
   }
   return user
 }

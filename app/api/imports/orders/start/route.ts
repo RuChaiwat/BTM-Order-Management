@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   const { file_name, total_rows } = await request.json()
   if (!file_name || typeof total_rows !== 'number') {
-    return NextResponse.json({ error: 'file_name and total_rows are required' }, { status: 400 })
+    return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 })
   }
 
   const admin = createAdminClient()

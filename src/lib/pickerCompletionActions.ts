@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { dbErrorTh, orderStatusTh } from '@/lib/apiError'
 import { writeAudit, writeStatusHistory } from './audit'
 
 export type SubmitPickerCompletionResult = { ok: true; status: string } | { ok: false; httpStatus: number; error: string }
@@ -22,14 +23,14 @@ export async function submitPickerCompletion(
   { orderId, pickerId, result, changedBy }: { orderId: string; pickerId: string; result: '100_percent' | 'short'; changedBy: string | null },
 ): Promise<SubmitPickerCompletionResult> {
   const { data: order } = await admin.from('orders').select('order_id, status, planned_pieces, assignment_batch_id, consolidation_batch_id').eq('order_id', orderId).single()
-  if (!order) return { ok: false, httpStatus: 404, error: 'Order not found' }
+  if (!order) return { ok: false, httpStatus: 404, error: 'ไม่พบ Order นี้' }
   if (!['assigned', 'in_progress', 'correction_in_progress'].includes(order.status)) {
-    return { ok: false, httpStatus: 409, error: `Order status is '${order.status}' — must be Assigned, In Progress, or returned for correction to complete` }
+    return { ok: false, httpStatus: 409, error: `Order นี้อยู่ในสถานะ "${orderStatusTh(order.status)}" ยืนยันเสร็จได้เฉพาะ Order ที่มอบหมายแล้ว กำลังหยิบ หรือส่งกลับแก้ไข` }
   }
 
   const { data: batch } = await admin.from('assignment_batches').select('picker_id').eq('assignment_batch_id', order.assignment_batch_id ?? '').maybeSingle()
   if (!batch || batch.picker_id !== pickerId) {
-    return { ok: false, httpStatus: 409, error: 'This order is not assigned to that picker' }
+    return { ok: false, httpStatus: 409, error: 'Order นี้ไม่ได้มอบหมายให้ Picker คนนี้' }
   }
 
   const nowIso = new Date().toISOString()
@@ -47,7 +48,7 @@ export async function submitPickerCompletion(
     .select('order_id')
     .maybeSingle()
   if (!updatedOrder) {
-    return { ok: false, httpStatus: 409, error: 'This order was just updated elsewhere (e.g. an admin just Unassigned it) — refresh and try again' }
+    return { ok: false, httpStatus: 409, error: 'Order นี้เพิ่งถูกอัปเดตจากที่อื่น (เช่น Admin เพิ่งยกเลิกการมอบหมาย) กรุณารีเฟรชแล้วลองใหม่' }
   }
 
   // actual_pieces is only really known for a full pick -- for a short completion, the real count
@@ -57,7 +58,7 @@ export async function submitPickerCompletion(
   const { error: completionError } = await admin
     .from('picker_completions')
     .upsert({ order_id: orderId, picker_completed_time: nowIso, actual_pieces: actualPieces, result }, { onConflict: 'order_id' })
-  if (completionError) return { ok: false, httpStatus: 400, error: completionError.message }
+  if (completionError) return { ok: false, httpStatus: 400, error: dbErrorTh(completionError) }
 
   await writeStatusHistory(admin, { entityType: 'orders', entityId: orderId, oldStatus: order.status, newStatus, changedBy })
   await writeAudit(admin, { userId: changedBy, action: 'picker_completion.create', entityType: 'orders', entityId: orderId, after: { result, picker_id: pickerId } })

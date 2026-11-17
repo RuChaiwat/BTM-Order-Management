@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -20,7 +21,7 @@ export async function PATCH(request: Request) {
 
   const { key, value, scope, change_reason } = await request.json()
   if (!key || value === undefined) {
-    return NextResponse.json({ error: 'key and value are required' }, { status: 400 })
+    return NextResponse.json({ error: 'ข้อมูลไม่ครบ: ต้องระบุค่าที่จะบันทึก' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -34,7 +35,7 @@ export async function PATCH(request: Request) {
     const yellow = key === PACKING_LONG_SESSION_KEY ? Number(value) : otherVal
     const red = key === PACKING_RED_KEY ? Number(value) : otherVal
     if (!(red > yellow)) {
-      return NextResponse.json({ error: `สีแดง (${red} นาที) ต้องมากกว่าสีเหลือง (${yellow} นาที) · Red must be more than yellow` }, { status: 400 })
+      return NextResponse.json({ error: `สีแดง (${red} นาที) ต้องมากกว่าสีเหลือง (${yellow} นาที)` }, { status: 400 })
     }
   }
   const reason = change_reason || 'Updated from Configuration settings'
@@ -54,7 +55,7 @@ export async function PATCH(request: Request) {
     .insert({ key, value, scope: effectiveScope, version: nextVersion, active: true, changed_by: caller.user_id, change_reason: reason })
     .select()
     .single()
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 400 })
+  if (insertError) return NextResponse.json({ error: dbErrorTh(insertError) }, { status: 400 })
 
   if (current) {
     await admin.from('configuration').update({ active: false }).eq('id', current.id)

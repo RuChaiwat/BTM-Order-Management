@@ -10,11 +10,11 @@ import { bangkokDateKey, formatDate } from '@/lib/formatDate'
 /** Packing Productivity (one day) -- Export to Excel: per packer, per station, per hour. */
 export async function GET(request: Request) {
   const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!canAccessMenuItem(user.role, 25)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
+  if (!canAccessMenuItem(user.role, 25)) return NextResponse.json({ error: 'คุณไม่มีสิทธิ์ทำรายการนี้' }, { status: 403 })
 
   const date = new URL(request.url).searchParams.get('date') || bangkokDateKey(new Date()) || new Date().toISOString().slice(0, 10)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'วันที่ไม่ถูกต้อง' }, { status: 400 })
   const admin = createAdminClient()
   const [data, settings] = await Promise.all([getPackingProductivity(admin, user.warehouse_code ?? 'DC002', date), getPackingSettings(admin)])
   const target = settings.targetPcsPerHour

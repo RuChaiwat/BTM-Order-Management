@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
   const { import_id, rows } = (await request.json()) as { import_id?: string; rows?: RawImportRow[] }
   if (!import_id || !Array.isArray(rows)) {
-    return NextResponse.json({ error: 'import_id and rows[] are required' }, { status: 400 })
+    return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 })
   }
 
   const admin = createAdminClient()

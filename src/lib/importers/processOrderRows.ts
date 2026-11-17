@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { dbErrorTh, orderStatusTh } from '@/lib/apiError'
 import { col, normalizeDate } from './parseSpreadsheet'
 
 export interface RawImportRow {
@@ -95,7 +96,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
     ].filter(Boolean)
 
     if (missing.length > 0) {
-      errors.push({ rowNumber, raw: row, reason: `Missing/invalid required field(s): ${missing.join(', ')} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' })
+      errors.push({ rowNumber, raw: row, reason: `ข้อมูลไม่ครบหรือไม่ถูกต้อง: ${missing.join(', ')} — แถวนี้ยังไม่ถูกนำเข้า แก้ไขแล้ว upload ใหม่`, severity: 'blocking' })
       continue
     }
 
@@ -183,7 +184,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
     if (insertError) {
       for (const g of newGroups) {
         g.lines.forEach((l) =>
-          errors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `Failed to create order: ${insertError.message} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' }),
+          errors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `สร้าง Order ไม่สำเร็จ: ${dbErrorTh(insertError)} — แถวนี้ยังไม่ถูกนำเข้า แก้ไขแล้ว upload ใหม่`, severity: 'blocking' }),
         )
       }
     } else {
@@ -227,13 +228,13 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
     // row that DO NOTHING skipped -- either way, fail loud instead of silently reporting 0
     // orders/lines imported while actually writing nothing for this order.
     if (newGroups.includes(g) && !insertedByKey.has(g.key)) {
-      const alreadyReported = errors.some((e) => e.reason.startsWith('Failed to create order:') && g.lines.some((l) => l.rowNumber === e.rowNumber))
+      const alreadyReported = errors.some((e) => e.reason.startsWith('สร้าง Order ไม่สำเร็จ:') && g.lines.some((l) => l.rowNumber === e.rowNumber))
       if (!alreadyReported) {
         g.lines.forEach((l) =>
           errors.push({
             rowNumber: l.rowNumber,
             raw: l.raw,
-            reason: `Order could not be found or created (internal key mismatch after upsert) — this row was NOT imported, fix and re-upload it`,
+            reason: `หาหรือสร้าง Order ไม่สำเร็จ — แถวนี้ยังไม่ถูกนำเข้า แก้ไขแล้ว upload ใหม่`,
             severity: 'blocking',
           }),
         )
@@ -255,7 +256,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
     errors.push({
       rowNumber: first.rowNumber,
       raw: first.raw,
-      reason: `Order ${group.orderNo} is already '${status}' (assigned or further) — duplicate NOT updated from this file; its ${group.lines.length} line(s) were left as they are. ออเดอร์นี้มอบหมายงานแล้ว จึงไม่อัปเดตตามไฟล์`,
+      reason: `Order ${group.orderNo} อยู่ในสถานะ "${orderStatusTh(status)}" แล้ว จึงไม่อัปเดตตามไฟล์นี้ (${group.lines.length} รายการคงเดิม)`,
       severity: 'warning',
     })
   }
@@ -271,7 +272,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
         errors.push({
           rowNumber: line.rowNumber,
           raw: line.raw,
-          reason: `Invalid Bin Code '${line.binCode}': not found in Location Master or inactive (§5.2, UAT-03) — the order line was still imported, but has no Zone/Pick Sequence. Safe to leave, or fix the Bin Code and re-upload to backfill it.`,
+          reason: `Invalid Bin Code '${line.binCode}': ไม่พบใน Location Master หรือถูกปิดใช้งาน — รายการนี้นำเข้าแล้วแต่ยังไม่มี Zone/Pick Sequence แก้ Bin Code แล้ว upload ใหม่เพื่อเติมข้อมูลได้`,
           severity: 'warning',
         })
       } else if (!location.zone_code) {
@@ -281,7 +282,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
         errors.push({
           rowNumber: line.rowNumber,
           raw: line.raw,
-          reason: `Bin Code '${line.binCode}' has no Zone Code set in Location Master — the order line was still imported, but won't appear on Order Density by Zone / Zone Dashboard until Location Master is updated.`,
+          reason: `Bin Code '${line.binCode}' ยังไม่ได้ตั้ง Zone Code ใน Location Master — รายการนี้นำเข้าแล้ว แต่จะไม่แสดงใน Order Density by Zone / Zone Dashboard จนกว่าจะแก้ Location Master`,
           severity: 'warning',
         })
       }
@@ -313,7 +314,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
       { onConflict: 'order_id,sku,bin_code,source_line_id' },
     )
     if (!linesError) linesUpserted = lineRows.length
-    else lineRows.forEach((l) => errors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `${linesError.message} — this row was NOT imported, fix and re-upload it`, severity: 'blocking' }))
+    else lineRows.forEach((l) => errors.push({ rowNumber: l.rowNumber, raw: l.raw, reason: `${dbErrorTh(linesError)} — แถวนี้ยังไม่ถูกนำเข้า แก้ไขแล้ว upload ใหม่`, severity: 'blocking' }))
   }
 
   // Step 4: recompute planned_pieces/unique_sku_count for every order touched by this batch in one

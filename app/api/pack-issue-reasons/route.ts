@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     .insert({ reason_code: code, label_th: labelTh, label_en: labelEn, sort_order: (last?.sort_order ?? 0) + 10, created_by: caller.user_id, updated_by: caller.user_id })
     .select()
     .single()
-  if (error) return NextResponse.json({ error: error.code === '23505' ? `รหัส ${code} มีอยู่แล้ว · already exists` : error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: error.code === '23505' ? `รหัส ${code} มีอยู่แล้ว` : dbErrorTh(error) }, { status: 400 })
 
   await writeAudit(admin, { userId: caller.user_id, action: 'pack_issue_reason.create', entityType: 'pack_issue_reasons', entityId: code, after: data })
   return NextResponse.json({ reason: data }, { status: 201 })
@@ -42,22 +43,22 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
   const { reason_code, label_th, label_en, active } = await request.json()
-  if (!reason_code) return NextResponse.json({ error: 'reason_code is required' }, { status: 400 })
+  if (!reason_code) return NextResponse.json({ error: 'กรุณากรอกรหัสเหตุผล' }, { status: 400 })
 
   const admin = createAdminClient()
   const { data: before } = await admin.from('pack_issue_reasons').select('*').eq('reason_code', reason_code).maybeSingle()
-  if (!before) return NextResponse.json({ error: 'Reason not found' }, { status: 404 })
+  if (!before) return NextResponse.json({ error: 'ไม่พบเหตุผลนี้' }, { status: 404 })
 
   const patch: Record<string, unknown> = { updated_by: caller.user_id, updated_at: new Date().toISOString() }
   if (typeof label_th === 'string') {
-    if (!label_th.trim()) return NextResponse.json({ error: 'Thai label is required' }, { status: 400 })
+    if (!label_th.trim()) return NextResponse.json({ error: 'กรุณากรอกชื่อภาษาไทย' }, { status: 400 })
     patch.label_th = label_th.trim()
   }
   if (typeof label_en === 'string' && label_en.trim()) patch.label_en = label_en.trim()
   if (typeof active === 'boolean') patch.active = active
 
   const { data: after, error } = await admin.from('pack_issue_reasons').update(patch).eq('reason_code', reason_code).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
   await writeAudit(admin, { userId: caller.user_id, action: 'pack_issue_reason.update', entityType: 'pack_issue_reasons', entityId: reason_code, before, after })
   return NextResponse.json({ reason: after })
 }

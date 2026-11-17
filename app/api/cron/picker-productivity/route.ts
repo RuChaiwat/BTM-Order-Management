@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getActiveConfig } from '@/lib/queries/config'
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
   if (!isCron) {
     const user = await getSessionUser()
     if (!user || user.role !== 'system_admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
     }
   }
 
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   const targetPcsPerHour = Number(cfg.value('picker_productivity.target_pcs_per_hour') ?? 4500)
 
   const { data: updatedCount, error } = await admin.rpc('recompute_picker_productivity', { p_target_pcs_per_hour: targetPcsPerHour })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: dbErrorTh(error) }, { status: 500 })
 
   await writeAudit(admin, {
     userId: null,

@@ -22,7 +22,7 @@ const BANDS: Band[] = ['green', 'yellow', 'red']
  */
 export async function GET(request: Request) {
   const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: 'Not signed in' }, { status: 403 })
+  if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบใหม่' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const warehouseCode = user.warehouse_code ?? 'DC002'

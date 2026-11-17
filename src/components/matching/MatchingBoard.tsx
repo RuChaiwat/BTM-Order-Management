@@ -99,8 +99,8 @@ export function MatchingBoard({
       // A route crash (rather than a handled { error } response) sends back an HTML error page,
       // not JSON -- res.json() would throw and previously left the button stuck on "Matching…"
       // forever with no visible error, reading as "the button did nothing" rather than a failure.
-      const body = await res.json().catch(() => ({ error: `Request failed (HTTP ${res.status})` }))
-      if (!res.ok) return setError(body.error ?? `Request failed (HTTP ${res.status})`)
+      const body = await res.json().catch(() => ({ error: `ทำรายการไม่สำเร็จ (รหัส ${res.status}) กรุณาลองใหม่` }))
+      if (!res.ok) return setError(body.error ?? `ทำรายการไม่สำเร็จ (รหัส ${res.status}) กรุณาลองใหม่`)
       setResult(body)
       // Run and review always show the same Order Date — jump the review list to whatever date was
       // just run, or just refresh in place if it was already the date being reviewed.
@@ -144,7 +144,7 @@ export function MatchingBoard({
           body: JSON.stringify({ action: 'approve', picker_id: pickerId }),
         })
         const body = await res.json()
-        if (!res.ok) throw new Error(body.error ?? 'Approve failed')
+        if (!res.ok) throw new Error(body.error ?? 'อนุมัติไม่สำเร็จ')
         approvedIds.push(id)
       } catch (e) {
         failures.push(`${id.slice(0, 8)}: ${(e as Error).message}`)
@@ -181,7 +181,7 @@ export function MatchingBoard({
     setPickerScanError(null)
     const match = pickers.find((p) => p.picker_id === value.toUpperCase())
     if (!match) {
-      setPickerScanError(`No active picker with ID '${value}'`)
+      setPickerScanError(`ไม่พบ Picker รหัส ${value} หรือถูกปิดใช้งาน`)
       return
     }
     setScannedPicker(match)

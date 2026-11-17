@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 403 })
   }
   const { session_id, reason } = (await request.json()) as { session_id?: string; reason?: string }
-  if (!session_id || !reason?.trim()) return NextResponse.json({ error: 'session_id and reason are required · ต้องระบุเหตุผล' }, { status: 400 })
+  if (!session_id || !reason?.trim()) return NextResponse.json({ error: 'กรุณาระบุเหตุผล' }, { status: 400 })
 
   const admin = createAdminClient()
   let q = admin
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     .is('finished_at', null)
   if (caller.warehouse_code) q = q.eq('warehouse_code', caller.warehouse_code)
   const { data: session } = await q.select('session_id, order_id, picker_id, station_code').maybeSingle()
-  if (!session) return NextResponse.json({ error: 'งานนี้ถูกปิดไปแล้ว · Already finished or not found' }, { status: 409 })
+  if (!session) return NextResponse.json({ error: 'งานนี้ถูกปิดไปแล้ว' }, { status: 409 })
 
   await admin.from('orders').update({ pack_status: 'pending' }).eq('order_id', session.order_id).eq('pack_status', 'packing')
   await writeStatusHistory(admin, { entityType: 'order_pack', entityId: session.order_id, oldStatus: 'packing', newStatus: 'pending', changedBy: caller.user_id, reason: reason.trim() })

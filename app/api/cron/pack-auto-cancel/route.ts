@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const isCron = !!secret && request.headers.get('authorization') === `Bearer ${secret}`
   if (!isCron) {
     const user = await getSessionUser()
-    if (!user || user.role !== 'system_admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user || user.role !== 'system_admin') return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
   }
   const cancelled = await cancelStalePackSessions(createAdminClient())
   return NextResponse.json({ cancelled })

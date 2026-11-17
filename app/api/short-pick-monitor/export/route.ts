@@ -12,11 +12,11 @@ import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
  * page, not kept as a periodic snapshot file. */
 export async function GET(request: Request) {
   const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
   const date = searchParams.get('date')
-  if (!date) return NextResponse.json({ error: 'date is required' }, { status: 400 })
+  if (!date) return NextResponse.json({ error: 'กรุณาเลือกวันที่' }, { status: 400 })
   const zone = searchParams.get('zone')
 
   const admin = createAdminClient()

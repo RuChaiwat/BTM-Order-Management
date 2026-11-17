@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { orderStatusTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
@@ -15,13 +16,13 @@ export async function POST(request: Request, { params }: { params: { orderId: st
   }
 
   const { reason } = await request.json()
-  if (!reason) return NextResponse.json({ error: 'reason is required (§12.1.2, immutable audit record)' }, { status: 400 })
+  if (!reason) return NextResponse.json({ error: 'กรุณาเลือกเหตุผลการยกเลิก' }, { status: 400 })
 
   const admin = createAdminClient()
   const { data: order } = await admin.from('orders').select('order_id, status').eq('order_id', params.orderId).single()
-  if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+  if (!order) return NextResponse.json({ error: 'ไม่พบ Order นี้' }, { status: 404 })
   if (order.status !== 'new') {
-    return NextResponse.json({ error: `Order status is '${order.status}' — can only cancel while New/Pending (§8)` }, { status: 409 })
+    return NextResponse.json({ error: `Order นี้อยู่ในสถานะ "${orderStatusTh(order.status)}" ยกเลิกได้เฉพาะ Order ที่ยังไม่มอบหมายงาน` }, { status: 409 })
   }
 
   const nowIso = new Date().toISOString()
@@ -38,7 +39,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     .select('order_id')
     .maybeSingle()
   if (!updatedOrder) {
-    return NextResponse.json({ error: 'This order was just assigned or changed elsewhere — refresh and try again' }, { status: 409 })
+    return NextResponse.json({ error: 'Order นี้เพิ่งถูกมอบหมายหรือแก้ไขจากที่อื่น กรุณารีเฟรชแล้วลองใหม่' }, { status: 409 })
   }
   await writeStatusHistory(admin, { entityType: 'orders', entityId: params.orderId, oldStatus: 'new', newStatus: 'cancelled', changedBy: caller.user_id, reason })
   await writeAudit(admin, { userId: caller.user_id, action: 'order.cancel', entityType: 'orders', entityId: params.orderId, after: { reason } })

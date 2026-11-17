@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -42,10 +43,10 @@ export async function POST(request: Request) {
   const { picker_id, name_en, name_th, warehouse_code, zone_scope, shift_label, note, employment_type } = body
 
   if (!picker_id || !name_th || !employment_type) {
-    return NextResponse.json({ error: 'picker_id, name_th, and employment_type are required' }, { status: 400 })
+    return NextResponse.json({ error: 'กรุณากรอก Picker ID, ชื่อภาษาไทย และประเภทการจ้างงาน' }, { status: 400 })
   }
   if (!isValidUserId(picker_id)) {
-    return NextResponse.json({ error: `picker_id must be 1-${USER_ID_MAX_LENGTH} characters (letters, numbers, - or _)` }, { status: 400 })
+    return NextResponse.json({ error: `Picker ID ต้องยาว 1-${USER_ID_MAX_LENGTH} ตัวอักษร (ตัวอักษรอังกฤษ ตัวเลข - หรือ _)` }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -90,7 +91,7 @@ export async function PATCH(request: Request) {
   const body = await request.json()
   const { picker_id, ...updates } = body
   if (!picker_id) {
-    return NextResponse.json({ error: 'picker_id is required' }, { status: 400 })
+    return NextResponse.json({ error: 'ต้องระบุรหัส Picker' }, { status: 400 })
   }
 
   const allowed = ['name_en', 'name_th', 'warehouse_code', 'zone_scope', 'active', 'shift_label', 'note', 'employment_type']
@@ -115,7 +116,7 @@ export async function PATCH(request: Request) {
 
   const { data: after, error } = await admin.from('pickers').update(patch).eq('picker_id', picker_id).select().single()
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
   }
 
   await writeAudit(admin, { userId: caller.user_id, action: 'picker.update', entityType: 'pickers', entityId: picker_id, before, after })
@@ -135,7 +136,7 @@ export async function DELETE(request: Request) {
 
   const { picker_id } = await request.json()
   if (!picker_id) {
-    return NextResponse.json({ error: 'picker_id is required' }, { status: 400 })
+    return NextResponse.json({ error: 'ต้องระบุรหัส Picker' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -147,13 +148,13 @@ export async function DELETE(request: Request) {
 
   const { count } = await admin.from('assignment_batches').select('assignment_batch_id', { count: 'exact', head: true }).eq('picker_id', picker_id)
   if (count && count > 0) {
-    return NextResponse.json({ error: `This Picker has ${count} assignment(s) on record — deactivate instead of deleting so that history stays attributable` }, { status: 400 })
+    return NextResponse.json({ error: `Picker คนนี้มีประวัติงาน ${count} รายการ ลบไม่ได้ ให้ปิดใช้งานแทนเพื่อเก็บประวัติไว้` }, { status: 400 })
   }
 
   const { data: before } = await admin.from('pickers').select('*').eq('picker_id', picker_id).single()
   const { error } = await admin.from('pickers').delete().eq('picker_id', picker_id)
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
   }
 
   await writeAudit(admin, { userId: caller.user_id, action: 'picker.delete', entityType: 'pickers', entityId: picker_id, before })

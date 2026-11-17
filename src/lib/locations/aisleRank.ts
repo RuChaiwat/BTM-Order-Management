@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { dbErrorTh } from '@/lib/apiError'
 
 /**
  * Looks up each Aisle's rank in the walking order, assigning a new one (always appended to the
@@ -22,7 +23,7 @@ export async function getOrAssignAisleRanks(admin: SupabaseClient, warehouseCode
 
   if (toInsert.length > 0) {
     const { error } = await admin.from('aisle_sequence').insert(toInsert)
-    if (error) throw new Error(`Failed to assign Aisle rank: ${error.message}`)
+    if (error) throw new Error(`กำหนดลำดับ Aisle ไม่สำเร็จ: ${dbErrorTh(error)}`)
   }
 
   return rankByAisle

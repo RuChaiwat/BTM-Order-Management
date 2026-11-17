@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -25,16 +26,16 @@ export async function POST(request: Request) {
   const { user_id, email, password, name_en, name_th, role, warehouse_code, zone_scope, employee_id, shift_label } = body
 
   if (!user_id || !password || !name_en || !role) {
-    return NextResponse.json({ error: 'user_id, password, name_en and role are required' }, { status: 400 })
+    return NextResponse.json({ error: 'กรุณากรอก User ID, รหัสผ่าน, ชื่อ และ Role' }, { status: 400 })
   }
   if (!isValidUserId(user_id)) {
-    return NextResponse.json({ error: `user_id must be 1-${USER_ID_MAX_LENGTH} characters (letters, numbers, - or _)` }, { status: 400 })
+    return NextResponse.json({ error: `User ID ต้องยาว 1-${USER_ID_MAX_LENGTH} ตัวอักษร (ตัวอักษรอังกฤษ ตัวเลข - หรือ _)` }, { status: 400 })
   }
   if (!VALID_ROLES.includes(role)) {
-    return NextResponse.json({ error: `role must be one of ${VALID_ROLES.join(', ')}` }, { status: 400 })
+    return NextResponse.json({ error: 'Role ไม่ถูกต้อง' }, { status: 400 })
   }
   if (!canManageUserRole(caller.role, role)) {
-    return NextResponse.json({ error: 'Only a System Admin can create a System Admin account' }, { status: 403 })
+    return NextResponse.json({ error: 'เฉพาะ System Admin เท่านั้นที่สร้างบัญชี System Admin ได้' }, { status: 403 })
   }
 
   const admin = createAdminClient()
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     email_confirm: true,
   })
   if (authError || !authUser.user) {
-    return NextResponse.json({ error: authError?.message ?? 'Failed to create auth user' }, { status: 400 })
+    return NextResponse.json({ error: authError ? dbErrorTh(authError, 'create auth user') : 'สร้างบัญชีไม่สำเร็จ กรุณาลองใหม่' }, { status: 400 })
   }
 
   const { data: employee, error: employeeError } = await admin
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
   if (employeeError) {
     // roll back the auth user so we don't leave an orphaned account with no employees_users row
     await admin.auth.admin.deleteUser(authUser.user.id)
-    return NextResponse.json({ error: employeeError.message }, { status: 400 })
+    return NextResponse.json({ error: dbErrorTh(employeeError) }, { status: 400 })
   }
 
   await writeAudit(admin, {
@@ -94,7 +95,7 @@ export async function PATCH(request: Request) {
   const body = await request.json()
   const { user_id, ...updates } = body
   if (!user_id) {
-    return NextResponse.json({ error: 'user_id is required' }, { status: 400 })
+    return NextResponse.json({ error: 'ต้องระบุ User ID' }, { status: 400 })
   }
 
   const allowed = ['role', 'warehouse_code', 'zone_scope', 'active', 'shift_label', 'name_en', 'name_th']
@@ -103,18 +104,18 @@ export async function PATCH(request: Request) {
   const admin = createAdminClient()
   const { data: before } = await admin.from('employees_users').select('*').eq('user_id', user_id).single()
   if (!before) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    return NextResponse.json({ error: 'ไม่พบผู้ใช้นี้' }, { status: 404 })
   }
   if (!canManageUserRole(caller.role, before.role)) {
-    return NextResponse.json({ error: 'Only a System Admin can edit another System Admin account' }, { status: 403 })
+    return NextResponse.json({ error: 'เฉพาะ System Admin เท่านั้นที่แก้ไขบัญชี System Admin ได้' }, { status: 403 })
   }
   if (typeof patch.role === 'string' && !canManageUserRole(caller.role, patch.role)) {
-    return NextResponse.json({ error: 'Only a System Admin can promote a user to System Admin' }, { status: 403 })
+    return NextResponse.json({ error: 'เฉพาะ System Admin เท่านั้นที่ตั้งผู้ใช้เป็น System Admin ได้' }, { status: 403 })
   }
 
   const { data: after, error } = await admin.from('employees_users').update(patch).eq('user_id', user_id).select().single()
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
   }
 
   await writeAudit(admin, {

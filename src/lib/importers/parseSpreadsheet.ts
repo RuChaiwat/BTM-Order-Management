@@ -113,14 +113,13 @@ async function readWmsReport(file: File, sheetName: string, requiredColumns: str
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = findSheet(workbook, sheetName) ?? workbook.Sheets[workbook.SheetNames[0]]
-  if (!sheet) throw new Error(`"${file.name}" has no sheets — expected the WMS "${sheetName}" export.`)
+  if (!sheet) throw new Error(`ไฟล์ "${file.name}" ไม่มีชีตข้อมูล — ต้องเป็นไฟล์ "${sheetName}" ที่ export จาก WMS`)
 
   const headers = sheetHeaders(sheet).map(normalizeHeader)
   const missing = requiredColumns.filter((alts) => !alts.some((a) => headers.includes(normalizeHeader(a)))).map((alts) => `"${alts[0]}"`)
   if (missing.length > 0) {
     throw new Error(
-      `"${file.name}" doesn't look like the WMS "${sheetName}" export — missing column(s): ${missing.join(', ')}. ` +
-        `ไฟล์นี้ไม่ใช่ "${sheetName}" — ตรวจว่าเลือกไฟล์ถูกช่อง (อาจสลับไฟล์กัน)`,
+      `ไฟล์ "${file.name}" ไม่ใช่ "${sheetName}" ที่ export จาก WMS — ไม่พบคอลัมน์: ${missing.join(', ')} ตรวจว่าเลือกไฟล์ถูกช่อง (อาจสลับไฟล์กัน)`,
     )
   }
   return sheetToRows(sheet)

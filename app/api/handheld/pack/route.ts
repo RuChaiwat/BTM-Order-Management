@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh, orderStatusTh } from '@/lib/apiError'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit, writeStatusHistory } from '@/lib/audit'
 import { PACK_ROOT_CAUSES, cancelStalePackSessions, getPackMinDurationMinutes, getPackOrderLines, getPackingSettings, issueDeductPieces, packCarryFor, previousPackIssue } from '@/lib/packing'
@@ -29,22 +30,22 @@ function err(message: string, status = 400) {
 
 async function loadStation(db: Db, code: string | undefined | null) {
   const stationCode = code?.trim().toUpperCase()
-  if (!stationCode) return { error: 'กรุณา scan Station · Station is required' }
+  if (!stationCode) return { error: 'กรุณา scan Station' }
   const { data: station } = await db.from('pack_stations').select('station_code, name, warehouse_code, active').eq('station_code', stationCode).maybeSingle()
-  if (!station) return { error: `ไม่พบ Station "${stationCode}" · Unknown pack station` }
-  if (!station.active) return { error: `Station ${station.station_code} ถูกปิดใช้งาน · Station is inactive` }
+  if (!station) return { error: `ไม่พบ Station "${stationCode}"` }
+  if (!station.active) return { error: `Station ${station.station_code} ถูกปิดใช้งาน` }
   return { station }
 }
 
 async function loadPicker(db: Db, raw: string | undefined | null, stationWarehouse: string | null) {
   const id = raw?.trim().toUpperCase()
-  if (!id) return { error: 'กรุณา scan รหัสพนักงาน · Employee ID is required' }
+  if (!id) return { error: 'กรุณา scan รหัสพนักงาน' }
   // Packers are the same people as Pickers: looked up in `pickers` (Picker & Packer Management) by
   // Picker ID, the only identifier since migration 0018 dropped the separate badge_code.
   const { data: picker, error } = await db.from('pickers').select('picker_id, name_en, name_th, active, warehouse_code').eq('picker_id', id).maybeSingle()
-  if (error) return { error: `ค้นหารหัสพนักงานไม่สำเร็จ: ${error.message}` }
-  if (!picker) return { error: `ไม่พบรหัสพนักงานแพ็ก ${id} · Unknown packer` }
-  if (!picker.active) return { error: `${picker.name_th || picker.name_en} (${picker.picker_id}) ถูกปิดใช้งาน · Employee is inactive` }
+  if (error) return { error: dbErrorTh(error) }
+  if (!picker) return { error: `ไม่พบรหัสพนักงานแพ็ก ${id}` }
+  if (!picker.active) return { error: `${picker.name_th || picker.name_en} (${picker.picker_id}) ถูกปิดใช้งาน` }
   if (stationWarehouse && picker.warehouse_code && picker.warehouse_code !== stationWarehouse) {
     return { error: `${picker.name_th || picker.name_en} อยู่คลัง ${picker.warehouse_code} ไม่ใช่คลังของ Station นี้ (${stationWarehouse})` }
   }
@@ -67,10 +68,10 @@ async function stationConflict(db: Db, stationCode: string, pickerId: string): P
   if (other) {
     const { data: p } = await db.from('pickers').select('name_en, name_th').eq('picker_id', other.picker_id).maybeSingle()
     const who = p ? p.name_th || p.name_en : other.picker_id
-    return `Station ${stationCode} กำลังใช้งานโดย ${who} (order ${await orderNo(other.order_id)}) — 1 Station แพ็กได้ทีละ 1 คน ต้องปิดงานนั้นก่อน หรือให้ Supervisor ยกเลิก · Station in use`
+    return `Station ${stationCode} กำลังใช้งานโดย ${who} (order ${await orderNo(other.order_id)}) — 1 Station แพ็กได้ทีละ 1 คน ต้องปิดงานนั้นก่อน หรือให้ Supervisor ยกเลิก`
   }
   if (mineElsewhere) {
-    return `คุณมีงานค้างอยู่ที่ Station ${mineElsewhere.station_code} (order ${await orderNo(mineElsewhere.order_id)}) — กลับไปปิดงานที่ Station นั้นก่อน · You have an open order at another station`
+    return `คุณมีงานค้างอยู่ที่ Station ${mineElsewhere.station_code} (order ${await orderNo(mineElsewhere.order_id)}) — กลับไปปิดงานที่ Station นั้นก่อน`
   }
   return null
 }
@@ -133,9 +134,9 @@ export async function GET(request: Request) {
 }
 
 const PACK_STATUS_ERROR: Record<string, string> = {
-  packed: 'order นี้แพ็กเสร็จแล้ว รอ Supervisor ยืนยัน · Already packed',
-  confirmed: 'order นี้ยืนยันการแพ็กแล้ว · Pack already confirmed',
-  issue: 'order นี้ถูกแจ้งปัญหา รอ Supervisor ตรวจสอบ · Issue under review',
+  packed: 'order นี้แพ็กเสร็จแล้ว รอ Supervisor ยืนยัน',
+  confirmed: 'order นี้ยืนยันการแพ็กแล้ว',
+  issue: 'order นี้ถูกแจ้งปัญหา รอ Supervisor ตรวจสอบ',
 }
 
 export async function POST(request: Request) {
@@ -156,7 +157,7 @@ export async function POST(request: Request) {
 
 async function scanOrder(db: Db, station: { station_code: string; warehouse_code: string | null }, picker: { picker_id: string; name: string }, rawOrderNo: string) {
   const orderNo = rawOrderNo.trim()
-  if (!orderNo) return err('กรุณา scan เลข order · Order number is required')
+  if (!orderNo) return err('กรุณา scan เลข order')
   // No packing carries over to a new day: clear yesterday's open sessions before anything else.
   await cancelStalePackSessions(db)
   // 1 station : 1 packer -- checked again here, the screen may have sat on this step a while.
@@ -166,15 +167,15 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
   let q = db.from('orders').select('order_id, order_no, store_code, status, pack_status, warehouse_code, original_order_date').eq('order_no', orderNo)
   if (station.warehouse_code) q = q.eq('warehouse_code', station.warehouse_code)
   const { data: candidates } = await q.order('original_order_date', { ascending: false }).limit(10)
-  if (!candidates || candidates.length === 0) return err(`ไม่พบ order "${orderNo}" · Order not found`, 404)
+  if (!candidates || candidates.length === 0) return err(`ไม่พบ order "${orderNo}"`, 404)
   // The same order number can recur on a later shipment date -- prefer the one actually in packing.
   const order = candidates.find((o) => o.pack_status === 'packing') ?? candidates.find((o) => o.pack_status === 'pending') ?? candidates[0]
 
-  if (order.status === 'cancelled') return err('order นี้ถูกยกเลิกแล้ว · Order is cancelled', 409)
+  if (order.status === 'cancelled') return err('order นี้ถูกยกเลิกแล้ว', 409)
   if (!order.pack_status) {
     return order.status === 'final_closed_100' || order.status === 'final_closed_short'
-      ? err('order นี้ verify ก่อนเปิดใช้ระบบแพ็ก จึงไม่อยู่ในคิวแพ็ก · Verified before packing went live', 409)
-      : err(`order นี้ยังไม่ผ่าน Admin Verification (สถานะ: ${order.status}) · Not verified yet`, 409)
+      ? err('order นี้ verify ก่อนเปิดใช้ระบบแพ็ก จึงไม่อยู่ในคิวแพ็ก', 409)
+      : err(`order นี้ยังไม่ผ่าน Admin Verification (สถานะ: ${orderStatusTh(order.status)})`, 409)
   }
   if (PACK_STATUS_ERROR[order.pack_status]) return err(PACK_STATUS_ERROR[order.pack_status], 409)
 
@@ -202,17 +203,17 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
         previous_issue: await previousPackIssue(db, open.resumed_from ?? null),
       })
     }
-    if (!open) return err('order นี้กำลังแพ็กอยู่ · Already being packed', 409)
+    if (!open) return err('order นี้กำลังแพ็กอยู่', 409)
     // Show who by name -- packers know each other by name, not by employee ID.
     const { data: other } = await db.from('pickers').select('name_en, name_th').eq('picker_id', open.picker_id).maybeSingle()
     const who = other ? other.name_th || other.name_en : open.picker_id
-    return err(`order นี้กำลังแพ็กโดย ${who} ที่ Station ${open.station_code} · Being packed by someone else`, 409)
+    return err(`order นี้กำลังแพ็กโดย ${who} ที่ Station ${open.station_code}`, 409)
   }
 
   // pending
   if (mine) {
     const { data: other } = await db.from('orders').select('order_no').eq('order_id', mine.order_id).maybeSingle()
-    return err(`คุณมีงานค้างอยู่: order ${other?.order_no ?? ''} — scan order นั้นเพื่อปิดงานก่อน · Finish your open order first`, 409)
+    return err(`คุณมีงานค้างอยู่: order ${other?.order_no ?? ''} — scan order นั้นเพื่อปิดงานก่อน`, 409)
   }
 
   // An order Admin sent back after a reported problem continues its clock from where it stopped.
@@ -222,12 +223,12 @@ async function scanOrder(db: Db, station: { station_code: string; warehouse_code
     .insert({ order_id: order.order_id, picker_id: picker.picker_id, station_code: station.station_code, warehouse_code: order.warehouse_code, pieces, carried_seconds: carry.carriedSeconds, resumed_from: carry.resumedFrom })
     .select('session_id, started_at, carried_seconds')
     .single()
-  if (insErr || !session) return err('order นี้หรือ Station นี้เพิ่งถูกเริ่มแพ็กจากอีกเครื่อง ลอง scan ใหม่ · Just started elsewhere, scan again', 409)
+  if (insErr || !session) return err('order นี้หรือ Station นี้เพิ่งถูกเริ่มแพ็กจากอีกเครื่อง ลอง scan ใหม่', 409)
 
   const { data: flipped } = await db.from('orders').update({ pack_status: 'packing' }).eq('order_id', order.order_id).eq('pack_status', 'pending').select('order_id').maybeSingle()
   if (!flipped) {
     await db.from('pack_sessions').delete().eq('session_id', session.session_id)
-    return err('สถานะ order เพิ่งเปลี่ยน ลอง scan ใหม่ · Order status just changed, scan again', 409)
+    return err('สถานะ order เพิ่งเปลี่ยน ลอง scan ใหม่', 409)
   }
 
   await writeStatusHistory(db, { entityType: 'order_pack', entityId: order.order_id, oldStatus: 'pending', newStatus: 'packing', changedBy: null, reason: `${picker.picker_id} @ ${station.station_code}` })
@@ -261,9 +262,9 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
   if (!body.session_id || (result !== 'completed' && result !== 'completed_short' && result !== 'issue')) return err("session_id and result ('completed' | 'completed_short' | 'issue') are required")
 
   const { data: session } = await db.from('pack_sessions').select('session_id, order_id, picker_id, station_code, warehouse_code, started_at, finished_at, pieces, carried_seconds').eq('session_id', body.session_id).maybeSingle()
-  if (!session) return err('ไม่พบงานแพ็กนี้ · Packing session not found', 404)
-  if (session.finished_at) return err('งานนี้ถูกปิดไปแล้ว · Already finished', 409)
-  if (session.picker_id !== picker.picker_id) return err('งานนี้เป็นของพนักงานคนอื่น · Not your packing session', 403)
+  if (!session) return err('ไม่พบงานแพ็กนี้', 404)
+  if (session.finished_at) return err('งานนี้ถูกปิดไปแล้ว', 409)
+  if (session.picker_id !== picker.picker_id) return err('งานนี้เป็นของพนักงานคนอื่น', 403)
 
   const minMinutes = await getPackMinDurationMinutes(db)
   // Includes time carried over from a paused attempt (problem reported, sent back by Admin).
@@ -271,7 +272,7 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
   // A problem can be found the moment the box is opened, so reporting one is never held back.
   if (result !== 'issue' && elapsedMs < minMinutes * 60_000) {
     const left = Math.ceil((minMinutes * 60_000 - elapsedMs) / 1000)
-    return err(`ยังไม่ครบเวลาขั้นต่ำ ${minMinutes} นาที — รออีก ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} · Too soon to finish`, 409)
+    return err(`ยังไม่ครบเวลาขั้นต่ำ ${minMinutes} นาที — รออีก ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`, 409)
   }
 
   // Validate the problem lines before writing anything.
@@ -279,7 +280,7 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
   let issuePieces = 0
   if (result === 'issue') {
     const input = Array.isArray(body.issue_lines) ? body.issue_lines : []
-    if (input.length === 0) return err('ต้องระบุสินค้าที่มีปัญหาอย่างน้อย 1 รายการ · Add at least one problem item')
+    if (input.length === 0) return err('ต้องระบุสินค้าที่มีปัญหาอย่างน้อย 1 รายการ')
     const [{ data: lines }, { data: reasons }] = await Promise.all([
       db.from('order_lines').select('line_id, sku, sku_barcode, item_description, bin_code').eq('order_id', session.order_id),
       db.from('pack_issue_reasons').select('reason_code').eq('active', true),
@@ -291,19 +292,19 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
       const n = i + 1
       const qty = Number(l.qty)
       const remark = typeof l.remark === 'string' ? l.remark.trim().slice(0, 500) || null : null
-      if (!l.reason_code || !validReasons.has(l.reason_code)) return err(`รายการที่ ${n}: เลือกปัญหา · Choose a problem`)
+      if (!l.reason_code || !validReasons.has(l.reason_code)) return err(`รายการที่ ${n}: เลือกปัญหา`)
       // No upper limit: สินค้าเกิน can be far more than was verified (client rule).
-      if (!Number.isInteger(qty) || qty < 1) return err(`รายการที่ ${n}: จำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป · Qty must be 1 or more`)
+      if (!Number.isInteger(qty) || qty < 1) return err(`รายการที่ ${n}: จำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป`)
       if (l.line_id) {
         const line = lineById.get(l.line_id)
-        if (!line) return err(`รายการที่ ${n}: สินค้านี้ไม่อยู่ใน order · Line not on this order`)
-        if (seen.has(line.line_id)) return err(`รายการที่ ${n}: บาร์โค้ดซ้ำ · Duplicate item`)
+        if (!line) return err(`รายการที่ ${n}: สินค้านี้ไม่อยู่ใน order`)
+        if (seen.has(line.line_id)) return err(`รายการที่ ${n}: บาร์โค้ดซ้ำ`)
         seen.add(line.line_id)
         issueRows.push({ line_id: line.line_id, sku: line.sku, barcode: line.sku_barcode, item_description: line.item_description, bin_code: line.bin_code, reason_code: l.reason_code, qty, remark })
       } else {
         const code = (l.barcode ?? l.sku ?? '').trim()
-        if (!code) return err(`รายการที่ ${n}: scan บาร์โค้ดของสินค้าที่ไม่อยู่ใน TO · Barcode required`)
-        if (seen.has(`x:${code.toUpperCase()}`)) return err(`รายการที่ ${n}: บาร์โค้ดซ้ำ · Duplicate item`)
+        if (!code) return err(`รายการที่ ${n}: scan บาร์โค้ดของสินค้าที่ไม่อยู่ใน TO`)
+        if (seen.has(`x:${code.toUpperCase()}`)) return err(`รายการที่ ${n}: บาร์โค้ดซ้ำ`)
         seen.add(`x:${code.toUpperCase()}`)
         issueRows.push({ line_id: null, sku: code, barcode: code, item_description: null, bin_code: null, reason_code: l.reason_code, qty, remark })
       }
@@ -320,7 +321,7 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
     .is('finished_at', null)
     .select('session_id')
     .maybeSingle()
-  if (!closed) return err('งานนี้ถูกปิดไปแล้ว · Already finished', 409)
+  if (!closed) return err('งานนี้ถูกปิดไปแล้ว', 409)
 
   const newPackStatus = result === 'issue' ? 'issue' : 'packed'
   await db.from('orders').update({ pack_status: newPackStatus }).eq('order_id', session.order_id).eq('pack_status', 'packing')
@@ -335,7 +336,7 @@ async function finish(db: Db, picker: { picker_id: string; name: string }, body:
     if (issueErr || !issue) return err(`บันทึกปัญหาไม่สำเร็จ: ${issueErr?.message ?? ''}`, 500)
     issueId = issue.issue_id
     const { error: linesErr } = await db.from('pack_issue_lines').insert(issueRows.map((r) => ({ issue_id: issue.issue_id, ...r })))
-    if (linesErr) return err(`บันทึกรายการปัญหาไม่สำเร็จ: ${linesErr.message}`, 500)
+    if (linesErr) return err(`บันทึกรายการปัญหาไม่สำเร็จ: ${dbErrorTh(linesErr)}`, 500)
   }
 
   await writeStatusHistory(db, { entityType: 'order_pack', entityId: session.order_id, oldStatus: 'packing', newStatus: newPackStatus, changedBy: null, reason: `${picker.picker_id} @ ${session.station_code}` })

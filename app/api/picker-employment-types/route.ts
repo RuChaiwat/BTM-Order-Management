@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
 
   const { type_code, label_en, label_th } = await request.json()
   if (!type_code || !label_en) {
-    return NextResponse.json({ error: 'type_code and label_en are required' }, { status: 400 })
+    return NextResponse.json({ error: 'กรุณากรอกรหัสและชื่อประเภท' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -47,7 +48,7 @@ export async function PATCH(request: Request) {
   }
 
   const { type_code, label_en, label_th, active } = await request.json()
-  if (!type_code) return NextResponse.json({ error: 'type_code is required' }, { status: 400 })
+  if (!type_code) return NextResponse.json({ error: 'กรุณากรอกรหัสประเภท' }, { status: 400 })
 
   const admin = createAdminClient()
   const { data: before } = await admin.from('picker_employment_types').select('*').eq('type_code', type_code).single()
@@ -58,7 +59,7 @@ export async function PATCH(request: Request) {
   if (active !== undefined) patch.active = active
 
   const { data: after, error } = await admin.from('picker_employment_types').update(patch).eq('type_code', type_code).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
 
   await writeAudit(admin, { userId: caller.user_id, action: 'picker_employment_type.update', entityType: 'picker_employment_types', entityId: type_code, before, after })
   return NextResponse.json({ type: after })

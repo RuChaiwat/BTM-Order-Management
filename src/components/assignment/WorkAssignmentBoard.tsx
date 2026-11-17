@@ -227,8 +227,8 @@ export function WorkAssignmentBoard({
   function addSelection(order: PoolOrder, knownZones: string[]): string | null {
     if (compatibleZones && !knownZones.some((z) => compatibleZones.includes(z))) {
       return compatibleZones.length > 0
-        ? `Order ${order.orderNo} doesn't share a Zone with the orders already selected (compatible zone(s): ${compatibleZones.join(', ')})`
-        : `Order ${order.orderNo} doesn't share a Zone with the orders already selected`
+        ? `Order ${order.orderNo} ไม่อยู่ใน Zone เดียวกับ Order ที่เลือกไว้ (Zone ที่ใช้ได้: ${compatibleZones.join(', ')})`
+        : `Order ${order.orderNo} ไม่อยู่ใน Zone เดียวกับ Order ที่เลือกไว้`
     }
     setSelected((prev) => new Set(prev).add(order.orderId))
     setSelectedDetails((prev) => new Map(prev).set(order.orderId, { ...order, knownZones }))
@@ -277,12 +277,12 @@ export function WorkAssignmentBoard({
         }
       : null
     if (!match) {
-      setOrderScanError(`No pending order '${value}' found`)
+      setOrderScanError(`ไม่พบ Order ${value} ที่รอมอบหมายงาน`)
       return
     }
     const knownZones = match.zones ?? []
     if (knownZones.length === 0) {
-      setOrderScanError(`Order '${value}' has no resolved Zone (invalid/missing Bin Code) — can't be assigned yet`)
+      setOrderScanError(`Order ${value} ยังไม่มี Zone (Bin Code ไม่ถูกต้องหรือไม่มี) จึงยังมอบหมายงานไม่ได้`)
       return
     }
     const err = addSelection(match, knownZones)
@@ -301,11 +301,11 @@ export function WorkAssignmentBoard({
     setPickerScanError(null)
     const match = pickers.find((p) => p.picker_id === value.toUpperCase())
     if (!match) {
-      setPickerScanError(`No active picker with ID '${value}'`)
+      setPickerScanError(`ไม่พบ Picker รหัส ${value} หรือถูกปิดใช้งาน`)
       return
     }
     if (effectiveZone && match.zone_scope.length > 0 && !match.zone_scope.includes(effectiveZone)) {
-      setPickerScanError(`${match.name_th || match.name_en} is not scoped to Zone ${effectiveZone}`)
+      setPickerScanError(`${match.name_th || match.name_en} ไม่ได้รับสิทธิ์ทำงานใน Zone ${effectiveZone}`)
       return
     }
     setPickerScanBusy(true)

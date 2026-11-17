@@ -241,8 +241,8 @@ export function PackHandheldBoard() {
       body: method === 'POST' ? JSON.stringify(payload) : undefined,
       cache: 'no-store',
     })
-    const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-    if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
+    const body = await res.json().catch(() => ({ error: `ทำรายการไม่สำเร็จ (รหัส ${res.status})` }))
+    if (!res.ok) throw new Error(body.error ?? `ทำรายการไม่สำเร็จ (รหัส ${res.status})`)
     return body
   }
 
@@ -255,7 +255,7 @@ export function PackHandheldBoard() {
 
     if (step === 'packing') {
       if (issues.length > 0) return fail('มีรายการแจ้งปัญหาอยู่ — ลบรายการปัญหาให้หมดก่อน จึงจะ scan ปิดงานได้')
-      if (!order || value.toUpperCase() !== order.order_no.toUpperCase()) return fail(`เลข order ไม่ตรงกับงานที่กำลังแพ็ก (${order?.order_no}) · Scan the same order to finish`)
+      if (!order || value.toUpperCase() !== order.order_no.toUpperCase()) return fail(`เลข order ไม่ตรงกับงานที่กำลังแพ็ก (${order?.order_no}) scan order เดิมเพื่อปิดงาน`)
       if (!canFinish) return fail(`ยังไม่ครบเวลาขั้นต่ำ ${minMinutes} นาที — รออีก ${mmss(minSec - elapsedSec)}`)
       beep(true)
       setNotice(null)
@@ -285,7 +285,7 @@ export function PackHandheldBoard() {
         if (body.bands) setBands(body.bands)
         setClockOffset(new Date(body.server_now).getTime() - Date.now())
         setNow(Date.now())
-        setNotice(body.resumed ? 'กลับมาทำงานที่เปิดค้างไว้ต่อ · Resumed your open order' : null)
+        setNotice(body.resumed ? 'กลับมาทำงานที่เปิดค้างไว้ต่อ' : null)
         setStep('packing')
       }
       beep(true)

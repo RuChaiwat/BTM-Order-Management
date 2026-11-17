@@ -10,7 +10,7 @@ import { formatDate, bangkokDateKey } from '@/lib/formatDate'
  * selected date vs. warehouse-wide-per-day this month). */
 export async function GET() {
   const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
 
   const admin = createAdminClient()
   const warehouseCode = user.warehouse_code ?? 'DC002'

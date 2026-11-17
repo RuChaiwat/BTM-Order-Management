@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { writeAudit } from '@/lib/audit'
@@ -34,15 +35,15 @@ export async function POST(request: Request) {
     !block && 'Block',
   ].filter(Boolean)
   if (missing.length > 0) {
-    return NextResponse.json({ error: `Required: ${missing.join(', ')}` }, { status: 400 })
+    return NextResponse.json({ error: `กรุณากรอก: ${missing.join(', ')}` }, { status: 400 })
   }
-  if (!/^[A-Za-z]$/.test(side)) return NextResponse.json({ error: 'Side must be a single letter (A-Z)' }, { status: 400 })
-  if (!/^[A-Za-z]$/.test(level)) return NextResponse.json({ error: 'Level must be a single letter (A-Z)' }, { status: 400 })
+  if (!/^[A-Za-z]$/.test(side)) return NextResponse.json({ error: 'Side ต้องเป็นตัวอักษร 1 ตัว (A-Z)' }, { status: 400 })
+  if (!/^[A-Za-z]$/.test(level)) return NextResponse.json({ error: 'Level ต้องเป็นตัวอักษร 1 ตัว (A-Z)' }, { status: 400 })
 
   const admin = createAdminClient()
 
   const { data: existing } = await admin.from('locations').select('bin_code').eq('warehouse_code', warehouse_code).eq('bin_code', bin_code).maybeSingle()
-  if (existing) return NextResponse.json({ error: `Bin Code '${bin_code}' already exists for ${warehouse_code} — edit it instead of adding it again` }, { status: 409 })
+  if (existing) return NextResponse.json({ error: `Bin Code ${bin_code} มีอยู่แล้วในคลัง ${warehouse_code} ให้แก้ไขรายการเดิมแทนการเพิ่มใหม่` }, { status: 409 })
 
   const rankByAisle = await getOrAssignAisleRanks(admin, warehouse_code, [aisle])
   const pickSequence = computePickSequence({ aisleRank: rankByAisle.get(aisle)!, side, bay, level, block })
@@ -88,13 +89,13 @@ export async function PATCH(request: Request) {
   const { warehouse_code, bin_code: rawBinCode, active } = await request.json()
   const bin_code = typeof rawBinCode === 'string' ? stripLocationDashes(rawBinCode) : rawBinCode
   if (!warehouse_code || !bin_code || typeof active !== 'boolean') {
-    return NextResponse.json({ error: 'warehouse_code, bin_code, and active (boolean) are required' }, { status: 400 })
+    return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 })
   }
 
   const admin = createAdminClient()
   const { data: location, error } = await admin.from('locations').update({ active }).eq('warehouse_code', warehouse_code).eq('bin_code', bin_code).select().maybeSingle()
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  if (!location) return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+  if (error) return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
+  if (!location) return NextResponse.json({ error: 'ไม่พบ Location นี้' }, { status: 404 })
 
   await writeAudit(admin, { userId: caller.user_id, action: active ? 'locations.activate' : 'locations.deactivate', entityType: 'locations', entityId: bin_code, after: location })
 

@@ -66,7 +66,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
 
     try {
       const rows = await parseWmsOrderFiles(transferFile, pickLinesFile)
-      if (rows.length === 0) throw new Error('No Picking-status order lines found — check BT Status in the Transfer List file and that the Warehouse Pick Lines file has matching Source No. rows')
+      if (rows.length === 0) throw new Error('ไม่พบรายการ Order สถานะ Picking — ตรวจ BT Status ในไฟล์ Transfer List และดูว่าไฟล์ Warehouse Pick Lines มี Source No. ที่ตรงกัน')
       const rawRows = rows.map((data, i) => ({ rowNumber: i + 2, data }))
 
       const groups = new Map<string, typeof rawRows>()
@@ -128,7 +128,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
           linesUpserted += body.lines_upserted
           allErrors.push(...body.errors)
         } else {
-          const reason = `Batch failed: ${lastError?.message ?? 'unknown error'} — this batch was NOT imported, re-upload the file to retry it`
+          const reason = `นำเข้าข้อมูลชุดนี้ไม่สำเร็จ: ${lastError?.message ?? 'ไม่ทราบสาเหตุ'} — ข้อมูลชุดนี้ยังไม่ถูกนำเข้า กรุณา upload ไฟล์ใหม่`
           for (const r of batches[i]) allErrors.push({ row_number: r.rowNumber, reason, severity: 'blocking' })
           await fetch(`/api/imports/${importId}/record-failed-batch`, {
             method: 'POST',

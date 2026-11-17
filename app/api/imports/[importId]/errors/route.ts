@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { dbErrorTh } from '@/lib/apiError'
 import { requireRole } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -18,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: { importId: s
     .eq('import_id', params.importId)
     .order('row_number')
     .limit(500)
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: dbErrorTh(error) }, { status: 400 })
 
   return NextResponse.json({ errors: data ?? [] })
 }

@@ -28,8 +28,8 @@ export default async function PickerManagementPage() {
       <TopBar title="Picker & Packer Management" subtitle={`จัดการพนักงานหยิบ / แพ็กสินค้า (ใช้รหัสเดียวกันทั้งงาน Pick และ Pack) · ${warehouseCode}`} />
       <div className="page-body">
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-          <KpiCard label="TOTAL PICKERS" labelTh="พนักงานหยิบสินค้าทั้งหมด" value={pickers.length} />
-          <KpiCard label="ACTIVE" labelTh="ใช้งานอยู่" value={active} valueColor="#16A34A" />
+          <KpiCard label="TOTAL PICKERS" labelTh="พนักงานหยิบสินค้าทั้งหมด (คน)" value={pickers.length} />
+          <KpiCard label="ACTIVE" labelTh="ใช้งานอยู่ (คน)" value={active} valueColor="#16A34A" />
         </div>
         <PickerManagementBoard pickers={pickers} warehouseCode={warehouseCode} employmentTypes={employmentTypes} />
       </div>

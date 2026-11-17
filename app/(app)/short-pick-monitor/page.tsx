@@ -33,10 +33,10 @@ export default async function ShortPickMonitorPage({ searchParams }: { searchPar
             <KpiCard
               key={r.code}
               label={r.labelEn.toUpperCase()}
-              labelTh={r.labelTh}
+              labelTh={`${r.labelTh} (ชิ้น)`}
               value={r.shortQty.toLocaleString()}
               valueColor={r.shortQty > 0 ? '#F59E0B' : undefined}
-              sub={`${r.count.toLocaleString()} order(s)`}
+              sub={`${r.count.toLocaleString()} order`}
               compact
               style={{ padding: 14 }}
             />

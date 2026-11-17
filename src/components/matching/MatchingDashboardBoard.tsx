@@ -51,54 +51,54 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
         <KpiCard
           label="TOTAL ORDERS (PCS)"
-          labelTh="ออเดอร์ทั้งหมดที่ Import"
+          labelTh="Order ทั้งหมดที่ Import (ชิ้น)"
           value={data.kpis.totalPieces.toLocaleString()}
-          sub={`${data.kpis.totalOrders.toLocaleString()} orders`}
+          sub={`${data.kpis.totalOrders.toLocaleString()} order`}
           compact
           style={{ padding: 12 }}
         />
         <KpiCard
           label="ELIGIBLE ORDERS (PCS)"
-          labelTh="ออเดอร์ที่พร้อมจับคู่"
+          labelTh="Order ที่พร้อมจับคู่ (ชิ้น)"
           value={data.kpis.eligiblePieces.toLocaleString()}
           valueColor="#16A34A"
-          sub={`${data.kpis.eligibleOrders.toLocaleString()} orders`}
+          sub={`${data.kpis.eligibleOrders.toLocaleString()} order`}
           compact
           style={{ padding: 12 }}
         />
         <KpiCard
           label="MATCHED ORDERS (PCS)"
-          labelTh="ออเดอร์ที่จับคู่แล้ว"
+          labelTh="Order ที่จับคู่แล้ว (ชิ้น)"
           value={data.kpis.matchedPieces.toLocaleString()}
           valueColor="#7C3AED"
-          sub={`${data.kpis.matchedOrders.toLocaleString()} orders`}
+          sub={`${data.kpis.matchedOrders.toLocaleString()} order`}
           compact
           style={{ padding: 12 }}
         />
         <KpiCard
           label="MATCH RATE"
-          labelTh="% การจับคู่สำเร็จ (ชิ้น)"
+          labelTh="จับคู่สำเร็จ คิดตามชิ้น (%)"
           value={`${data.kpis.matchRatePieces}%`}
           valueColor="#0891B2"
-          sub={`${data.kpis.matchRateOrders}% by order count`}
+          sub={`${data.kpis.matchRateOrders}% คิดตามจำนวน order`}
           compact
           style={{ padding: 12 }}
         />
         <KpiCard
           label="BATCHES CREATED"
-          labelTh="แบตช์ที่สร้างแล้ว"
+          labelTh="Batch ที่สร้างแล้ว (batch)"
           value={data.kpis.batchesCreated.toLocaleString()}
           valueColor="#EA580C"
-          sub="batches"
+          
           compact
           style={{ padding: 12 }}
         />
         <KpiCard
           label="SINGLE ORDERS"
-          labelTh="ออเดอร์เดี่ยว (ไม่จับคู่)"
+          labelTh="Order เดี่ยว ไม่จับคู่ (order)"
           value={data.kpis.singleOrders.toLocaleString()}
           valueColor="#DC2626"
-          sub="orders"
+          
           compact
           style={{ padding: 12 }}
         />
@@ -107,28 +107,28 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         <KpiCard
           label="ORDERS APPROVED (PCS)"
-          labelTh="ออเดอร์ที่อนุมัติแล้ว"
+          labelTh="Order ที่อนุมัติแล้ว (ชิ้น)"
           value={data.kpis.approvedPieces.toLocaleString()}
           valueColor="#2563EB"
-          sub={`${data.kpis.approvedOrders.toLocaleString()} orders`}
+          sub={`${data.kpis.approvedOrders.toLocaleString()} order`}
           compact
           style={{ padding: 12 }}
         />
         <KpiCard
           label="ORDERS COMPLETED (PCS)"
-          labelTh="ออเดอร์ที่เสร็จสิ้นแล้ว"
+          labelTh="Order ที่เสร็จสิ้นแล้ว (ชิ้น)"
           value={data.kpis.completedPieces.toLocaleString()}
           valueColor="#16A34A"
-          sub={`${data.kpis.completedOrders.toLocaleString()} orders`}
+          sub={`${data.kpis.completedOrders.toLocaleString()} order`}
           compact
           style={{ padding: 12 }}
         />
         <KpiCard
           label="ORDERS PENDING (PCS)"
-          labelTh="ออเดอร์ที่รอดำเนินการ"
+          labelTh="Order ที่รอดำเนินการ (ชิ้น)"
           value={data.kpis.pendingPieces.toLocaleString()}
           valueColor={data.kpis.pendingPieces > 0 ? '#F59E0B' : undefined}
-          sub={`${data.kpis.pendingOrders.toLocaleString()} orders`}
+          sub={`${data.kpis.pendingOrders.toLocaleString()} order`}
           compact
           style={{ padding: 12 }}
         />

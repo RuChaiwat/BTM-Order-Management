@@ -33,7 +33,7 @@ export default async function BacklogPage() {
             label="PICKING PENDING (PCS)"
             labelTh="รอ Picker ดำเนินการ (ชิ้น)"
             value={data.summary.pickingBacklogPieces.toLocaleString()}
-            sub={`${data.summary.pickingBacklogOrders.toLocaleString()} orders`}
+            sub={`${data.summary.pickingBacklogOrders.toLocaleString()} order`}
             valueColor="#F59E0B"
             compact
             style={{ padding: 14 }}
@@ -42,7 +42,7 @@ export default async function BacklogPage() {
             label="VERIFICATION PENDING (PCS)"
             labelTh="รอ Admin ตรวจสอบ (ชิ้น)"
             value={data.summary.verificationBacklogPieces.toLocaleString()}
-            sub={`${data.summary.verificationBacklogOrders.toLocaleString()} orders`}
+            sub={`${data.summary.verificationBacklogOrders.toLocaleString()} order`}
             valueColor="#2563EB"
             compact
             style={{ padding: 14 }}
@@ -51,7 +51,7 @@ export default async function BacklogPage() {
             label="OVERDUE (PCS)"
             labelTh="เกินกำหนด (ชิ้น)"
             value={data.summary.overduePieces.toLocaleString()}
-            sub={`${data.summary.overdueOrders.toLocaleString()} orders`}
+            sub={`${data.summary.overdueOrders.toLocaleString()} order`}
             valueColor={ALERT_LABEL_COLOR.overdue}
             compact
             style={{ padding: 14 }}
@@ -60,7 +60,7 @@ export default async function BacklogPage() {
             label="CRITICAL (PCS)"
             labelTh="วิกฤต (ชิ้น)"
             value={data.summary.criticalPieces.toLocaleString()}
-            sub={`${data.summary.criticalOrders.toLocaleString()} orders`}
+            sub={`${data.summary.criticalOrders.toLocaleString()} order`}
             valueColor="#DC2626"
             compact
             style={{ padding: 14 }}

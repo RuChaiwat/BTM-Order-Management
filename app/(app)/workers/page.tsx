@@ -29,9 +29,9 @@ export default async function WorkerManagementPage() {
       <TopBar title="User Management" subtitle={`จัดการผู้ใช้งาน · ${warehouseCode}`} />
       <div className="page-body">
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-          <KpiCard label="TOTAL USERS" labelTh="ผู้ใช้งานทั้งหมด" value={users.length} />
-          <KpiCard label="ACTIVE" labelTh="ใช้งานอยู่" value={active} valueColor="#16A34A" />
-          <KpiCard label="ROLES IN USE" labelTh="บทบาทที่ใช้งาน" value={roles} />
+          <KpiCard label="TOTAL USERS" labelTh="ผู้ใช้งานทั้งหมด (คน)" value={users.length} />
+          <KpiCard label="ACTIVE" labelTh="ใช้งานอยู่ (คน)" value={active} valueColor="#16A34A" />
+          <KpiCard label="ROLES IN USE" labelTh="บทบาทที่ใช้งาน (Role)" value={roles} />
         </div>
         <WorkerManagementBoard users={users} warehouseCode={warehouseCode} currentUserRole={user.role} />
       </div>

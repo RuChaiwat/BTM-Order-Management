@@ -151,56 +151,56 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
         <KpiCard
           label="TOTAL ORDERS (PCS)"
-          labelTh="ออเดอร์ทั้งหมดที่ Import"
+          labelTh="Order ทั้งหมดที่ Import (ชิ้น)"
           value={kpis.totalPieces.toLocaleString()}
-          sub={`${kpis.totalOrders.toLocaleString()} orders`}
+          sub={`${kpis.totalOrders.toLocaleString()} order`}
           style={{ textAlign: 'center' }}
         />
         <KpiCard
           label="ORDERS COMPLETED (PCS)"
-          labelTh="ปิดงานแล้ว (Admin Verified)"
+          labelTh="ปิดงานแล้ว · Admin Verified (ชิ้น)"
           value={kpis.completedPieces.toLocaleString()}
           valueColor="#16A34A"
-          sub={`${kpis.completedOrders.toLocaleString()} orders`}
+          sub={`${kpis.completedOrders.toLocaleString()} order`}
           subColor="#16A34A"
           style={{ textAlign: 'center' }}
         />
         <KpiCard
           label="% COMPLETED"
-          labelTh="% ความสำเร็จ (ชิ้น)"
+          labelTh="ความสำเร็จ คิดตามชิ้น (%)"
           value={`${kpis.pctPiecesCompleted}%`}
           valueColor={kpis.pctPiecesCompleted >= 85 ? '#16A34A' : kpis.pctPiecesCompleted >= 60 ? '#F59E0B' : '#DC2626'}
-          sub={`Completed ${kpis.completedPieces.toLocaleString()} · Issue ${kpis.issuePieces.toLocaleString()}`}
+          sub={`ปิดงาน ${kpis.completedPieces.toLocaleString()} · มีปัญหา ${kpis.issuePieces.toLocaleString()}`}
           style={{ textAlign: 'center' }}
         />
         <KpiCard
           label="TOTAL BACKLOG (PCS)"
-          labelTh="งานคงค้างทั้งหมด"
+          labelTh="งานคงค้างทั้งหมด (ชิ้น)"
           value={kpis.totalBacklogPieces.toLocaleString()}
           valueColor={kpis.totalBacklogPieces > 0 ? '#F59E0B' : undefined}
-          sub={`${kpis.totalBacklogOrders.toLocaleString()} orders`}
+          sub={`${kpis.totalBacklogOrders.toLocaleString()} order`}
           style={{ textAlign: 'center' }}
         />
         <KpiCard
           label="ORDERS ASSIGNED (PCS)"
-          labelTh="มอบหมายงานแล้ว"
+          labelTh="มอบหมายงานแล้ว (ชิ้น)"
           value={kpis.assignedPieces.toLocaleString()}
-          sub={`${kpis.assignedOrders.toLocaleString()} orders`}
+          sub={`${kpis.assignedOrders.toLocaleString()} order`}
           style={{ textAlign: 'center' }}
         />
         <KpiCard
           label="ACTIVE PICKERS (PCS)"
-          labelTh="ผู้หยิบที่ทำงานอยู่"
+          labelTh="งานในมือ Picker ที่ทำงานอยู่ (ชิ้น)"
           value={kpis.activePickerTotalPieces.toLocaleString()}
-          sub={`${kpis.activePickerTotalOrders.toLocaleString()} orders in hand`}
+          sub={`${kpis.activePickerTotalOrders.toLocaleString()} order ในมือ`}
           style={{ textAlign: 'center' }}
         />
         <KpiCard
           label="PENDING CONFIRMATION (PCS)"
-          labelTh="รอ Admin Confirm"
+          labelTh="รอ Admin Confirm (ชิ้น)"
           value={kpis.waitingVerifyPieces.toLocaleString()}
           valueColor={kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
-          sub={`${kpis.waitingVerifyOrders.toLocaleString()} orders`}
+          sub={`${kpis.waitingVerifyOrders.toLocaleString()} order`}
           style={{ textAlign: 'center' }}
         />
       </div>

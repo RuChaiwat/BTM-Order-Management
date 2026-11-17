@@ -42,52 +42,52 @@ export default async function ControlTowerPage() {
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
           <KpiCard
             label="TOTAL ORDERS (PCS)"
-            labelTh="ออเดอร์ทั้งหมดที่ Import"
+            labelTh="Order ทั้งหมดที่ Import (ชิ้น)"
             value={data.kpis.totalPlannedPieces.toLocaleString()}
-            sub={`${data.kpis.totalOrders.toLocaleString()} orders`}
+            sub={`${data.kpis.totalOrders.toLocaleString()} order`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
           <KpiCard
             label="ORDERS COMPLETED (PCS)"
-            labelTh="ปิดงานแล้ว (Admin Verified)"
+            labelTh="ปิดงานแล้ว · Admin Verified (ชิ้น)"
             value={data.kpis.completedPieces.toLocaleString()}
             valueColor="#16A34A"
-            sub={`${data.kpis.completedOrders.toLocaleString()} orders`}
+            sub={`${data.kpis.completedOrders.toLocaleString()} order`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
           <KpiCard
             label="% COMPLETED"
-            labelTh="% ความสำเร็จ (ชิ้น)"
+            labelTh="ความสำเร็จ คิดตามชิ้น (%)"
             value={`${data.kpis.pctPiecesCompleted}%`}
             valueColor={data.kpis.pctPiecesCompleted >= 85 ? '#16A34A' : data.kpis.pctPiecesCompleted >= 60 ? '#F59E0B' : '#DC2626'}
-            sub={`Completed ${data.kpis.completedPieces.toLocaleString()} · Issue ${data.kpis.issuePieces.toLocaleString()}`}
+            sub={`ปิดงาน ${data.kpis.completedPieces.toLocaleString()} · มีปัญหา ${data.kpis.issuePieces.toLocaleString()}`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
           <KpiCard
             label="TOTAL BACKLOG (PCS)"
-            labelTh="งานคงค้างทั้งหมด"
+            labelTh="งานคงค้างทั้งหมด (ชิ้น)"
             value={data.kpis.totalBacklogPieces.toLocaleString()}
             valueColor={data.kpis.totalBacklogPieces > 0 ? '#F59E0B' : undefined}
-            sub={`${data.kpis.totalBacklogOrders.toLocaleString()} orders`}
+            sub={`${data.kpis.totalBacklogOrders.toLocaleString()} order`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
           <KpiCard
             label="ORDERS ASSIGNED (PCS)"
-            labelTh="มอบหมายงานแล้ว"
+            labelTh="มอบหมายงานแล้ว (ชิ้น)"
             value={data.kpis.assignedPieces.toLocaleString()}
-            sub={`${data.kpis.assignedOrders.toLocaleString()} orders`}
+            sub={`${data.kpis.assignedOrders.toLocaleString()} order`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
           <KpiCard
             label="ACTIVE PICKERS (PCS)"
-            labelTh="ผู้หยิบที่ทำงานอยู่"
+            labelTh="งานในมือ Picker ที่ทำงานอยู่ (ชิ้น)"
             value={data.kpis.activePickerTotalPieces.toLocaleString()}
-            sub={`${data.kpis.activePickerTotalOrders.toLocaleString()} orders in hand`}
+            sub={`${data.kpis.activePickerTotalOrders.toLocaleString()} order ในมือ`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
@@ -95,9 +95,9 @@ export default async function ControlTowerPage() {
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <KpiCard
             label="WARNING ORDERS (PCS)"
-            labelTh="ออเดอร์เตือน (Warning)"
+            labelTh="Order ใกล้เกินกำหนด · Warning (ชิ้น)"
             value={data.secondaryKpis.warningPieces.toLocaleString()}
-            sub={`${data.secondaryKpis.warningOrders.toLocaleString()} orders`}
+            sub={`${data.secondaryKpis.warningOrders.toLocaleString()} order`}
             accentColor="#F59E0B"
             labelColor="#B45309"
             valueColor="#B45309"
@@ -106,9 +106,9 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="OVERDUE ORDERS (PCS)"
-            labelTh="ออเดอร์เกินกำหนด (Overdue)"
+            labelTh="Order เกินกำหนด · Overdue (ชิ้น)"
             value={data.secondaryKpis.overduePieces.toLocaleString()}
-            sub={`${data.secondaryKpis.overdueOrders.toLocaleString()} orders`}
+            sub={`${data.secondaryKpis.overdueOrders.toLocaleString()} order`}
             accentColor={ALERT_COLOR.overdue}
             labelColor={ALERT_LABEL_COLOR.overdue}
             valueColor={ALERT_LABEL_COLOR.overdue}
@@ -117,9 +117,9 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="CRITICAL ORDERS (PCS)"
-            labelTh="ออเดอร์วิกฤต (Critical)"
+            labelTh="Order วิกฤต · Critical (ชิ้น)"
             value={data.secondaryKpis.criticalPieces.toLocaleString()}
-            sub={`${data.secondaryKpis.criticalOrders.toLocaleString()} orders`}
+            sub={`${data.secondaryKpis.criticalOrders.toLocaleString()} order`}
             accentColor="#DC2626"
             valueColor="#DC2626"
             compact
@@ -127,11 +127,11 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="PENDING CONFIRMATION (PCS)"
-            labelTh="รอ Admin Confirm"
+            labelTh="รอ Admin Confirm (ชิ้น)"
             value={data.kpis.waitingVerifyPieces.toLocaleString()}
             valueColor={data.worstVerificationAlert ? ALERT_COLOR[data.worstVerificationAlert] : data.kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
             accentColor={data.worstVerificationAlert ? ALERT_COLOR[data.worstVerificationAlert] : undefined}
-            sub={`${data.kpis.waitingVerifyOrders.toLocaleString()} orders · ${data.worstVerificationAlert ?? 'on track'}`}
+            sub={`${data.kpis.waitingVerifyOrders.toLocaleString()} order · ${data.worstVerificationAlert ? { warning: 'ใกล้เกินกำหนด', overdue: 'เกินกำหนด', critical: 'วิกฤต' }[data.worstVerificationAlert] ?? data.worstVerificationAlert : 'ตามกำหนด'}`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />

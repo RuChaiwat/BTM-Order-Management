@@ -27,22 +27,22 @@ export default async function ConsolidationPickReportPage() {
       <TopBar title="Consolidation Pick Report" subtitle={`รายงานหยิบรวม · ${batches.length} batch(es) active at consolidation`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          <KpiCard label="ACTIVE BATCHES" labelTh="แบตช์ที่กำลังดำเนินการ" value={kpis.activeBatches.toLocaleString()} sub="batches" compact style={{ padding: 14 }} />
+          <KpiCard label="ACTIVE BATCHES" labelTh="Batch ที่กำลังดำเนินการ (batch)" value={kpis.activeBatches.toLocaleString()} compact style={{ padding: 14 }} />
           <KpiCard
             label="TOTAL PIECES (PCS)"
-            labelTh="จำนวนชิ้นทั้งหมด"
+            labelTh="จำนวนชิ้นทั้งหมด (ชิ้น)"
             value={kpis.totalPieces.toLocaleString()}
-            sub={`${kpis.totalOrders.toLocaleString()} orders`}
+            sub={`${kpis.totalOrders.toLocaleString()} order`}
             compact
             style={{ padding: 14 }}
           />
-          <KpiCard label="TOTAL STORES" labelTh="จำนวนร้านค้าทั้งหมด" value={kpis.totalStores.toLocaleString()} sub="stores" compact style={{ padding: 14 }} />
+          <KpiCard label="TOTAL STORES" labelTh="จำนวนร้านค้าทั้งหมด (ร้าน)" value={kpis.totalStores.toLocaleString()} compact style={{ padding: 14 }} />
           <KpiCard
             label="ORDERS PENDING COMPLETION (PCS)"
-            labelTh="ออเดอร์ที่ยังไม่ปิดงาน (รอหยิบ/ตรวจสอบ)"
+            labelTh="Order ที่ยังไม่ปิดงาน รอหยิบ/ตรวจสอบ (ชิ้น)"
             value={kpis.pendingCompletionPieces.toLocaleString()}
             valueColor={kpis.pendingCompletionPieces > 0 ? '#F59E0B' : undefined}
-            sub={`${kpis.pendingCompletionOrders.toLocaleString()} orders`}
+            sub={`${kpis.pendingCompletionOrders.toLocaleString()} order`}
             compact
             style={{ padding: 14 }}
           />

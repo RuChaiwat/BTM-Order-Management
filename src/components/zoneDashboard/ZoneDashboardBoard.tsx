@@ -181,14 +181,14 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
             <KpiCard
               label="TOTAL PIECES (PCS)"
-              labelTh="จำนวนชิ้นทั้งหมดในโซน"
+              labelTh="ชิ้นทั้งหมดในโซน (ชิ้น)"
               value={selected.totalPieces.toLocaleString()}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />
             <KpiCard
               label="PENDING PIECES (PCS)"
-              labelTh="จำนวนชิ้นที่ยังค้างอยู่"
+              labelTh="ชิ้นที่ยังค้างอยู่ (ชิ้น)"
               value={selected.pendingPieces.toLocaleString()}
               valueColor={selected.pendingPieces > 0 ? '#F59E0B' : undefined}
               compact
@@ -196,7 +196,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             />
             <KpiCard
               label="SLA"
-              labelTh="% ปิดงานสำเร็จของโซน"
+              labelTh="ปิดงานสำเร็จของโซน (%)"
               value={`${selected.slaPct}%`}
               valueColor={selected.slaPct >= 85 ? '#16A34A' : '#DC2626'}
               compact
@@ -204,27 +204,27 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             />
             <KpiCard
               label="ACTIVE PICKERS (PCS)"
-              labelTh="ผู้หยิบที่กำลังทำงานในโซน"
+              labelTh="งานในมือ Picker ในโซน (ชิ้น)"
               value={selected.activePickerTotalPieces.toLocaleString()}
-              sub={`${selected.activePickers} picker(s) · ${selected.activePickerTotalOrders} orders in hand`}
+              sub={`${selected.activePickers} คน · ${selected.activePickerTotalOrders} order ในมือ`}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />
             <KpiCard
               label="PICKING / VERIFY"
-              labelTh="รอหยิบ / รอ Admin ยืนยัน"
+              labelTh="รอหยิบ / รอ Admin ยืนยัน (order)"
               value={`${selected.pickingBacklog} / ${selected.verificationBacklog}`}
               valueColor="#F59E0B"
-              sub={`${selected.verificationBacklogPieces.toLocaleString()} pcs waiting verify`}
+              sub={`${selected.verificationBacklogPieces.toLocaleString()} ชิ้นรอ Admin ยืนยัน`}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />
             <KpiCard
               label="QTY SHORT (PCS)"
-              labelTh="จำนวนชิ้นที่ขาด (Short)"
+              labelTh="ชิ้นที่ขาด · Short (ชิ้น)"
               value={selected.qtyShortPieces.toLocaleString()}
               valueColor={selected.qtyShortPieces > 0 ? '#DC2626' : undefined}
-              sub={`${selected.qtyShortOrders.toLocaleString()} order(s)`}
+              sub={`${selected.qtyShortOrders.toLocaleString()} order`}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />

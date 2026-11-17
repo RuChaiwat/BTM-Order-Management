@@ -36,10 +36,10 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <KpiCard
             label="ORDERS COMPLETED (PCS)"
-            labelTh="Picker ยืนยันเสร็จแล้ว"
+            labelTh="Picker ยืนยันเสร็จแล้ว (ชิ้น)"
             value={data.kpis.totalPieces.toLocaleString()}
             valueColor="#16A34A"
-            sub={`${data.kpis.completedOrders.toLocaleString()} orders`}
+            sub={`${data.kpis.completedOrders.toLocaleString()} order`}
             compact
             style={{ padding: 14 }}
           />
@@ -47,25 +47,25 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
             label="AVG PCS / HOUR"
             labelTh="อัตราหยิบเฉลี่ย (ชิ้น/ชม.)"
             value={data.kpis.avgPcsPerHour ?? '—'}
-            sub={`target ${data.targetPcsPerHour.toLocaleString()} pcs/hr`}
+            sub={`เป้า ${data.targetPcsPerHour.toLocaleString()} ชิ้น/ชม.`}
             compact
             style={{ padding: 14 }}
           />
           <KpiCard
             label="SLA COMPLIANCE"
-            labelTh="คุณภาพการให้บริการ"
+            labelTh="ทำเสร็จทันเวลา SLA (%)"
             value={data.kpis.slaPct !== null ? `${data.kpis.slaPct}%` : '—'}
             valueColor={data.kpis.slaPct !== null && data.kpis.slaPct < 85 ? '#DC2626' : '#16A34A'}
-            sub="cycle time ≤ 120 min"
+            sub="ใช้เวลาไม่เกิน 120 นาที"
             compact
             style={{ padding: 14 }}
           />
           <KpiCard
             label="SHORT PICK RATE"
-            labelTh="อัตราหยิบขาด (Short Pick)"
+            labelTh="อัตราหยิบขาด · Short Pick (%)"
             value={data.kpis.shortRatePct !== null ? `${data.kpis.shortRatePct}%` : '—'}
             valueColor={data.kpis.shortRatePct !== null && data.kpis.shortRatePct > 5 ? '#F59E0B' : undefined}
-            sub={`${data.kpis.completedOrders.toLocaleString()} orders completed`}
+            sub={`${data.kpis.completedOrders.toLocaleString()} order ที่ทำเสร็จ`}
             compact
             style={{ padding: 14 }}
           />

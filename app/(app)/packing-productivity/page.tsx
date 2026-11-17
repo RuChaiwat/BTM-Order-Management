@@ -41,11 +41,11 @@ export default async function PackingProductivityPage({ searchParams }: { search
       </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
-          <KpiCard label="PIECES PACKED" labelTh="ชิ้นที่แพ็กเสร็จ ไม่นับชิ้นมีปัญหา (ชิ้น)" value={d.totals.pieces.toLocaleString()} valueColor="#16A34A" sub={`${d.totals.orders.toLocaleString()} orders`} compact style={{ padding: 14 }} />
-          <KpiCard label="AVG PCS / HOUR" labelTh="ชิ้นต่อชั่วโมง เฉลี่ยทั้งทีม (ชิ้น/ชม.)" value={d.totals.pcsPerHour?.toLocaleString() ?? '—'} valueColor={pctColor(totalPct)} sub={`target ${target.toLocaleString()} pcs/hr${totalPct !== null ? ` · ${totalPct}%` : ''}`} compact style={{ padding: 14 }} />
+          <KpiCard label="PIECES PACKED" labelTh="ชิ้นที่แพ็กเสร็จ ไม่นับชิ้นมีปัญหา (ชิ้น)" value={d.totals.pieces.toLocaleString()} valueColor="#16A34A" sub={`${d.totals.orders.toLocaleString()} order`} compact style={{ padding: 14 }} />
+          <KpiCard label="AVG PCS / HOUR" labelTh="ชิ้นต่อชั่วโมง เฉลี่ยทั้งทีม (ชิ้น/ชม.)" value={d.totals.pcsPerHour?.toLocaleString() ?? '—'} valueColor={pctColor(totalPct)} sub={`เป้า ${target.toLocaleString()} ชิ้น/ชม.${totalPct !== null ? ` · ${totalPct}%` : ''}`} compact style={{ padding: 14 }} />
           <KpiCard label="PACKERS" labelTh="พนักงานแพ็ก (คน)" value={d.totals.packers.toLocaleString()} sub={`เวลาแพ็กรวม ${dur(d.totals.seconds)}`} compact style={{ padding: 14 }} />
           <KpiCard label="ISSUES REPORTED" labelTh="แจ้งปัญหา (order)" value={d.totals.issues.toLocaleString()} valueColor={d.totals.issues ? '#DC2626' : undefined} sub={`หัก ${d.totals.issuePieces.toLocaleString()} ชิ้นจากปัญหา`} compact style={{ padding: 14 }} />
-          <KpiCard label="AVG TIME / ORDER" labelTh="เวลาเฉลี่ยต่อ order (นาที)" value={d.totals.orders ? dur(Math.round(d.totals.seconds / d.totals.orders)) : '—'} compact style={{ padding: 14 }} />
+          <KpiCard label="AVG TIME / ORDER" labelTh="เวลาเฉลี่ยต่อ order (นาที)" value={d.totals.orders ? (d.totals.seconds / d.totals.orders / 60).toLocaleString(undefined, { maximumFractionDigits: 1 }) : '—'} sub={d.totals.orders ? dur(Math.round(d.totals.seconds / d.totals.orders)) : undefined} compact style={{ padding: 14 }} />
         </div>
 
         <div className="card">

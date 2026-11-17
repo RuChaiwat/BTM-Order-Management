@@ -45,11 +45,11 @@ export default async function PackIssueDashboardPage({ searchParams }: { searchP
       </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
-          <KpiCard label="ISSUES" labelTh="จำนวนเรื่องที่แจ้ง" value={d.kpis.issues.toLocaleString()} valueColor={d.kpis.issues ? '#DC2626' : undefined} compact style={{ padding: 14 }} />
-          <KpiCard label="ISSUE PIECES" labelTh="จำนวนชิ้นที่มีปัญหา" value={d.kpis.pieces.toLocaleString()} compact style={{ padding: 14 }} />
-          <KpiCard label="ISSUE RATE" labelTh="% ของ order ที่แพ็ก" value={d.kpis.issueRatePct !== null ? `${d.kpis.issueRatePct}%` : '—'} sub={`${d.kpis.packedOrders.toLocaleString()} order ที่แพ็ก`} compact style={{ padding: 14 }} />
-          <KpiCard label="STILL OPEN" labelTh="ยังไม่ปิดเรื่อง" value={d.kpis.open.toLocaleString()} valueColor={d.kpis.open ? '#F59E0B' : undefined} compact style={{ padding: 14 }} />
-          <KpiCard label="AVG TIME TO RESOLVE" labelTh="เวลาเฉลี่ยในการปิดเรื่อง" value={d.kpis.avgResolveMinutes !== null ? `${d.kpis.avgResolveMinutes.toLocaleString()} นาที` : '—'} compact style={{ padding: 14 }} />
+          <KpiCard label="ISSUES" labelTh="จำนวนเรื่องที่แจ้ง (issue)" value={d.kpis.issues.toLocaleString()} valueColor={d.kpis.issues ? '#DC2626' : undefined} compact style={{ padding: 14 }} />
+          <KpiCard label="ISSUE PIECES" labelTh="จำนวนชิ้นที่มีปัญหา (ชิ้น)" value={d.kpis.pieces.toLocaleString()} compact style={{ padding: 14 }} />
+          <KpiCard label="ISSUE RATE" labelTh="สัดส่วนของ order ที่แพ็ก (%)" value={d.kpis.issueRatePct !== null ? `${d.kpis.issueRatePct}%` : '—'} sub={`${d.kpis.packedOrders.toLocaleString()} order ที่แพ็ก`} compact style={{ padding: 14 }} />
+          <KpiCard label="STILL OPEN" labelTh="ยังไม่ปิดเรื่อง (issue)" value={d.kpis.open.toLocaleString()} valueColor={d.kpis.open ? '#F59E0B' : undefined} compact style={{ padding: 14 }} />
+          <KpiCard label="AVG TIME TO RESOLVE" labelTh="เวลาเฉลี่ยในการปิดเรื่อง (นาที)" value={d.kpis.avgResolveMinutes !== null ? d.kpis.avgResolveMinutes.toLocaleString() : '—'} compact style={{ padding: 14 }} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14, alignItems: 'start' }}>

@@ -157,7 +157,7 @@ export default async function PackingDashboardPage() {
           <div className="card">
             <div className="card-title">Pieces packed per hour (today)</div>
             <div className="card-subtitle">จำนวนชิ้นที่แพ็กเสร็จรายชั่วโมง (ไม่นับชิ้นที่แจ้งปัญหา)</div>
-            <HourBars rows={d.hourly.map((h) => ({ hour: h.hour, value: h.pieces }))} color="var(--color-success)" />
+            <HourBars rows={d.hourly.map((h) => ({ hour: h.hour, value: h.pieces, orders: h.orders }))} color="var(--color-success)" />
           </div>
         </div>
 

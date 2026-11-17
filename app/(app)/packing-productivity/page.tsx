@@ -4,6 +4,7 @@ import { KpiCard } from '@/components/KpiCard'
 import { ExportExcelButton } from '@/components/ExportExcelButton'
 import { PackDateFilter } from '@/components/packing/PackDateFilter'
 import { HourBars } from '@/components/packing/BarList'
+import { PackerProductivityTable, StationProductivityTable } from '@/components/packing/PackProductivityTables'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireMenuAccess } from '@/lib/pageAccess'
@@ -40,145 +41,35 @@ export default async function PackingProductivityPage({ searchParams }: { search
       </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
-          <KpiCard label="PIECES PACKED" labelTh="ชิ้นที่แพ็กเสร็จ (ไม่นับชิ้นมีปัญหา)" value={d.totals.pieces.toLocaleString()} valueColor="#16A34A" sub={`${d.totals.orders.toLocaleString()} orders`} compact style={{ padding: 14 }} />
-          <KpiCard label="AVG PCS / HOUR" labelTh="ชิ้นต่อชั่วโมง (เฉลี่ยทั้งทีม)" value={d.totals.pcsPerHour?.toLocaleString() ?? '—'} valueColor={pctColor(totalPct)} sub={`target ${target.toLocaleString()} pcs/hr${totalPct !== null ? ` · ${totalPct}%` : ''}`} compact style={{ padding: 14 }} />
-          <KpiCard label="PACKERS" labelTh="จำนวนพนักงานแพ็ก" value={d.totals.packers.toLocaleString()} sub={`เวลาแพ็กรวม ${dur(d.totals.seconds)}`} compact style={{ padding: 14 }} />
+          <KpiCard label="PIECES PACKED" labelTh="ชิ้นที่แพ็กเสร็จ ไม่นับชิ้นมีปัญหา (ชิ้น)" value={d.totals.pieces.toLocaleString()} valueColor="#16A34A" sub={`${d.totals.orders.toLocaleString()} orders`} compact style={{ padding: 14 }} />
+          <KpiCard label="AVG PCS / HOUR" labelTh="ชิ้นต่อชั่วโมง เฉลี่ยทั้งทีม (ชิ้น/ชม.)" value={d.totals.pcsPerHour?.toLocaleString() ?? '—'} valueColor={pctColor(totalPct)} sub={`target ${target.toLocaleString()} pcs/hr${totalPct !== null ? ` · ${totalPct}%` : ''}`} compact style={{ padding: 14 }} />
+          <KpiCard label="PACKERS" labelTh="พนักงานแพ็ก (คน)" value={d.totals.packers.toLocaleString()} sub={`เวลาแพ็กรวม ${dur(d.totals.seconds)}`} compact style={{ padding: 14 }} />
           <KpiCard label="ISSUES REPORTED" labelTh="แจ้งปัญหา (order)" value={d.totals.issues.toLocaleString()} valueColor={d.totals.issues ? '#DC2626' : undefined} sub={`หัก ${d.totals.issuePieces.toLocaleString()} ชิ้นจากปัญหา`} compact style={{ padding: 14 }} />
-          <KpiCard label="AVG TIME / ORDER" labelTh="เวลาเฉลี่ยต่อ order" value={d.totals.orders ? dur(Math.round(d.totals.seconds / d.totals.orders)) : '—'} compact style={{ padding: 14 }} />
+          <KpiCard label="AVG TIME / ORDER" labelTh="เวลาเฉลี่ยต่อ order (นาที)" value={d.totals.orders ? dur(Math.round(d.totals.seconds / d.totals.orders)) : '—'} compact style={{ padding: 14 }} />
         </div>
 
         <div className="card">
           <div className="card-title">Packer productivity</div>
           <div className="card-subtitle" style={{ marginBottom: 10 }}>
-            รายคน · ชิ้น/ชม. = ชิ้นที่นับได้ ÷ เวลาแพ็กจริง (scan เริ่ม → ปิดงาน) · เทียบเป้า {target.toLocaleString()} ชิ้น/ชม.
+            รายคน · ชิ้น/ชม. = ชิ้นที่นับได้ ÷ เวลาแพ็กจริง (scan เริ่ม → ปิดงาน) รวมทุก Station ที่ทำ · เทียบเป้า {target.toLocaleString()} ชิ้น/ชม. · กดหัวคอลัมน์เพื่อเรียงลำดับ
           </div>
-          <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
-            <colgroup>
-              <col style={{ width: '26%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '10%' }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>PACKER</th>
-                <th>ORDERS</th>
-                <th>PIECES</th>
-                <th>
-                  PACK
-                  <br />
-                  TIME
-                </th>
-                <th>
-                  PCS
-                  <br />
-                  / HOUR
-                </th>
-                <th>
-                  % OF
-                  <br />
-                  TARGET
-                </th>
-                <th>
-                  AVG
-                  <br />
-                  / ORDER
-                </th>
-                <th>ISSUES</th>
-                <th>STATIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.packers.map((p) => {
-                const pct = pctOfTarget(p.pcsPerHour)
-                return (
-                  <tr key={p.picker_id}>
-                    <td style={{ overflowWrap: 'break-word' }}>
-                      {p.name}
-                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{p.picker_id}</div>
-                    </td>
-                    <td>{p.orders.toLocaleString()}</td>
-                    <td style={{ fontWeight: 700 }}>{p.pieces.toLocaleString()}</td>
-                    <td>{dur(p.seconds)}</td>
-                    <td style={{ fontWeight: 700 }}>{p.pcsPerHour?.toLocaleString() ?? '—'}</td>
-                    <td style={{ fontWeight: 700, color: pctColor(pct) }}>{pct !== null ? `${pct}%` : '—'}</td>
-                    <td>{dur(p.avgSecondsPerOrder)}</td>
-                    <td style={{ color: p.issuesReported ? 'var(--color-danger)' : undefined }}>
-                      {p.issuesReported}
-                      {p.issuePieces > 0 && <div style={{ fontSize: 11 }}>หัก {p.issuePieces} ชิ้น</div>}
-                    </td>
-                    <td style={{ fontSize: 12, overflowWrap: 'break-word' }}>{p.stations.join(', ')}</td>
-                  </tr>
-                )
-              })}
-              {d.packers.length === 0 && (
-                <tr>
-                  <td colSpan={9} style={{ color: 'var(--color-text-secondary)' }}>
-                    ไม่มีงานแพ็กที่ปิดในวันนี้ · No packing finished on this date.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <PackerProductivityTable packers={d.packers} target={target} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.4fr)', gap: 14, alignItems: 'start' }}>
-          <div className="card">
-            <div className="card-title">By station</div>
-            <div className="card-subtitle" style={{ marginBottom: 10 }}>
-              ราย Station
-            </div>
-            <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
-              <colgroup>
-                <col style={{ width: '24%' }} />
-                <col style={{ width: '16%' }} />
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '22%' }} />
-                <col style={{ width: '20%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>STATION</th>
-                  <th>ORDERS</th>
-                  <th>PIECES</th>
-                  <th>
-                    PCS
-                    <br />
-                    / HOUR
-                  </th>
-                  <th>ISSUES</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.stations.map((s) => (
-                  <tr key={s.station_code}>
-                    <td style={{ fontWeight: 700 }}>{s.station_code}</td>
-                    <td>{s.orders.toLocaleString()}</td>
-                    <td>{s.pieces.toLocaleString()}</td>
-                    <td style={{ fontWeight: 700 }}>{s.pcsPerHour?.toLocaleString() ?? '—'}</td>
-                    <td>{s.issuesReported}</td>
-                  </tr>
-                ))}
-                {d.stations.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                      —
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        <div className="card">
+          <div className="card-title">Pieces packed per hour</div>
+          <div className="card-subtitle" style={{ marginBottom: 10 }}>
+            จำนวนชิ้นที่แพ็กเสร็จรายชั่วโมง (นับตามเวลาที่ปิดงาน) · ทั้งวัน
           </div>
-          <div className="card">
-            <div className="card-title">Pieces packed per hour</div>
-            <div className="card-subtitle">จำนวนชิ้นที่แพ็กเสร็จรายชั่วโมง</div>
-            <HourBars rows={d.hourly.map((h) => ({ hour: h.hour, value: h.pieces }))} color="var(--color-success)" />
+          <HourBars rows={d.hourly.map((h) => ({ hour: h.hour, value: h.pieces, orders: h.orders }))} color="var(--color-success)" />
+        </div>
+
+        <div className="card">
+          <div className="card-title">By station</div>
+          <div className="card-subtitle" style={{ marginBottom: 10 }}>
+            ราย Station · กดหัวคอลัมน์เพื่อเรียงลำดับ
           </div>
+          <StationProductivityTable stations={d.stations} />
         </div>
       </div>
     </>

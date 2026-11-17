@@ -250,7 +250,7 @@ export function MatchingBoard({
       <div className="card">
         <div className="card-title">Run matching</div>
         <div className="card-subtitle" style={{ marginBottom: 12 }}>
-          §10 pre-screen + P1-P4 clustering · {unmatchedPendingCount} pending orders not yet matched for this date
+          สั่งจับคู่ Order · {unmatchedPendingCount} order ยังไม่จับคู่
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'end' }}>
           <div className="field">
@@ -269,16 +269,16 @@ export function MatchingBoard({
         {error && <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
         {result && (
           <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
-            {String(result.eligible_count)} eligible · {String(result.excluded_over_max_sku)} excluded (over max SKU) · {(result.batches as unknown[]).length} batch(es) created ·{' '}
-            {String(result.single_order_count)} routed to Single Order
+            พร้อมจับคู่ {String(result.eligible_count)} order · ตัดออก {String(result.excluded_over_max_sku)} order (SKU เกินกำหนด) · สร้าง {(result.batches as unknown[]).length} batch ·{' '}
+            เป็น Order เดี่ยว {String(result.single_order_count)} order
             {Number(result.already_assigned_or_consolidated ?? 0) > 0 && (
               <>
                 {' '}
-                · {String(result.already_assigned_or_consolidated)} of {String(result.total_orders_for_date)} order(s) for this date already assigned/consolidated, skipped
+                · ข้าม {String(result.already_assigned_or_consolidated)} จาก {String(result.total_orders_for_date)} order ที่มอบหมาย/รวม Batch ไปแล้ว
               </>
             )}
             {Number(result.eligible_count) === 0 && Number(result.total_orders_for_date ?? 0) === 0 && (
-              <div style={{ marginTop: 4, color: 'var(--color-text-secondary)' }}>No orders at all imported for this date/warehouse yet.</div>
+              <div style={{ marginTop: 4, color: 'var(--color-text-secondary)' }}>ยังไม่มี Order ที่ Import สำหรับวันที่/คลังนี้</div>
             )}
           </div>
         )}
@@ -294,7 +294,7 @@ export function MatchingBoard({
           <div>
             <div className="card-title">Batch review — {formatDate(orderDate)}</div>
             <div className="card-subtitle" style={{ marginBottom: 12 }}>
-              แดชบอร์ดตรวจแบตช์ · Approve prints the A4 pick report immediately
+              แดชบอร์ดตรวจ Batch
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -371,24 +371,25 @@ export function MatchingBoard({
             {pageRows.length === 0 && (
               <tr>
                 <td colSpan={9} style={{ color: 'var(--color-text-secondary)' }}>
-                  No consolidation batches for {formatDate(orderDate)} — run matching above, or pick a different Order Date.
+                  ยังไม่มี Batch ของวันที่ {formatDate(orderDate)} · กด Run matching ด้านบน หรือเลือก Order Date อื่น
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-        {sorted.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} suffix={<> · {sorted.length} batch(es)</>} />}
+        {sorted.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} suffix={<> · {sorted.length} batch</>} />}
+        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>กด Approve แล้วระบบจะพิมพ์ Pick Report (A4) ทันที</div>
       </div>
 
       {approveTarget && (
         <Modal
           title={approveTarget.length === 1 ? 'Approve batch' : `Approve ${approveTarget.length} batches`}
-          subtitle="สแกนรหัส Picker เพื่อมอบหมายงานหยิบก่อนอนุมัติ · orders in this batch will be assigned to the scanned picker"
+          subtitle="มอบหมาย Picker ก่อนอนุมัติ"
           onSubmit={confirmApprove}
         >
           <div className="modal-body">
             <div style={{ fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 8 }}>
-              Assign to picker <span style={{ color: '#DC2626' }}>*</span>
+              มอบหมายให้ Picker <span style={{ color: '#DC2626' }}>*</span>
             </div>
             {scannedPicker ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '10px 12px' }}>
@@ -405,7 +406,7 @@ export function MatchingBoard({
                 <input
                   ref={pickerScanInputRef}
                   className="control"
-                  placeholder="Scan picker ID…"
+                  placeholder="Scan รหัส Picker…"
                   value={pickerScanValue}
                   onChange={(e) => setPickerScanValue(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handlePickerScan()}
@@ -420,8 +421,8 @@ export function MatchingBoard({
             {pickerScanError && <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--color-danger)' }}>{pickerScanError}</div>}
             <div style={{ marginTop: 14, fontSize: 12, color: '#6B7280' }}>
               {approveTarget.length === 1
-                ? "This batch's orders will be assigned to the picker above and immediately available on their Pick Completion screen."
-                : `All ${approveTarget.length} selected batches will be assigned to the same picker above.`}
+                ? 'Order ใน Batch นี้จะมอบหมายให้ Picker ด้านบน และแสดงในหน้า Pick Completion ทันที'
+                : `ทั้ง ${approveTarget.length} batch ที่เลือกจะมอบหมายให้ Picker คนเดียวกันด้านบน`}
             </div>
           </div>
           <ModalFooter>

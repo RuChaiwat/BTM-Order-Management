@@ -547,7 +547,7 @@ export function PackHandheldBoard() {
             <thead>
               <tr>
                 <th>BARCODE</th>
-                <th title="Order QTY / Verify QTY">
+                <th title="จำนวนสั่ง / จำนวนที่ Verify">
                   QTY <span style={{ fontWeight: 400, fontSize: 11 }}>(O/V)</span>
                 </th>
               </tr>
@@ -653,7 +653,7 @@ export function PackHandheldBoard() {
             <textarea
               value={form.remark}
               onChange={(e) => setForm({ ...form, remark: e.target.value })}
-              placeholder="Comment (ไม่บังคับ)"
+              placeholder="หมายเหตุ (ไม่บังคับ)"
               maxLength={500}
               style={{ width: '100%', minHeight: 64, border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px', fontSize: 15, fontFamily: 'inherit' }}
             />

@@ -106,7 +106,7 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
       <div className="card">
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Active pick &amp; sort worklist</span>
-        <span className="card-subtitle">รายการที่กำลังหยิบ/จัดเรียง · click a column to sort</span>
+        <span className="card-subtitle">รายการที่กำลังหยิบ/จัดเรียง</span>
       </div>
       {error && <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -188,21 +188,20 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={9} style={{ color: 'var(--color-text-secondary)' }}>
-                Nothing released and active right now — release a batch from Matching Analysis &amp; Batch Review.
+                ยังไม่มี Batch ที่กำลังดำเนินการ · อนุมัติ Batch ได้ที่หน้า Matching Analysis &amp; Batch Review
               </td>
             </tr>
           )}
         </tbody>
       </table>
-      {sorted.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} suffix={<> · {sorted.length} batch(es)</>} />}
+      {sorted.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} suffix={<> · {sorted.length} batch</>} />}
       </div>
 
       {completeBatch && (
-        <Modal title={`Mark ${completeBatch.batch_no} completed`} subtitle="ยืนยันผลการหยิบของทั้ง Batch · หยุดเวลาของทุกออเดอร์ในกลุ่มนี้">
+        <Modal title={`Mark ${completeBatch.batch_no} completed`} subtitle="ยืนยันผลการหยิบของทั้ง Batch">
           <div className="modal-body">
-            All {completeBatch.orders_count} order(s) in this batch will be marked picked and sent to Admin Verification. Choose 100% only if every order in the batch was fully picked --
-            otherwise use Completed with Short (Admin will record the actual short quantity/reason per order during verification). If the batch is genuinely mixed, you can instead confirm each
-            order individually from Pick Completion — this batch closes itself automatically once every order in it has been confirmed there.
+            ทั้ง {completeBatch.orders_count} order ใน Batch นี้จะถูกปิดงานหยิบ หยุดจับเวลา และส่งต่อไปหน้า Admin Verification · เลือก 100% เฉพาะเมื่อหยิบครบทุก order ไม่เช่นนั้นให้เลือก Completed with Short
+            (Admin จะบันทึกจำนวนและสาเหตุที่ขาดของแต่ละ order ตอนตรวจสอบ) · หาก Batch มีทั้งครบและขาดปนกัน ให้ยืนยันทีละ order ที่หน้า Pick Completion แทน แล้ว Batch จะปิดเองเมื่อยืนยันครบทุก order
           </div>
           <ModalFooter>
             <button type="button" className="modal-footer-btn btn-secondary" disabled={busyBatch === completeTarget} onClick={() => setCompleteTarget(null)}>

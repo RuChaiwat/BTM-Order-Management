@@ -73,7 +73,7 @@ function paginate(lines: PickSheetLine[]): PageUnit[][] {
 export function PickSheetDocument({ sheets, generatedAt }: { sheets: PickSheetRow[]; generatedAt: string }) {
   return (
     <div className="pick-sheet-doc">
-      {sheets.length === 0 && <div className="no-print">No orders found for this print job.</div>}
+      {sheets.length === 0 && <div className="no-print">ไม่พบ Order สำหรับพิมพ์</div>}
       {sheets.map((s, sheetIndex) => {
         const pages = paginate(s.lines)
         return pages.map((pageUnits, pageIndex) => {

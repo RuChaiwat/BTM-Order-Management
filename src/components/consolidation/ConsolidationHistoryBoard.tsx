@@ -52,7 +52,7 @@ export function ConsolidationHistoryBoard({ rows }: { rows: ConsolidationHistory
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Consolidation History</span>
         <span className="card-subtitle">
-          ประวัติการรวมออเดอร์ · {rows.length.toLocaleString()} batch(es) · click a column to sort
+          ประวัติการรวมออเดอร์ · {rows.length.toLocaleString()} batch
         </span>
       </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -109,7 +109,7 @@ export function ConsolidationHistoryBoard({ rows }: { rows: ConsolidationHistory
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={8} style={{ color: 'var(--color-text-secondary)' }}>
-                No batches match this search.
+                ไม่พบ Batch ตามที่ค้นหา
               </td>
             </tr>
           )}

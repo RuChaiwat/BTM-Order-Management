@@ -26,7 +26,7 @@ export default async function BacklogPage() {
   return (
     <>
       <AutoRefresh />
-      <TopBar title="Pending Actions Monitor" subtitle={`รายการที่ต้องดำเนินการ · ${data.rows.length} orders pending action`} />
+      <TopBar title="Pending Actions Monitor" subtitle={`รายการที่ต้องดำเนินการ · ${data.rows.length} order`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <KpiCard

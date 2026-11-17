@@ -25,7 +25,7 @@ export default async function OrderPoolPage() {
     // operational log, same shape as Audit Trail, not a "last 10" preview.
     admin.from('import_batches').select('import_id, file_name, uploaded_at, status, total_rows, success_rows, error_rows').order('uploaded_at', { ascending: false }).limit(200),
     getOrderPoolOverview(admin, warehouseCode),
-    admin.from('reason_master').select('reason_code, label_en').eq('reason_type', 'cancel').eq('active', true).order('label_en'),
+    admin.from('reason_master').select('reason_code, label_en, label_th').eq('reason_type', 'cancel').eq('active', true).order('label_en'),
   ])
   if (importsError) console.error('[orders] import_batches error', importsError.message)
 
@@ -48,17 +48,17 @@ export default async function OrderPoolPage() {
 
   return (
     <>
-      <TopBar title="Order Pool / Import Status" subtitle="พูลออเดอร์ / สถานะนำเข้า · WMS Transfer Order export" />
+      <TopBar title="Order Pool / Import Status" subtitle="พูลออเดอร์ / สถานะนำเข้า" />
       <div className="page-body">
         <OrderImportForm
           endpointBase="/api/imports/orders"
-          hint={'อัปโหลด 2 ไฟล์แยกกันจาก WMS · Upload the two WMS exports (.xlsx) as separate files — "Transfer List" (order header, only BT Status = Picking is imported) and "Warehouse Pick Lines" (order lines, matched by Source No.)'}
+          hint={'อัปโหลด 2 ไฟล์ (.xlsx) จาก WMS แยกกัน · "Transfer List" (หัว order — นำเข้าเฉพาะ BT Status = Picking) และ "Warehouse Pick Lines" (รายการสินค้าใน order — จับคู่ด้วย Source No.)'}
         />
 
         <div className="card">
           <div className="card-title">Recent imports</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            ประวัติการนำเข้าล่าสุด · click a column to sort
+            ประวัติการนำเข้าล่าสุด
           </div>
           <RecentImportsTable rows={importRows} />
         </div>

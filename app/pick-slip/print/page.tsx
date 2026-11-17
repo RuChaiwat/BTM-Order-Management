@@ -28,7 +28,7 @@ export default async function PickSlipPrintPage({ searchParams }: { searchParams
   return (
     <div>
       <style>{PICK_SLIP_PRINT_CSS}</style>
-      {slips.length === 0 && <div className="no-print">No orders found to print.</div>}
+      {slips.length === 0 && <div className="no-print">ไม่พบ Order สำหรับพิมพ์</div>}
       {slips.length > 0 && (
         <>
           <PickSlipDocument slips={slips} />

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Legend } from '@/components/Legend'
 import { CONFIG_CATEGORIES, CONFIG_FIELDS, CONFIG_FIELD_BY_KEY, PACKING_LONG_SESSION_KEY, PACKING_RED_KEY, toDisplayValue, fromDisplayValue } from '@/lib/configCatalog'
 
 interface ConfigRow {
@@ -58,13 +59,13 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
     const field = CONFIG_FIELD_BY_KEY.get(key)!
     const parsed = fromDisplayValue(field.kind, edits[key] ?? '')
     if (!parsed.ok) {
-      setErrors((e) => ({ ...e, [key]: 'Enter a valid number · กรอกตัวเลขให้ถูกต้อง' }))
+      setErrors((e) => ({ ...e, [key]: 'กรอกตัวเลขให้ถูกต้อง' }))
       return
     }
     if (typeof parsed.value === 'number' && field.kind !== 'percent') {
       if ((field.min !== undefined && parsed.value < field.min) || (field.max !== undefined && parsed.value > field.max)) {
         const range = field.max !== undefined ? `${field.min ?? 0}–${field.max}` : `≥ ${field.min}`
-        setErrors((e) => ({ ...e, [key]: `Allowed range ${range} ${field.unit} · ค่าที่ใส่ได้ ${range} ${field.unit}` }))
+        setErrors((e) => ({ ...e, [key]: `ค่าที่ใส่ได้ ${range} ${field.unit}` }))
         return
       }
     }
@@ -88,7 +89,7 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
     <div className="card">
       <div className="card-title">Settings</div>
       <div className="card-subtitle" style={{ marginBottom: 4 }}>
-        ตั้งค่าระบบ · แก้ไขค่าแล้วกด Save เพื่อบันทึกทันที
+        ตั้งค่าระบบ
       </div>
 
       {CONFIG_CATEGORIES.map((cat) => {
@@ -117,8 +118,7 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{field.labelEn}</div>
                       <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>{field.labelTh}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 4, maxWidth: 560 }}>{field.descriptionEn}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', maxWidth: 560 }}>{field.descriptionTh}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 4, maxWidth: 560 }}>{field.descriptionTh}</div>
                       {error && <div style={{ fontSize: 11.5, color: 'var(--color-danger)', marginTop: 4 }}>{error}</div>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
@@ -132,7 +132,7 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
                         >
                           {field.options?.map((o) => (
                             <option key={o.value} value={o.value}>
-                              {o.labelEn} · {o.labelTh}
+                              {o.labelTh}
                             </option>
                           ))}
                         </select>
@@ -142,7 +142,7 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
                             className="field-input"
                             style={{ border: '1px solid var(--color-border)', width: 90, textAlign: 'right' }}
                             value={displayFor(field.key)}
-                            placeholder={field.kind === 'nullable_integer' ? 'no limit' : undefined}
+                            placeholder={field.kind === 'nullable_integer' ? 'ไม่จำกัด' : undefined}
                             onChange={(e) => setEdit(field.key, e.target.value)}
                             disabled={busy}
                           />
@@ -175,23 +175,19 @@ export function ConfigEditor({ configs }: { configs: ConfigRow[] }) {
 /** What the two Packing time thresholds mean, shown as the three colour bands (follows unsaved edits). */
 function PackBandPreview({ yellow, red }: { yellow: number; red: number }) {
   const ok = Number.isFinite(yellow) && Number.isFinite(red) && yellow > 0 && red > yellow
-  const chip = (color: string, text: string) => (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginRight: 14 }}>
-      <span style={{ width: 12, height: 12, borderRadius: 3, background: color }} />
-      {text}
-    </span>
-  )
   return (
-    <div style={{ fontSize: 12.5, marginTop: 8, padding: '8px 12px', border: '1px dashed var(--color-border)', borderRadius: 8 }}>
-      <b>สีเวลาแพ็ก:</b>{' '}
+    <div style={{ marginTop: 8, padding: '8px 12px', border: '1px dashed var(--color-border)', borderRadius: 8 }}>
       {ok ? (
-        <>
-          {chip('#16A34A', `0 – ${yellow - 1} นาที`)}
-          {chip('#F59E0B', `${yellow} – ${red - 1} นาที`)}
-          {chip('#DC2626', `${red} นาทีขึ้นไป`)}
-        </>
+        <Legend
+          note="สีเวลาแพ็ก:"
+          items={[
+            { color: '#16A34A', label: `0 – ${yellow - 1} นาที` },
+            { color: '#F59E0B', label: `${yellow} – ${red - 1} นาที` },
+            { color: '#DC2626', label: `${red} นาทีขึ้นไป` },
+          ]}
+        />
       ) : (
-        <span style={{ color: 'var(--color-danger)' }}>ค่าสีแดงต้องมากกว่าค่าสีเหลือง</span>
+        <span style={{ fontSize: 12, color: 'var(--color-danger)' }}>ค่าสีแดงต้องมากกว่าค่าสีเหลือง</span>
       )}
     </div>
   )

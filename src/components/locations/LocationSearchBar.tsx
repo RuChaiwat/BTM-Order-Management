@@ -32,7 +32,7 @@ export function LocationSearchBar() {
 
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-      <input className="control" placeholder="Warehouse" value={warehouse} onChange={(e) => setWarehouse(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && apply()} style={{ width: 120 }} />
+      <input className="control" placeholder="Warehouse Code" value={warehouse} onChange={(e) => setWarehouse(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && apply()} style={{ width: 120 }} />
       <input className="control" placeholder="Bin Code" value={bin} onChange={(e) => setBin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && apply()} style={{ width: 200 }} />
       <input className="control" placeholder="Zone Code" value={zone} onChange={(e) => setZone(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && apply()} style={{ width: 140 }} />
       <button className="btn btn-primary btn-sm" onClick={apply}>

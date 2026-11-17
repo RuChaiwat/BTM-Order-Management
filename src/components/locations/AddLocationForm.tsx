@@ -85,7 +85,7 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
         <span className="card-title">Add Location</span>
         <span className="card-subtitle" style={{ marginLeft: 8 }}>
-          เพิ่มตำแหน่งจัดเก็บใหม่ · Pick Sequence is computed automatically — not entered by hand
+          เพิ่มตำแหน่งจัดเก็บใหม่
         </span>
         <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setOpen(false)}>
           Cancel
@@ -95,9 +95,9 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         <div className="field">
           <label className="field-label">
-            Bin Code * <span className="field-hint">Location ID — dashes typed here are stripped automatically; shown with dashes everywhere else</span>
+            Bin Code * <span className="field-hint">ขีด (-) ที่พิมพ์จะถูกตัดออกอัตโนมัติ</span>
           </label>
-          <input className="field-input" style={{ border: '1px solid var(--color-border)' }} value={form.bin_code} onChange={(e) => setForm({ ...form, bin_code: e.target.value })} placeholder="e.g. A1A01A01" />
+          <input className="field-input" style={{ border: '1px solid var(--color-border)' }} value={form.bin_code} onChange={(e) => setForm({ ...form, bin_code: e.target.value })} placeholder="เช่น A1A01A01" />
         </div>
         <div className="field">
           <label className="field-label">Zone Code *</label>
@@ -108,16 +108,16 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
           <input className="field-input" style={{ border: '1px solid var(--color-border)' }} value={form.zone_name} onChange={(e) => setForm({ ...form, zone_name: e.target.value })} />
         </div>
         <div className="field">
-          <label className="field-label">Active</label>
+          <label className="field-label">สถานะ</label>
           <select className="field-input" style={{ border: '1px solid var(--color-border)' }} value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
-            <option value="1">Active</option>
-            <option value="0">Inactive</option>
+            <option value="1">ใช้งาน</option>
+            <option value="0">ปิดใช้งาน</option>
           </select>
         </div>
 
         <div className="field">
           <label className="field-label">
-            Aisle * <span className="field-hint">walking order — new aisles go to the end</span>
+            Aisle * <span className="field-hint">ตามลำดับการเดิน · Aisle ใหม่จะต่อท้าย</span>
           </label>
           {!addingNewAisle ? (
             <select
@@ -126,13 +126,13 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
               value={form.aisle}
               onChange={(e) => (e.target.value === '__new__' ? setAddingNewAisle(true) : setForm({ ...form, aisle: e.target.value }))}
             >
-              <option value="">Select aisle…</option>
+              <option value="">เลือก Aisle…</option>
               {existingAisles.map((a) => (
                 <option key={a.aisle} value={a.aisle}>
-                  {a.aisle} (rank {a.aisle_rank})
+                  {a.aisle} (ลำดับ {a.aisle_rank})
                 </option>
               ))}
-              <option value="__new__">+ New aisle (append to end)…</option>
+              <option value="__new__">+ เพิ่ม Aisle ใหม่ (ต่อท้าย)…</option>
             </select>
           ) : (
             <div style={{ display: 'flex', gap: 6 }}>
@@ -141,7 +141,7 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
                 style={{ border: '1px solid var(--color-border)' }}
                 value={form.newAisle}
                 onChange={(e) => setForm({ ...form, newAisle: e.target.value })}
-                placeholder={`new aisle — will be rank ${nextAisleRank}`}
+                placeholder={`Aisle ใหม่ — ลำดับที่ ${nextAisleRank}`}
               />
               {existingAisles.length > 0 && (
                 <button className="btn btn-secondary btn-sm" onClick={() => setAddingNewAisle(false)}>
@@ -170,7 +170,7 @@ export function AddLocationForm({ warehouseCode, existingAisles, nextAisleRank }
       </div>
 
       <div style={{ marginTop: 14, background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5 }}>
-        <span style={{ color: '#6B7280' }}>Pick Sequence preview</span>
+        <span style={{ color: '#6B7280' }}>ตัวอย่าง Pick Sequence (ระบบคำนวณให้อัตโนมัติ)</span>
         <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace' }}>{preview ?? '—'}</div>
       </div>
 

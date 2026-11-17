@@ -68,12 +68,13 @@ export default async function LocationMasterPage({ searchParams }: { searchParam
 
   return (
     <>
-      <TopBar title="Location Master" subtitle="ข้อมูลตำแหน่งจัดเก็บ · Bin → Zone → Pick Sequence" />
+      <TopBar title="Location Master" subtitle="ข้อมูลตำแหน่งจัดเก็บ" />
       <div className="page-body">
         <UploadForm
           endpoint="/api/imports/locations"
           label="Import Location Master"
-          hint="Upload Bin Code master (.csv or .xlsx) — required columns: Bin Code, Warehouse Code, Zone Code, Aisle, Side, Bay, Level, Block (optional: Zone Name, Active Flag) — Pick Sequence is always computed, not read from the file"
+          subtitle="นำเข้าข้อมูลตำแหน่งจัดเก็บ"
+          hint="อัปโหลดไฟล์ Bin Code (.csv หรือ .xlsx) · คอลัมน์ที่ต้องมี: Bin Code, Warehouse Code, Zone Code, Aisle, Side, Bay, Level, Block (ไม่บังคับ: Zone Name, Active Flag) · ระบบคำนวณ Pick Sequence ให้เอง ไม่อ่านจากไฟล์"
         />
 
         <AddLocationForm warehouseCode={warehouseCode} existingAisles={existingAisles} nextAisleRank={nextAisleRank} />
@@ -82,7 +83,7 @@ export default async function LocationMasterPage({ searchParams }: { searchParam
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
             <span className="card-title">Locations</span>
             <span className="card-subtitle">
-              รายการตำแหน่งจัดเก็บ · {total.toLocaleString()} bin code{total === 1 ? '' : 's'} match{isFiltered ? 'ing search' : ''} · sorted by Pick Sequence
+              รายการตำแหน่งจัดเก็บ · {total.toLocaleString()} Bin Code{isFiltered ? ' (ตามที่ค้นหา)' : ''}
             </span>
             <ExportExcelButton href={exportHref} style={{ marginLeft: 'auto' }} />
           </div>

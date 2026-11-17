@@ -9,6 +9,7 @@ import { createClient } from '../../lib/supabase/client'
 import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
 import { formatDateTime } from '../../lib/formatDate'
 import { productivityMeta } from '../../lib/pickerProductivity'
+import { actionMeta } from '../../lib/auditCatalog'
 import { PickerImportModal } from './PickerImportModal'
 
 interface PickerRow {
@@ -77,7 +78,7 @@ function ProductivityBadge({ picker }: { picker: PickerRow }) {
     <span
       className="badge"
       style={{ background: meta.bg, color: meta.color, fontWeight: 700 }}
-      title={picker.productivity_pcs_per_hour ? `${picker.productivity_pcs_per_hour.toLocaleString()} pcs/hr avg` : undefined}
+      title={picker.productivity_pcs_per_hour ? `เฉลี่ย ${picker.productivity_pcs_per_hour.toLocaleString()} ชิ้น/ชม.` : undefined}
     >
       {meta.label}
     </span>
@@ -91,7 +92,7 @@ function ProductivityBadge({ picker }: { picker: PickerRow }) {
  * after UAT feedback that it read like an achievement badge, not an ID card number). */
 export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes }: { pickers: PickerRow[]; warehouseCode: string; employmentTypes: EmploymentType[] }) {
   const router = useRouter()
-  const labelByType = useMemo(() => new Map(employmentTypes.map((t) => [t.type_code, t.label_en])), [employmentTypes])
+  const labelByType = useMemo(() => new Map(employmentTypes.map((t) => [t.type_code, t.label_th || t.label_en])), [employmentTypes])
   const [selectedId, setSelectedId] = useState(pickers[0]?.picker_id ?? '')
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'picker_id', dir: 'asc' })
   const [page, setPage] = useState(1)
@@ -164,16 +165,16 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span className="card-title">Picker List</span>
-          <span className="card-subtitle">รายชื่อพนักงานหยิบสินค้า · {pickers.length} pickers · {warehouseCode}</span>
+          <span className="card-subtitle">รายชื่อพนักงานหยิบสินค้า · {pickers.length} คน · {warehouseCode}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <a className="btn btn-secondary btn-sm" href="/api/pickers/template" download title="Standard Excel format for bulk upload · ดาวน์โหลดแบบฟอร์มสำหรับกรอกข้อมูล">
+            <a className="btn btn-secondary btn-sm" href="/api/pickers/template" download title="ดาวน์โหลดแบบฟอร์มสำหรับกรอกข้อมูล">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 3v12m0 0l-4-4m4 4l4-4" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               Download template
             </a>
-            <button className="btn btn-info btn-sm" onClick={() => setShowImport(true)} title="Add or update pickers from the filled-in template · นำเข้าจากไฟล์ Excel">
+            <button className="btn btn-info btn-sm" onClick={() => setShowImport(true)} title="เพิ่มหรือแก้ไขพนักงานจากไฟล์ Excel ที่กรอกแล้ว">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 15V3m0 0l-4 4m4-4l4 4" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" strokeLinecap="round" strokeLinejoin="round" />
@@ -214,19 +215,20 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
                 <td>
                   <ProductivityBadge picker={p} />
                 </td>
-                <td>{p.active ? <span style={{ color: '#16A34A' }}>● Active</span> : <span style={{ color: '#9CA3AF' }}>● Inactive</span>}</td>
+                <td>{p.active ? <span style={{ color: '#16A34A' }}>● ใช้งาน</span> : <span style={{ color: '#9CA3AF' }}>● ปิดใช้งาน</span>}</td>
               </tr>
             ))}
             {pageRows.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                  No pickers yet — add one to get started.
+                  ยังไม่มีพนักงานหยิบสินค้า — กด + Add picker เพื่อเพิ่ม
                 </td>
               </tr>
             )}
           </tbody>
         </table>
         {pickers.length > 0 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>ใช้รหัสเดียวกันทั้งงาน Pick และ Pack</div>
       </div>
 
       <div className="card">
@@ -252,10 +254,10 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
               <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: -4, marginBottom: 6 }}>ระดับประสิทธิผล</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ProductivityBadge picker={selected} />
-                {selected.productivity_pcs_per_hour != null && <span style={{ fontSize: 12, color: '#6B7280' }}>{selected.productivity_pcs_per_hour.toLocaleString()} pcs/hr avg</span>}
+                {selected.productivity_pcs_per_hour != null && <span style={{ fontSize: 12, color: '#6B7280' }}>เฉลี่ย {selected.productivity_pcs_per_hour.toLocaleString()} ชิ้น/ชม.</span>}
               </div>
               <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
-                {selected.productivity_updated_at ? `Updated ${formatDateTime(selected.productivity_updated_at)}` : 'Not yet computed'} · auto-calculated every Sunday, not editable
+                {selected.productivity_updated_at ? `อัปเดต ${formatDateTime(selected.productivity_updated_at)}` : 'ยังไม่ได้คำนวณ'} · คำนวณอัตโนมัติทุกวันอาทิตย์ แก้ไขไม่ได้
               </div>
             </div>
 
@@ -283,14 +285,14 @@ export function PickerManagementBoard({ pickers, warehouseCode, employmentTypes 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               {auditTrail.map((a) => (
                 <div key={a.id}>
-                  {formatDateTime(a.created_at)} · {a.action}
+                  {formatDateTime(a.created_at)} · {actionMeta(a.action).labelTh}
                 </div>
               ))}
-              {auditTrail.length === 0 && <span style={{ color: '#6B7280' }}>No recorded actions.</span>}
+              {auditTrail.length === 0 && <span style={{ color: '#6B7280' }}>ยังไม่มีประวัติ</span>}
             </div>
           </>
         ) : (
-          <span style={{ color: '#6B7280' }}>No pickers yet — add one to get started.</span>
+          <span style={{ color: '#6B7280' }}>ยังไม่มีพนักงานหยิบสินค้า — กด + Add picker เพื่อเพิ่ม</span>
         )}
       </div>
 
@@ -337,10 +339,10 @@ function PickerModal({
     setError(null)
     const missing: string[] = []
     if (!form.picker_id) missing.push('Picker ID')
-    if (!form.name_th) missing.push('Name (TH)')
-    if (!form.employment_type) missing.push('Employment Type')
+    if (!form.name_th) missing.push('ชื่อ (ไทย)')
+    if (!form.employment_type) missing.push('ประเภทการจ้างงาน')
     if (missing.length > 0) {
-      setError(`กรุณากรอกข้อมูลที่จำเป็น — Required: ${missing.join(', ')}`)
+      setError(`กรุณากรอกข้อมูลที่จำเป็น: ${missing.join(', ')}`)
       return
     }
 
@@ -366,7 +368,7 @@ function PickerModal({
         <div className="field">
           <label className="field-label">
             Picker ID <span className="field-label-required">*</span>{' '}
-            <span className="field-hint">max {USER_ID_MAX_LENGTH} characters — same ID printed on the picker's employee card, scanned directly at Assignment time — cannot be changed later</span>
+            <span className="field-hint">ไม่เกิน {USER_ID_MAX_LENGTH} ตัวอักษร · รหัสเดียวกับบัตรพนักงาน ใช้สแกนตอนมอบหมายงาน · แก้ไขภายหลังไม่ได้</span>
           </label>
           <input
             className="field-input"
@@ -374,14 +376,14 @@ function PickerModal({
             maxLength={USER_ID_MAX_LENGTH}
             disabled={isEdit}
             onChange={(e) => setForm({ ...form, picker_id: e.target.value.toUpperCase() })}
-            placeholder="e.g. P020"
+            placeholder="เช่น P020"
             style={{ border: '1px solid var(--color-border)' }}
             autoFocus={!isEdit}
           />
         </div>
         <div className="field">
           <label className="field-label">
-            Name (TH) <span className="field-label-required">*</span>
+            ชื่อ (ไทย) <span className="field-label-required">*</span>
           </label>
           <input
             className="field-input"
@@ -393,13 +395,13 @@ function PickerModal({
         </div>
         <div className="field">
           <label className="field-label">
-            Name (EN) <span className="field-hint">optional</span>
+            ชื่อ (อังกฤษ) <span className="field-hint">ไม่บังคับ</span>
           </label>
           <input className="field-input" value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <div className="field">
           <label className="field-label">
-            Employment Type <span className="field-label-required">*</span> <span className="field-hint">ประเภทการจ้างงาน, configurable in Configuration</span>
+            ประเภทการจ้างงาน <span className="field-label-required">*</span> <span className="field-hint">ปรับได้ที่หน้า Configuration</span>
           </label>
           <select
             className="field-input"
@@ -407,17 +409,17 @@ function PickerModal({
             onChange={(e) => setForm({ ...form, employment_type: e.target.value })}
             style={{ border: '1px solid var(--color-border)' }}
           >
-            <option value="">— Select —</option>
+            <option value="">— เลือก —</option>
             {typeOptions.map((t) => (
               <option key={t.type_code} value={t.type_code}>
-                {t.label_en}
+                {t.label_th || t.label_en}
               </option>
             ))}
           </select>
         </div>
         <div className="field">
           <label className="field-label">
-            Note <span className="field-hint">optional — distinction, certification. Informational only, not used to look the picker up</span>
+            หมายเหตุ <span className="field-hint">ไม่บังคับ · เช่น ความชำนาญ ใบรับรอง (ใช้แสดงข้อมูลเท่านั้น)</span>
           </label>
           <textarea
             className="field-input"

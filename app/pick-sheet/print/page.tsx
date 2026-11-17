@@ -32,7 +32,7 @@ export default async function PickSheetPrintPage({ searchParams }: { searchParam
   return (
     <div>
       <style>{PICK_SHEET_PRINT_CSS}</style>
-      {sheets.length === 0 && <div className="no-print">No orders found to print.</div>}
+      {sheets.length === 0 && <div className="no-print">ไม่พบ Order สำหรับพิมพ์</div>}
       {sheets.length > 0 && (
         <>
           <PickSheetDocument sheets={sheets} generatedAt={generatedAt} />

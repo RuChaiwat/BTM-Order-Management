@@ -186,7 +186,7 @@ export function BatchReportDocument({ batch, warehouseCode, orders, pickLines, g
             {orders.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ color: '#6B7280' }}>
-                  No orders linked to this batch.
+                  ไม่มี Order ใน Batch นี้
                 </td>
               </tr>
             )}

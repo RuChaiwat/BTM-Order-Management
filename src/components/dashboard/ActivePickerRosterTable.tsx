@@ -16,6 +16,7 @@ interface ActivePicker {
 
 const PAGE_SIZE = 20
 const ALERT_RANK: Record<string, number> = { critical: 3, overdue: 2, warning: 1 }
+const ALERT_TH: Record<'warning' | 'overdue' | 'critical', string> = { warning: 'ใกล้เกินกำหนด', overdue: 'เกินกำหนด', critical: 'วิกฤต' }
 
 type SortKey = 'name' | 'timeAlert' | 'elapsedMinutes' | 'pieces' | 'orders'
 
@@ -105,11 +106,11 @@ export function ActivePickerRosterTable({ pickers }: { pickers: ActivePicker[] }
               </td>
               <td style={{ textAlign: 'right' }}>{p.orders}</td>
               <td style={{ fontWeight: 700, textAlign: 'right' }}>{p.pieces.toLocaleString()}</td>
-              <td style={{ textAlign: 'right' }}>{p.elapsedMinutes} min</td>
+              <td style={{ textAlign: 'right' }}>{p.elapsedMinutes} นาที</td>
               <td>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.timeAlert ? ALERT_COLOR[p.timeAlert] : '#16A34A', flex: '0 0 auto' }} />
-                  {p.timeAlert ?? 'On track'}
+                  {p.timeAlert ? ALERT_TH[p.timeAlert] : 'ตามกำหนด'}
                 </span>
               </td>
             </tr>
@@ -117,7 +118,7 @@ export function ActivePickerRosterTable({ pickers }: { pickers: ActivePicker[] }
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                No pickers actively working right now.
+                ไม่มี Picker ที่กำลังทำงานในขณะนี้
               </td>
             </tr>
           )}

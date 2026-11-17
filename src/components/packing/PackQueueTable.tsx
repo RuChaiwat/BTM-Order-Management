@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Pagination } from '../Pagination'
+import { Legend } from '../Legend'
 import { formatDate } from '../../lib/formatDate'
 import type { PackQueueRow } from '../../lib/queries/packing'
 
@@ -33,7 +34,7 @@ export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
         <div>
           <div className="card-title">Orders waiting to pack</div>
-          <div className="card-subtitle">order ที่ผ่าน Admin Verification แล้ว รอ scan แพ็ก · เรียงจากรอนานที่สุด · สีส้ม ≥ 4 ชม. · สีแดง ≥ 8 ชม.</div>
+          <div className="card-subtitle">order รอแพ็ก</div>
         </div>
         <input
           className="field-input"
@@ -89,7 +90,7 @@ export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
               <td>{formatDate(r.order_date)}</td>
               <td>
                 <span className={`badge ${r.pick_status === 'final_closed_short' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: 10 }}>
-                  {r.pick_status === 'final_closed_short' ? 'Short' : '100%'}
+                  {r.pick_status === 'final_closed_short' ? 'ไม่ครบ' : '100%'}
                 </span>
               </td>
               <td>{r.skus.toLocaleString()}</td>
@@ -101,14 +102,21 @@ export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
           {shown.length === 0 && (
             <tr>
               <td colSpan={8} style={{ color: 'var(--color-text-secondary)' }}>
-                {rows.length === 0 ? 'ไม่มี order รอแพ็ก · Nothing waiting to pack.' : 'ไม่พบ order ที่ค้นหา'}
+                {rows.length === 0 ? 'ไม่มี order รอแพ็ก' : 'ไม่พบ order ที่ค้นหา'}
               </td>
             </tr>
           )}
         </tbody>
       </table>
+      <Legend
+        style={{ marginTop: 10 }}
+        items={[
+          { color: waitColor(240)!, label: 'รอ 4 ชม. ขึ้นไป' },
+          { color: waitColor(480)!, label: 'รอ 8 ชม. ขึ้นไป' },
+        ]}
+      />
       <div style={{ marginTop: 12 }}>
-        <Pagination page={current} totalPages={totalPages} onChange={setPage} suffix={<>· {filtered.length.toLocaleString()} orders</>} />
+        <Pagination page={current} totalPages={totalPages} onChange={setPage} suffix={<>· {filtered.length.toLocaleString()} order</>} />
       </div>
     </div>
   )

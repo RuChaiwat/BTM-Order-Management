@@ -87,7 +87,7 @@ export function PickerProductivityTable({ pickers, targetPcsPerHour }: { pickers
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={2} style={{ color: 'var(--color-text-secondary)' }}>
-                No completed picks yet today.
+                ยังไม่มีงานหยิบที่เสร็จวันนี้
               </td>
             </tr>
           )}

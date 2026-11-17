@@ -60,7 +60,7 @@ export function PackSettingsBoard({ stations, reasons }: { stations: StationRow[
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
           <div>
             <div className="card-title">Pack Stations</div>
-            <div className="card-subtitle">โต๊ะแพ็ก · พนักงาน scan บาร์โค้ด Station ก่อนเริ่มงานทุก order</div>
+            <div className="card-subtitle">โต๊ะแพ็ก</div>
           </div>
           <a className="btn btn-info btn-sm" style={{ marginLeft: 'auto' }} href={`/pack-stations/print?codes=${encodeURIComponent(activeCodes.join(','))}`} target="_blank" rel="noreferrer" aria-disabled={activeCodes.length === 0}>
             พิมพ์บาร์โค้ดทั้งหมด ({activeCodes.length})
@@ -86,7 +86,7 @@ export function PackSettingsBoard({ stations, reasons }: { stations: StationRow[
               <tr key={s.station_code}>
                 <td style={{ fontWeight: 700 }}>{s.station_code}</td>
                 <td style={{ overflowWrap: 'break-word' }}>{s.name}</td>
-                <td>{s.active ? <span className="badge badge-success">Active</span> : <span className="badge badge-neutral">Inactive</span>}</td>
+                <td>{s.active ? <span className="badge badge-success">ใช้งาน</span> : <span className="badge badge-neutral">ปิดใช้งาน</span>}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button
@@ -149,7 +149,7 @@ export function PackSettingsBoard({ stations, reasons }: { stations: StationRow[
       <div className="card">
         <div className="card-title">Pack Issue Reasons</div>
         <div className="card-subtitle" style={{ marginBottom: 12 }}>
-          รายการปัญหาใน Drop down ตอนกด Completed with Short บน Handheld
+          รายการปัญหาการแพ็ก
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
@@ -174,7 +174,7 @@ export function PackSettingsBoard({ stations, reasons }: { stations: StationRow[
                   {r.label_th || r.label_en}
                   {r.label_th && r.label_en !== r.label_th && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{r.label_en}</div>}
                 </td>
-                <td>{r.active ? <span className="badge badge-success">Active</span> : <span className="badge badge-neutral">Inactive</span>}</td>
+                <td>{r.active ? <span className="badge badge-success">ใช้งาน</span> : <span className="badge badge-neutral">ปิดใช้งาน</span>}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button

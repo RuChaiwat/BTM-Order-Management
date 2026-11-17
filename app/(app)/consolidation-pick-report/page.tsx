@@ -24,7 +24,7 @@ export default async function ConsolidationPickReportPage() {
   return (
     <>
       <AutoRefresh />
-      <TopBar title="Consolidation Pick Report" subtitle={`รายงานหยิบรวม · ${batches.length} batch(es) active at consolidation`} />
+      <TopBar title="Consolidation Pick Report" subtitle={`รายงานหยิบรวม · ${batches.length} batch`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <KpiCard label="ACTIVE BATCHES" labelTh="Batch ที่กำลังดำเนินการ (batch)" value={kpis.activeBatches.toLocaleString()} compact style={{ padding: 14 }} />

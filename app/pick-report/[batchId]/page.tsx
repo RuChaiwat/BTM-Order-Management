@@ -35,7 +35,7 @@ export default async function PickReportPage({ params }: { params: { batchId: st
           <PrintButton />
         ) : (
           <div style={{ fontSize: 12.5, color: '#B45309', background: '#FFFBEB', border: '1px solid #FED7AA', borderRadius: 8, padding: '8px 12px', display: 'inline-block' }}>
-            This batch is <strong>{batchStatusLabel(batch.status)}</strong> — approve it in Matching Analysis &amp; Batch Review before printing.
+            Batch นี้อยู่ในสถานะ <strong>{batchStatusLabel(batch.status)}</strong> · กรุณาอนุมัติที่หน้า Matching Analysis &amp; Batch Review ก่อนพิมพ์
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import type { ComplexityBand } from '@/lib/queries/orderPool'
+import { Legend } from '@/components/Legend'
 
 interface Props {
   totalOrders: number
@@ -8,9 +9,9 @@ interface Props {
 }
 
 const BAND_META: Record<ComplexityBand, { label: string; color: string; bg: string; desc: string }> = {
-  green: { label: 'Green — Easy', color: '#16A34A', bg: '#F0FDF4', desc: 'pieces/SKU สูง (ชิ้นเยอะ SKU น้อย)' },
-  yellow: { label: 'Yellow — Balanced', color: '#B45309', bg: '#FFFBEB', desc: 'pieces/SKU ปานกลาง' },
-  red: { label: 'Red — Hard', color: '#DC2626', bg: '#FEF2F2', desc: 'pieces/SKU ต่ำ (ชิ้นน้อย SKU เยอะ — เดินเยอะ)' },
+  green: { label: 'ง่าย', color: '#16A34A', bg: '#F0FDF4', desc: 'ชิ้นต่อ SKU สูง (ชิ้นเยอะ SKU น้อย)' },
+  yellow: { label: 'ปานกลาง', color: '#B45309', bg: '#FFFBEB', desc: 'ชิ้นต่อ SKU ปานกลาง' },
+  red: { label: 'ยาก', color: '#DC2626', bg: '#FEF2F2', desc: 'ชิ้นต่อ SKU ต่ำ (ชิ้นน้อย SKU เยอะ — เดินเยอะ)' },
 }
 
 /** Replaces the old raw "50 most recent orders" list with two decision-support breakdowns of the
@@ -24,7 +25,7 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
       <div className="card">
         <div className="card-header" style={{ marginBottom: 10 }}>
           <span className="card-title">Order Density by Zone</span>
-          <span className="card-subtitle">ความหนาแน่นของออเดอร์แต่ละโซน · {totalOrders.toLocaleString()} orders in pool</span>
+          <span className="card-subtitle">ความหนาแน่นของออเดอร์แต่ละโซน · {totalOrders.toLocaleString()} order</span>
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
@@ -61,7 +62,7 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
             {zoneDensity.length === 0 && (
               <tr>
                 <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
-                  No pending orders with a resolved Zone yet.
+                  ยังไม่มี order ที่รอดำเนินการและระบุ Zone ได้
                 </td>
               </tr>
             )}
@@ -72,7 +73,7 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
       <div className="card">
         <div className="card-header" style={{ marginBottom: 10 }}>
           <span className="card-title">Order Complexity</span>
-          <span className="card-subtitle">ความยากง่ายของออเดอร์ · ตาม pieces/SKU ratio</span>
+          <span className="card-subtitle">ความยากง่ายของออเดอร์</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(['green', 'yellow', 'red'] as const).map((band) => {
@@ -87,18 +88,23 @@ export function OrderPoolOverview({ totalOrders, zoneDensity, bands, thresholds 
                 </div>
                 <div style={{ textAlign: 'right', fontSize: 12 }}>
                   <div>
-                    <strong>{stat.count.toLocaleString()}</strong> orders
+                    <strong>{stat.count.toLocaleString()}</strong> order
                   </div>
-                  <div style={{ color: '#6B7280' }}>{stat.sumPieces.toLocaleString()} pcs (sum)</div>
+                  <div style={{ color: '#6B7280' }}>{stat.sumPieces.toLocaleString()} ชิ้น (รวม)</div>
                 </div>
               </div>
             )
           })}
         </div>
-        <div style={{ marginTop: 12, fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-          Threshold ปัจจุบัน: Green ≥ {thresholds.greenMinPcsPerSku} pcs/SKU, Red ≤ {thresholds.redMaxPcsPerSku} pcs/SKU — ปรับได้ที่ Configuration / Audit
-          (order_complexity.*)
-        </div>
+        <Legend
+          style={{ marginTop: 12 }}
+          note="เกณฑ์ชิ้นต่อ SKU (ปรับได้ที่หน้า Configuration):"
+          items={[
+            { color: BAND_META.green.color, label: `ง่าย ≥ ${thresholds.greenMinPcsPerSku} ชิ้น/SKU` },
+            { color: BAND_META.yellow.color, label: `ปานกลาง > ${thresholds.redMaxPcsPerSku} และ < ${thresholds.greenMinPcsPerSku} ชิ้น/SKU` },
+            { color: BAND_META.red.color, label: `ยาก ≤ ${thresholds.redMaxPcsPerSku} ชิ้น/SKU` },
+          ]}
+        />
       </div>
     </div>
   )

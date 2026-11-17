@@ -26,6 +26,7 @@ const FILTERS = [
 ] as const
 
 const PAGE_SIZE = 20
+const ALERT_TH: Record<string, string> = { warning: 'ใกล้เกินกำหนด', overdue: 'เกินกำหนด', critical: 'วิกฤต' }
 
 type SortKey = 'order_no' | 'store_code' | 'original_order_date' | 'zones' | 'pickerName' | 'backlogType' | 'elapsed' | 'alert'
 
@@ -107,7 +108,7 @@ export function BacklogBoard({ rows }: { rows: BacklogRow[] }) {
     <div className="card" style={{ flex: 1 }}>
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Pending Action</span>
-        <span className="card-subtitle">รายการที่ต้องดำเนินการ · click a column to sort</span>
+        <span className="card-subtitle">รายการที่ต้องดำเนินการ</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
           {FILTERS.map((f) => (
             <button key={f.key} className={`btn btn-sm ${filter === f.key ? 'btn-primary' : 'btn-secondary'}`} onClick={() => selectFilter(f.key)}>
@@ -174,18 +175,18 @@ export function BacklogBoard({ rows }: { rows: BacklogRow[] }) {
                 <td>
                   {r.backlogType === 'both' ? (
                     <>
-                      <span className="badge badge-warning">Picking</span> <span className="badge badge-info">Verification</span>
+                      <span className="badge badge-warning">รอหยิบ</span> <span className="badge badge-info">รอตรวจสอบ</span>
                     </>
                   ) : r.backlogType === 'picking' ? (
-                    <span className="badge badge-warning">Picking</span>
+                    <span className="badge badge-warning">รอหยิบ</span>
                   ) : (
-                    <span className="badge badge-info">Verification</span>
+                    <span className="badge badge-info">รอตรวจสอบ</span>
                   )}
                 </td>
-                <td>{r.alert ? `${Math.round(r.alert.elapsed_minutes)} min` : '—'}</td>
+                <td>{r.alert ? `${Math.round(r.alert.elapsed_minutes)} นาที` : '—'}</td>
                 <td>
                   {r.alert?.time_alert ? (
-                    <span className={`badge badge-${r.alert.time_alert === 'critical' ? 'danger' : 'warning'}`}>{r.alert.time_alert}</span>
+                    <span className={`badge badge-${r.alert.time_alert === 'critical' ? 'danger' : 'warning'}`}>{ALERT_TH[r.alert.time_alert] ?? r.alert.time_alert}</span>
                   ) : (
                     <span style={{ color: '#9CA3AF' }}>—</span>
                   )}
@@ -196,7 +197,7 @@ export function BacklogBoard({ rows }: { rows: BacklogRow[] }) {
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={8} style={{ color: 'var(--color-text-secondary)' }}>
-                No pending actions — nice work.
+                ไม่มีรายการที่ต้องดำเนินการ
               </td>
             </tr>
           )}

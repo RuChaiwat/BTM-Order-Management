@@ -9,6 +9,7 @@ import { apiFetch } from '../../lib/apiFetch'
 interface CancelReason {
   reason_code: string
   label_en: string
+  label_th?: string | null
 }
 
 interface FoundOrder {
@@ -91,13 +92,13 @@ export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
     <div className="card">
       <div className="card-title">Cancel Order</div>
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        ยกเลิกออเดอร์ · เฉพาะออเดอร์ที่ยังไม่ถูก Assign (สถานะ New/Pending)
+        ยกเลิกออเดอร์
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input
           ref={scanInputRef}
           className="control"
-          placeholder="Scan or type Order No…"
+          placeholder="สแกนหรือพิมพ์ Order No…"
           value={scanValue}
           onChange={(e) => setScanValue(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && lookup()}
@@ -110,20 +111,21 @@ export function CancelOrderPanel({ reasons }: { reasons: CancelReason[] }) {
         </button>
       </div>
       {scanError && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-danger)' }}>{scanError}</div>}
+      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>ยกเลิกได้เฉพาะ order ที่ยังไม่ถูก Assign (สถานะ New/Pending)</div>
 
       {found && (
-        <Modal title={`Cancel ${found.order_no}?`} subtitle="ยืนยันการยกเลิกออเดอร์ · บันทึกเหตุผลถาวร" onSubmit={confirmCancel}>
+        <Modal title={`Cancel ${found.order_no}?`} subtitle="ยืนยันการยกเลิกออเดอร์" onSubmit={confirmCancel}>
           <div className="modal-body">
-            Store {found.store_code} · {found.planned_pieces.toLocaleString()} planned pieces. This order will move to Cancelled and can never be assigned or picked.
+            ร้าน {found.store_code} · {found.planned_pieces.toLocaleString()} ชิ้น · order นี้จะเปลี่ยนเป็นสถานะ Cancelled และจะมอบหมายงานหรือหยิบไม่ได้อีก (บันทึกเหตุผลถาวร)
           </div>
           <div className="field" style={{ marginTop: 4 }}>
             <label className="field-label">
-              Cancel reason <span style={{ color: '#DC2626' }}>*</span>
+              เหตุผลการยกเลิก <span style={{ color: '#DC2626' }}>*</span>
             </label>
             <select className="field-input" style={{ border: '1px solid var(--color-border)' }} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} autoFocus>
               {reasons.map((r) => (
                 <option key={r.reason_code} value={r.reason_code}>
-                  {r.label_en}
+                  {r.label_th || r.label_en}
                 </option>
               ))}
             </select>

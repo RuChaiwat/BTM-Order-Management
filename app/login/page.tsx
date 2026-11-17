@@ -68,11 +68,10 @@ export default function LoginPage() {
             ORDER CONSOLIDATION + PICKING PRODUCTIVITY
           </div>
           <h2 style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.25, margin: '0 0 14px', maxWidth: '22ch' }}>
-            One order core for consolidation and picking productivity
+            ระบบเดียวสำหรับรวม order และติดตามประสิทธิผลการหยิบสินค้า
           </h2>
           <p style={{ fontSize: 14, color: '#9CA3AF', maxWidth: '46ch', margin: 0, lineHeight: 1.7 }}>
-            WMS is the source of truth for the pick Bin Code. Zone and pick sequence are joined from Location Master
-            on import.
+            Bin Code สำหรับหยิบสินค้าอ้างอิงจาก WMS · Zone และ Pick Sequence ดึงจาก Location Master ตอน Import
           </p>
         </div>
 
@@ -114,14 +113,14 @@ export default function LoginPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="field">
               <label className="field-label">
-                User ID <span className="field-hint">/ รหัสผู้ใช้</span>
+                User ID
               </label>
               <input
                 type="text"
                 required
                 maxLength={USER_ID_MAX_LENGTH}
                 autoComplete="username"
-                placeholder="e.g. U0001"
+                placeholder="เช่น U0001"
                 className="field-input"
                 value={userId}
                 onChange={(e) => setUserId(e.target.value.toUpperCase())}
@@ -131,7 +130,7 @@ export default function LoginPage() {
 
             <div className="field">
               <label className="field-label">
-                Password <span className="field-hint">/ รหัสผ่าน</span>
+                รหัสผ่าน
               </label>
               <div className="field-input is-focused">
                 <input
@@ -147,14 +146,14 @@ export default function LoginPage() {
                   onClick={() => setShowPassword((v) => !v)}
                   style={{ border: 0, background: 'none', color: 'var(--color-info)', fontSize: 12, cursor: 'pointer', font: 'inherit' }}
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? 'ซ่อน' : 'แสดง'}
                 </button>
               </div>
             </div>
 
             <div className="field">
               <label className="field-label">
-                Warehouse <span className="field-hint">/ คลังสินค้า</span>
+                คลังสินค้า
               </label>
               <select
                 className="field-input"
@@ -173,10 +172,10 @@ export default function LoginPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#374151', cursor: 'pointer' }}>
                 <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-                Remember this device
+                จดจำอุปกรณ์นี้
               </label>
               <a href="#forgot" style={{ color: 'var(--color-info)', textDecoration: 'none' }} onClick={(e) => e.preventDefault()}>
-                Forgot password?
+                ลืมรหัสผ่าน?
               </a>
             </div>
 
@@ -187,10 +186,10 @@ export default function LoginPage() {
             )}
 
             <button type="submit" className="btn btn-primary" disabled={loading} style={{ height: 46, fontSize: 15 }}>
-              {loading ? 'Signing in…' : 'Sign in / เข้าสู่ระบบ'}
+              {loading ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
             </button>
             <div style={{ fontSize: 11.5, color: '#6B7280', textAlign: 'center', lineHeight: 1.6 }}>
-              Access is role-based. Menu visibility and action permission are granted separately by System Admin.
+              สิทธิ์การใช้งานขึ้นกับ Role · System Admin เป็นผู้กำหนดเมนูและสิทธิ์การทำงาน
             </div>
           </div>
         </form>

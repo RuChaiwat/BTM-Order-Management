@@ -37,7 +37,7 @@ export function ConsolidationHistoryFilter({ field, date, batchNo }: { field: Co
       {field === 'batch_no' ? (
         <input
           className="control"
-          placeholder="Search Batch No…"
+          placeholder="ค้นหา Batch No…"
           value={batchNoInput}
           onChange={(e) => setBatchNoInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && goTo(field, date, batchNoInput)}

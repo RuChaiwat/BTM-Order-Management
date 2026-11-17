@@ -162,7 +162,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
         <div className="card">
           <div className="card-title">Pack verify queue</div>
           <div className="card-subtitle" style={{ marginBottom: 10 }}>
-            คิวรอยืนยันการแพ็ก · เรียงตามเวลาที่แพ็กเสร็จ
+            คิวรอยืนยันการแพ็ก
           </div>
           <button className="btn btn-success btn-sm btn-block" style={{ marginBottom: 10 }} disabled={fullyPacked.length === 0 || working} onClick={() => setShowConfirmAll(true)}>
             Confirm All Completed ({fullyPacked.length})
@@ -191,7 +191,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
                     {o.order_no}
                   </span>
                   <span className={`badge badge-${o.isShort ? 'warning' : 'success'}`} style={{ fontSize: 10 }}>
-                    {o.isShort ? 'Short' : 'Completed'}
+                    {o.isShort ? 'ไม่ครบ' : 'ครบ'}
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: '#6B7280' }}>
@@ -204,7 +204,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
                 )}
               </button>
             ))}
-            {queue.length === 0 && <span style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>ไม่มี order รอยืนยันการแพ็ก · Nothing waiting.</span>}
+            {queue.length === 0 && <span style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>ไม่มี order รอยืนยันการแพ็ก</span>}
           </div>
         </div>
 
@@ -220,11 +220,8 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
                   </span>
                 </div>
                 <span className={`badge badge-${selected.isShort ? 'warning' : 'success'}`} style={{ marginLeft: 'auto' }}>
-                  {selected.isShort ? 'Packer Completed with Short' : 'Packer Completed'}
+                  {selected.isShort ? 'Packer แจ้ง Completed with Short' : 'Packer แจ้ง Completed'}
                 </span>
-              </div>
-              <div className="card-subtitle" style={{ marginBottom: 12 }}>
-                ติ๊กรายการที่แพ็กขาด แล้วระบุเหตุผลและจำนวนที่แพ็กจริง · ตรวจสอบกับระบบ WMS
               </div>
               <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
@@ -300,6 +297,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
                   )}
                 </tbody>
               </table>
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>ติ๊กรายการที่แพ็กขาด แล้วระบุเหตุผลและจำนวนที่แพ็กจริง · ตรวจสอบกับระบบ WMS</div>
             </>
           ) : (
             <span style={{ color: 'var(--color-text-secondary)' }}>เลือก order จากคิวด้านซ้าย</span>
@@ -358,7 +356,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
               </>
             ) : overridingShort ? (
               <>
-                พนักงานแจ้ง <strong>Short</strong> แต่จะบันทึกว่า <strong>แพ็กครบทุกรายการ</strong> — ยืนยันว่าตรวจใน WMS แล้วครบจริง · ย้อนกลับไม่ได้
+                พนักงานแจ้ง <strong>Completed with Short</strong> แต่จะบันทึกว่า <strong>แพ็กครบทุกรายการ</strong> — ยืนยันว่าตรวจใน WMS แล้วครบจริง · ย้อนกลับไม่ได้
               </>
             ) : (
               'แพ็กครบทุกรายการ · ย้อนกลับไม่ได้'
@@ -380,7 +378,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
       {showConfirmAll && (
         <Modal title={`Confirm all ${fullyPacked.length} completed orders?`} subtitle="ยืนยันเฉพาะ order ที่พนักงานปิดงาน Completed" onSubmit={doConfirmAll}>
           <div className="modal-body">
-            order ทั้ง {fullyPacked.length} รายการที่พนักงานแพ็กครบ จะถูกบันทึกเป็น <strong>ยืนยันแพ็กแล้ว ครบทุกรายการ</strong> · order ที่แจ้ง Short ไม่รวมอยู่ด้วย ต้องเปิดตรวจทีละ order · ย้อนกลับไม่ได้
+            order ทั้ง {fullyPacked.length} รายการที่พนักงานแพ็กครบ จะถูกบันทึกเป็น <strong>ยืนยันแพ็กแล้ว ครบทุกรายการ</strong> · order ที่แจ้ง Completed with Short ไม่รวมอยู่ด้วย ต้องเปิดตรวจทีละ order · ย้อนกลับไม่ได้
             {error && <div style={{ marginTop: 8, color: 'var(--color-danger)' }}>{error}</div>}
           </div>
           <ModalFooter>

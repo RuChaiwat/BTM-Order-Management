@@ -34,7 +34,7 @@ export default async function ConsolidationHistoryPage({ searchParams }: { searc
   return (
     <>
       <AutoRefresh />
-      <TopBar title="Consolidation History" subtitle="ประวัติการรวมออเดอร์ · released, completed and cancelled batches">
+      <TopBar title="Consolidation History" subtitle="ประวัติการรวมออเดอร์">
         <ConsolidationHistoryFilter field={field} date={date} batchNo={batchNo} />
       </TopBar>
       <div className="page-body">

@@ -13,7 +13,7 @@ export default async function PickCompletionPage({ searchParams }: { searchParam
 
   return (
     <>
-      <TopBar title="Pick Completion" subtitle={`ปิดงานหยิบแทนพนักงาน (สแกนรหัส Picker) · ${user.warehouse_code ?? ''}`} />
+      <TopBar title="Pick Completion" subtitle={`ปิดงานหยิบแทนพนักงาน ·${user.warehouse_code ?? ''}`} />
       <PickCompletionBoard autoPickerId={searchParams.picker_id} highlightOrderId={searchParams.order_id} />
     </>
   )

@@ -19,7 +19,7 @@ export default async function HandheldPackPage() {
   return (
     <div className="app-shell">
       <div className="app-main">
-        <TopBar title="Packing" subtitle="บันทึกเวลาแพ็กสินค้า · Scan Station → รหัสพนักงาน → Order">
+        <TopBar title="Packing" subtitle="บันทึกเวลาแพ็กสินค้า">
           <HandheldNav idleMinutes={idleMinutes} />
         </TopBar>
         <PackHandheldBoard />

@@ -57,7 +57,7 @@ export default async function AdminPage() {
 
   return (
     <>
-      <TopBar title="Configuration" subtitle="ตั้งค่าระบบ · Reason Master, thresholds — see Audit Trail (sidebar) for the change log" />
+      <TopBar title="Configuration" subtitle="ตั้งค่าระบบ" />
       <div className="page-body">
         <ReasonMasterManager reasons={reasons ?? []} />
         <PickerEmploymentTypeManager types={employmentTypes ?? []} />

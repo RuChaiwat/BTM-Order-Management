@@ -27,7 +27,7 @@ export default async function PackQueuePage() {
   return (
     <>
       <AutoRefresh intervalMs={refreshMs} />
-      <TopBar title="Orders Waiting to Pack" subtitle={`รายการ order รอแพ็ก · ${rows.length.toLocaleString()} orders · ${pieces.toLocaleString()} ชิ้น · ${warehouseCode}`}>
+      <TopBar title="Orders Waiting to Pack" subtitle={`รายการ order รอแพ็ก · ${rows.length.toLocaleString()} order · ${pieces.toLocaleString()} ชิ้น · ${warehouseCode}`}>
         <BackButton fallbackHref="/packing-dashboard" />
         <ExportExcelButton href="/api/packing-queue/export" />
       </TopBar>

@@ -44,7 +44,7 @@ export default async function PickReportPrintPage({ searchParams }: { searchPara
   return (
     <div>
       <style>{PICK_REPORT_PRINT_CSS}</style>
-      {reports.length === 0 && <div style={{ padding: 24, fontFamily: 'Arial, sans-serif' }}>No approved batches found to print.</div>}
+      {reports.length === 0 && <div style={{ padding: 24, fontFamily: 'Arial, sans-serif' }}>ไม่พบ Batch ที่อนุมัติแล้วสำหรับพิมพ์</div>}
       {reports.map((r, i) => (
         <BatchReportDocument key={r.batch.consol_batch_id} {...r} generatedAt={generatedAt} generatedByName={user.name_en} isLastInDocument={i === reports.length - 1} />
       ))}

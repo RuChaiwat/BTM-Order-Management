@@ -21,7 +21,7 @@ export default async function AdminVerificationPage({ searchParams }: { searchPa
 
   return (
     <>
-      <TopBar title="Admin Verification" subtitle={`รอตรวจสอบยืนยัน (สำนักงาน) · ${data.queue.length} orders`} />
+      <TopBar title="Admin Verification" subtitle={`รอตรวจสอบยืนยัน (สำนักงาน) · ${data.queue.length} order`} />
       <AdminVerificationBoard queue={data.queue} linesByOrder={data.linesByOrder} shortPickReasons={data.shortPickReasons} initialSelectedId={searchParams.order_id} />
     </>
   )

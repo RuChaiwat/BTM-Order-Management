@@ -73,13 +73,13 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
     <div className="card" style={{ flex: 1 }}>
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Product Issue List</span>
-        <span className="card-subtitle">รายการสินค้ามีปัญหา · click a column to sort</span>
+        <span className="card-subtitle">รายการสินค้ามีปัญหา</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Zone</span>
           <select className="control" value={zoneFilter} onChange={(e) => onZoneFilterChange(e.target.value)}>
-            <option value="ALL">All zones</option>
+            <option value="ALL">ทุก Zone</option>
             {zones.map((z) => (
               <option key={z} value={z}>
                 {z}
@@ -87,7 +87,7 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
             ))}
           </select>
           <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-            {sorted.length.toLocaleString()} of {rows.length.toLocaleString()} item(s)
+            {sorted.length.toLocaleString()} จาก {rows.length.toLocaleString()} รายการ
           </span>
         </div>
         <ExportExcelButton href={exportHref} />
@@ -153,7 +153,7 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={11} style={{ color: 'var(--color-text-secondary)' }}>
-                No product issues for {warehouseCode} on this date{zoneFilter === 'ALL' ? '' : ` in zone ${zoneFilter}`}.
+                ไม่มีรายการสินค้ามีปัญหาของ {warehouseCode} ในวันนี้{zoneFilter === 'ALL' ? '' : ` ใน Zone ${zoneFilter}`}
               </td>
             </tr>
           )}

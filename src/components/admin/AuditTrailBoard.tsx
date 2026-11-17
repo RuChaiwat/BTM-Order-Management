@@ -41,12 +41,12 @@ export function AuditTrailBoard({ rows }: { rows: AuditTrailRow[] }) {
         <input
           className="control"
           style={{ width: 320 }}
-          placeholder="Search by user or action · ค้นหาผู้ใช้งานหรือรายการ"
+          placeholder="ค้นหาผู้ใช้งานหรือรายการ"
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
         />
         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          {filtered.length.toLocaleString()} of {rows.length.toLocaleString()} action(s)
+          {filtered.length.toLocaleString()} จาก {rows.length.toLocaleString()} รายการ
         </span>
       </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -68,7 +68,7 @@ export function AuditTrailBoard({ rows }: { rows: AuditTrailRow[] }) {
           {pageRows.map((a) => (
             <tr key={a.id}>
               <td>{formatDateTime(a.created_at)}</td>
-              <td>{a.user_id ?? 'system'}</td>
+              <td>{a.user_id ?? 'ระบบ'}</td>
               <td>
                 <div style={{ fontWeight: 600 }}>{a.actionLabelEn}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)' }}>{a.actionLabelTh}</div>
@@ -79,7 +79,7 @@ export function AuditTrailBoard({ rows }: { rows: AuditTrailRow[] }) {
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
-                {rows.length === 0 ? "No audit records for this date — either nothing happened, or it's past the retention window." : 'No actions match your search.'}
+                {rows.length === 0 ? 'ไม่มีประวัติในวันนี้ (ไม่มีรายการ หรือเกินระยะเวลาเก็บข้อมูลแล้ว)' : 'ไม่พบรายการที่ตรงกับคำค้นหา'}
               </td>
             </tr>
           )}

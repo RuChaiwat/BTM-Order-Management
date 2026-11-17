@@ -47,16 +47,18 @@ interface ZoneDetail {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  new: 'New',
-  assigned: 'Assigned',
-  in_progress: 'In Progress',
-  picker_completed_100: 'Picker Completed 100%',
-  picker_completed_short: 'Picker Completed Short',
-  correction_in_progress: 'Correction in Progress',
-  final_closed_100: 'Final Closed 100%',
-  final_closed_short: 'Final Closed Short',
-  cancelled: 'Cancelled',
+  new: 'รอมอบหมายงาน',
+  assigned: 'มอบหมายงานแล้ว',
+  in_progress: 'กำลังหยิบ',
+  picker_completed_100: 'Picker ยืนยันเสร็จ (ครบ)',
+  picker_completed_short: 'Picker ยืนยันเสร็จ (ขาด)',
+  correction_in_progress: 'กำลังแก้ไข',
+  final_closed_100: 'ปิดงานแล้ว (ครบ)',
+  final_closed_short: 'ปิดงานแล้ว (ขาด)',
+  cancelled: 'ยกเลิกแล้ว',
 }
+
+const ALERT_TH: Record<string, string> = { warning: 'ใกล้เกินกำหนด', overdue: 'เกินกำหนด', critical: 'วิกฤต' }
 
 const PAGE_SIZE = 15
 
@@ -153,27 +155,27 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
           >
             <div style={{ fontSize: 13, fontWeight: 700 }}>Zone {z.zone}</div>
             <div style={{ fontSize: 22, fontWeight: 700, margin: '4px 0' }}>{z.pendingPieces.toLocaleString()}</div>
-            <div style={{ fontSize: 11, color: '#6B7280' }}>pieces pending</div>
+            <div style={{ fontSize: 11, color: '#6B7280' }}>ชิ้นค้าง</div>
             <div style={{ fontSize: 11, color: '#6B7280' }}>
-              <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{z.totalPieces.toLocaleString()}</span> total pieces
+              <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{z.totalPieces.toLocaleString()}</span> ชิ้นทั้งหมด
             </div>
             <div style={{ fontSize: 11, color: '#6B7280' }}>
-              <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{z.activePickers}</span> active picker(s)
+              <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{z.activePickers}</span> Picker ที่ทำงานอยู่ (คน)
             </div>
             {/* % completed = picker-submitted share of the zone's pieces (total - pending), same basis
                 as Operations Dashboard's Zone Status cards. The badge keeps the risk colour; the old
                 "N critical / N overdue / On track" text moved to the tooltip. */}
             <div
               style={{ marginTop: 8, display: 'flex', gap: 6, justifyContent: 'center' }}
-              title={z.criticalCount > 0 ? `${z.criticalCount} critical` : z.overdueCount > 0 ? `${z.overdueCount} overdue` : 'On track'}
+              title={z.criticalCount > 0 ? `วิกฤต ${z.criticalCount} order` : z.overdueCount > 0 ? `เกินกำหนด ${z.overdueCount} order` : 'ตามกำหนด'}
             >
               <span className={`badge ${z.criticalCount > 0 ? 'badge-danger' : z.overdueCount > 0 ? 'badge-warning' : 'badge-success'}`} style={{ fontWeight: 700 }}>
-                {z.totalPieces > 0 ? Math.round(((z.totalPieces - z.pendingPieces) / z.totalPieces) * 1000) / 10 : 0}% completed
+                เสร็จ {z.totalPieces > 0 ? Math.round(((z.totalPieces - z.pendingPieces) / z.totalPieces) * 1000) / 10 : 0}%
               </span>
             </div>
           </button>
         ))}
-        {zoneDetail.length === 0 && <div className="card">No zones found — import Location Master data first.</div>}
+        {zoneDetail.length === 0 && <div className="card">ไม่พบโซน — กรุณา Import ข้อมูล Location Master ก่อน</div>}
       </div>
 
       {selected && (
@@ -237,7 +239,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
           <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone {selected.zone} — Active Picker Orders</span>
-              <span className="card-subtitle">ออเดอร์ที่กำลังหยิบอยู่ในโซนนี้ · {orderTable.total} orders currently being picked · click a column to sort</span>
+              <span className="card-subtitle">Order ที่กำลังหยิบอยู่ในโซนนี้ · {orderTable.total} order</span>
             </div>
             <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
@@ -265,10 +267,10 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
                       {o.pickerEmploymentType && <div style={{ fontSize: 11, color: '#6B7280' }}>{o.pickerEmploymentType}</div>}
                     </td>
                     <td>{STATUS_LABEL[o.status] ?? o.status}</td>
-                    <td>{o.elapsedMinutes} min</td>
+                    <td>{o.elapsedMinutes} นาที</td>
                     <td>
                       {o.timeAlert ? (
-                        <span className={`badge badge-${o.timeAlert === 'critical' ? 'danger' : o.timeAlert === 'overdue' ? 'warning' : 'info'}`}>{o.timeAlert}</span>
+                        <span className={`badge badge-${o.timeAlert === 'critical' ? 'danger' : o.timeAlert === 'overdue' ? 'warning' : 'info'}`}>{ALERT_TH[o.timeAlert] ?? o.timeAlert}</span>
                       ) : (
                         <span style={{ color: '#9CA3AF' }}>—</span>
                       )}
@@ -278,7 +280,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
                 {orderTable.pageRows.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                      No orders being actively picked in Zone {selected.zone} right now.
+                      ไม่มี Order ที่กำลังหยิบใน Zone {selected.zone} ในขณะนี้
                     </td>
                   </tr>
                 )}
@@ -290,7 +292,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
           <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone {selected.zone} — Confirmed Short Picks</span>
-              <span className="card-subtitle">รายการที่ยืนยันว่าหยิบขาดในโซนนี้ · {shortTable.total} short-picked line(s) · click a column to sort</span>
+              <span className="card-subtitle">รายการที่ยืนยันว่าหยิบขาดในโซนนี้ · {shortTable.total} รายการ</span>
             </div>
             <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
@@ -352,7 +354,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
                 {shortTable.pageRows.length === 0 && (
                   <tr>
                     <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
-                      No confirmed short picks in Zone {selected.zone}.
+                      ไม่มีรายการ Short Pick ที่ยืนยันแล้วใน Zone {selected.zone}
                     </td>
                   </tr>
                 )}

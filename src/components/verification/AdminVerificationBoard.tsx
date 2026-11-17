@@ -207,7 +207,7 @@ export function AdminVerificationBoard({
         <div className="card">
           <div className="card-title">Verification queue</div>
           <div className="card-subtitle" style={{ marginBottom: 10 }}>
-            คิวรอตรวจสอบ · เรียงตามเวลาที่ picker ปิดงาน
+            คิวรอตรวจสอบ · {queue.length} order
           </div>
           <button className="btn btn-success btn-sm btn-block" style={{ marginBottom: 10 }} disabled={fullyPickedOrders.length === 0 || working} onClick={() => setShowConfirmAll(true)}>
             Confirm All 100% ({fullyPickedOrders.length})
@@ -231,15 +231,15 @@ export function AdminVerificationBoard({
                     {o.order_no}
                   </span>
                   <span className={`badge badge-${o.completion?.result === '100_percent' ? 'success' : 'warning'}`} style={{ fontSize: 10 }}>
-                    {o.completion?.result === '100_percent' ? '100%' : 'Short'}
+                    {o.completion?.result === '100_percent' ? '100%' : 'Short Pick'}
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: '#6B7280' }}>
-                  {o.pickerName} · {o.waitMinutes}m wait
+                  {o.pickerName} · รอ {o.waitMinutes} นาที
                 </div>
               </button>
             ))}
-            {queue.length === 0 && <span style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>Nothing waiting on verification.</span>}
+            {queue.length === 0 && <span style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>ไม่มี order รอตรวจสอบ</span>}
           </div>
         </div>
 
@@ -254,12 +254,10 @@ export function AdminVerificationBoard({
                   </span>
                 </div>
                 <span className={`badge badge-${selected.completion?.result === '100_percent' ? 'success' : 'warning'}`} style={{ marginLeft: 'auto' }}>
-                  {selected.completion?.result === '100_percent' ? 'Picker Completed 100%' : 'Picker Completed Short'}
+                  {selected.completion?.result === '100_percent' ? 'Picker ปิดงาน 100%' : 'Picker ปิดงาน Short Pick'}
                 </span>
               </div>
-              <div className="card-subtitle" style={{ marginBottom: 12 }}>
-                ทำเครื่องหมายรายการที่หยิบขาด แล้วระบุเหตุผลและจำนวนจริง · ตรวจสอบกับระบบ WMS
-              </div>
+              <div style={{ marginBottom: 12 }} />
               <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
                   <col style={{ width: 28 }} />
@@ -294,7 +292,7 @@ export function AdminVerificationBoard({
                             onClick={() => toggleShort(l.line_id, l.qty)}
                             className={`checkbox-box${st.isShort ? ' checked' : ''}`}
                             style={{ border: st.isShort ? 'none' : undefined, cursor: 'pointer', padding: 0 }}
-                            title="Short picked?"
+                            title="หยิบขาด?"
                           >
                             {st.isShort ? '✓' : ''}
                           </button>
@@ -342,15 +340,18 @@ export function AdminVerificationBoard({
                   {orderLines.length === 0 && (
                     <tr>
                       <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
-                        No lines found for this order.
+                        ไม่พบรายการสินค้าของ order นี้
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                ทำเครื่องหมายรายการที่หยิบขาด แล้วระบุเหตุผลและจำนวนจริง · ตรวจสอบกับระบบ WMS
+              </div>
             </>
           ) : (
-            <span style={{ color: 'var(--color-text-secondary)' }}>Select an order from the queue.</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>เลือก order จากคิว</span>
           )}
         </div>
 
@@ -363,11 +364,11 @@ export function AdminVerificationBoard({
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5, marginBottom: 14 }}>
                 <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
-                  <span style={{ color: '#6B7280', fontSize: 11 }}>Ordered pcs</span>
+                  <span style={{ color: '#6B7280', fontSize: 11 }}>ชิ้นที่สั่ง</span>
                   <div style={{ fontWeight: 700, fontSize: 17 }}>{totalOrdered}</div>
                 </div>
                 <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
-                  <span style={{ color: '#6B7280', fontSize: 11 }}>Actual pcs</span>
+                  <span style={{ color: '#6B7280', fontSize: 11 }}>ชิ้นที่หยิบจริง</span>
                   <div style={{ fontWeight: 700, fontSize: 17, color: totalPicked < totalOrdered ? '#F59E0B' : '#16A34A' }}>{totalPicked}</div>
                 </div>
                 <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
@@ -375,12 +376,12 @@ export function AdminVerificationBoard({
                   <div style={{ fontWeight: 700 }}>{selected.pickerName}</div>
                 </div>
                 <div style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
-                  <span style={{ color: '#6B7280', fontSize: 11 }}>Wait time</span>
-                  <div style={{ fontWeight: 700 }}>{selected.waitMinutes}m</div>
+                  <span style={{ color: '#6B7280', fontSize: 11 }}>เวลารอ</span>
+                  <div style={{ fontWeight: 700 }}>{selected.waitMinutes} นาที</div>
                 </div>
               </div>
               <div style={{ marginBottom: 14 }}>
-                <span className={`badge badge-${shortLines.length > 0 ? 'warning' : 'success'}`}>{shortLines.length > 0 ? `${shortLines.length} item(s) short` : 'Full pick — 100%'}</span>
+                <span className={`badge badge-${shortLines.length > 0 ? 'warning' : 'success'}`}>{shortLines.length > 0 ? `ขาด ${shortLines.length} รายการ` : 'หยิบครบ 100%'}</span>
               </div>
               {error && <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
               <div className="mt-auto" style={{ paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -400,10 +401,10 @@ export function AdminVerificationBoard({
       </div>
 
       {showConfirmAll && (
-        <Modal title={`Confirm all ${fullyPickedOrders.length} fully-picked orders?`} subtitle="ยืนยันเฉพาะที่ picker ปิดงาน 100%" onSubmit={confirmAll}>
+        <Modal title={`Confirm all ${fullyPickedOrders.length} fully-picked orders?`} subtitle="ยืนยันเฉพาะ order ที่ Picker ปิดงาน 100%" onSubmit={confirmAll}>
           <div className="modal-body">
-            Every order the picker reported as fully picked (100%) will be marked Final Closed with every line at its full ordered quantity. Orders reported short are not included — open each
-            one individually. This cannot be undone.
+            ทุก order ที่ Picker แจ้งว่าหยิบครบ (100%) จะถูก Final Close โดยบันทึกทุกรายการเต็มจำนวนที่สั่ง · order ที่แจ้ง Short Pick จะไม่รวมอยู่ด้วย ให้เปิดตรวจทีละ order ·
+            ไม่สามารถย้อนกลับได้
           </div>
           <ModalFooter>
             <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setShowConfirmAll(false)}>
@@ -420,16 +421,16 @@ export function AdminVerificationBoard({
       {showReject && selected && (
         <Modal title={`Reject ${selected.order_no} for correction?`} subtitle="ส่งกลับเพื่อแก้ไข" onSubmit={reject}>
           <div className="modal-body" style={{ paddingTop: 14 }}>
-            The order returns to <strong>Correction in Progress</strong> for the picker to re-check. A reason is required and written to the audit trail.
+            Order จะกลับไปสถานะ <strong>ส่งกลับแก้ไข</strong> ให้ Picker ตรวจซ้ำ · ต้องระบุเหตุผล และระบบจะบันทึกไว้ในประวัติ
           </div>
           <div style={{ padding: '16px 24px 0' }}>
             <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>
-              Reason <span style={{ color: '#DC2626' }}>*</span>
+              เหตุผล <span style={{ color: '#DC2626' }}>*</span>
             </div>
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="e.g. Short quantity not verified at bin"
+              placeholder="เช่น ยังไม่ได้ตรวจจำนวนที่ขาดที่ Bin"
               style={{ width: '100%', minHeight: 76, border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 13.5, fontFamily: 'inherit' }}
               autoFocus
             />

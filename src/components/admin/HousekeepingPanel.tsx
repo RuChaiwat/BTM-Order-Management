@@ -27,6 +27,8 @@ interface PurgeRow {
 
 const PAGE_SIZE = 20
 
+const STATUS_TH: Record<string, string> = { success: 'สำเร็จ', failed: 'ไม่สำเร็จ', running: 'กำลังทำงาน' }
+
 type ExportSortKey = 'period_start' | 'status' | 'row_count' | 'finished_at'
 type PurgeSortKey = 'covered_period_start' | 'table_name' | 'rows_purged' | 'result' | 'created_at'
 
@@ -110,8 +112,7 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
     <div className="card">
       <div className="card-title">Housekeeping</div>
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        Export รายสัปดาห์ + ลบข้อมูลตามระยะเวลาเก็บ · §20.1/§20.2 weekly Excel (.xlsx) export + 7-day retention purge — normally run by Vercel Cron
-        (vercel.json); manual trigger here for System Admin
+        Export รายสัปดาห์ และลบข้อมูลตามระยะเวลาเก็บ
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <button className="btn btn-secondary btn-sm" disabled={busy !== null} onClick={() => trigger('export')}>
@@ -122,7 +123,7 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
         </button>
       </div>
 
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Recent export jobs · click a column to sort</div>
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>ประวัติการ Export ล่าสุด</div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
           <col style={{ width: '26%' }} />
@@ -147,7 +148,7 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
                 {formatDate(j.period_start)} – {formatDate(j.period_end)}
               </td>
               <td>
-                <span className={`badge badge-${j.status === 'success' ? 'success' : j.status === 'failed' ? 'danger' : 'warning'}`}>{j.status}</span>
+                <span className={`badge badge-${j.status === 'success' ? 'success' : j.status === 'failed' ? 'danger' : 'warning'}`}>{STATUS_TH[j.status] ?? j.status}</span>
               </td>
               <td>{j.row_count ?? '—'}</td>
               <td>{j.finished_at ? formatDateTime(j.finished_at) : '—'}</td>
@@ -159,7 +160,7 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
           {exportPageRows.length === 0 && (
             <tr>
               <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                No export runs yet.
+                ยังไม่มีการ Export
               </td>
             </tr>
           )}
@@ -167,7 +168,7 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
       </table>
       {sortedExportJobs.length > 0 && <Pagination page={exportPage} totalPages={exportTotalPages} onChange={setExportPage} />}
 
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Recent purge log · click a column to sort</div>
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>ประวัติการลบข้อมูลล่าสุด</div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
           <col style={{ width: '16%' }} />
@@ -203,7 +204,7 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
               <td style={{ overflowWrap: 'break-word' }}>{p.table_name}</td>
               <td>{p.rows_purged}</td>
               <td>
-                <span className={`badge badge-${p.result === 'success' ? 'success' : 'danger'}`}>{p.result}</span>
+                <span className={`badge badge-${p.result === 'success' ? 'success' : 'danger'}`}>{STATUS_TH[p.result] ?? p.result}</span>
               </td>
               <td>{formatDateTime(p.created_at)}</td>
             </tr>
@@ -211,13 +212,16 @@ export function HousekeepingPanel({ exportJobs, purgeLog }: { exportJobs: Export
           {purgePageRows.length === 0 && (
             <tr>
               <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                No purge runs yet.
+                ยังไม่มีการลบข้อมูล
               </td>
             </tr>
           )}
         </tbody>
       </table>
       {sortedPurgeLog.length > 0 && <Pagination page={purgePage} totalPages={purgeTotalPages} onChange={setPurgePage} />}
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+        ระบบทำงานอัตโนมัติทุกสัปดาห์ · กดปุ่มด้านบนเพื่อสั่งทำทันที
+      </div>
     </div>
   )
 }

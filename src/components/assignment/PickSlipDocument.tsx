@@ -29,7 +29,7 @@ export const PICK_SLIP_PRINT_CSS = `
 export function PickSlipDocument({ slips }: { slips: PickSlipRow[] }) {
   return (
     <div className="pick-slip-doc">
-      {slips.length === 0 && <div className="no-print">No orders found for this assignment.</div>}
+      {slips.length === 0 && <div className="no-print">ไม่พบ Order ของงานที่มอบหมายนี้</div>}
       {slips.map((s, i) => (
         <div className="pick-slip" key={s.orderId}>
           <div style={{ textAlign: 'center' }}>

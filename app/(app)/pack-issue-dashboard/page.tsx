@@ -54,10 +54,10 @@ export default async function PackIssueDashboardPage({ searchParams }: { searchP
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14, alignItems: 'start' }}>
           {card('By problem', 'แยกตามประเภทปัญหา (จำนวนรายการ · ชิ้น)', <BarList rows={rows(d.byReason)} color="var(--color-danger)" />)}
-          {card('By station', 'แยกตาม Station ที่แจ้ง (เรื่อง · ชิ้น)', <BarList rows={rows(d.byStation)} color="var(--color-info)" />)}
-          {card('By picker', 'แยกตามคนที่ Pick order นั้น — Top 15 (เรื่อง · ชิ้น)', <BarList rows={rows(d.byPicker)} color="var(--color-warning)" />)}
-          {card('By zone', 'แยกตาม Zone ของสินค้าที่มีปัญหา (รายการ · ชิ้น)', <BarList rows={rows(d.byZone)} color="var(--color-warning)" />)}
-          {card('By root cause', 'สาเหตุจริงจากการตรวจสอบ (เฉพาะเรื่องที่ปิดแล้ว)', <BarList rows={rows(d.byRootCause, (k) => rootLabel.get(k) ?? k)} color="var(--color-success)" />)}
+          {card('By station', 'แยกตาม Station (เรื่อง · ชิ้น)', <BarList rows={rows(d.byStation)} color="var(--color-info)" />)}
+          {card('By picker', 'แยกตาม Picker · Top 15 (เรื่อง · ชิ้น)', <BarList rows={rows(d.byPicker)} color="var(--color-warning)" />)}
+          {card('By zone', 'แยกตาม Zone (รายการ · ชิ้น)', <BarList rows={rows(d.byZone)} color="var(--color-warning)" />)}
+          {card('By root cause', 'สาเหตุจริง · เฉพาะเรื่องที่ปิดแล้ว', <BarList rows={rows(d.byRootCause, (k) => rootLabel.get(k) ?? k)} color="var(--color-success)" />)}
           {card('Daily trend', 'จำนวนเรื่องที่แจ้งรายวัน', <BarList rows={d.days.map((x) => ({ label: formatDate(x.day), value: x.count }))} color="var(--color-danger)" />)}
         </div>
       </div>

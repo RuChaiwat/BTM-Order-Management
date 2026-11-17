@@ -22,6 +22,8 @@ interface ImportBatch {
 
 const PAGE_SIZE = 20
 
+const STATUS_TH: Record<string, string> = { completed: 'สำเร็จ', failed: 'ไม่สำเร็จ', completed_with_errors: 'สำเร็จบางส่วน', validating: 'กำลังตรวจสอบ' }
+
 type SortKey = 'file_name' | 'uploaded_at' | 'status' | 'new_orders' | 'duplicate_orders' | 'total_rows' | 'success_rows' | 'error_rows'
 
 function sortValue(b: ImportBatch, key: SortKey): string | number {
@@ -92,7 +94,7 @@ export function RecentImportsTable({ rows }: { rows: ImportBatch[] }) {
               <td style={{ overflowWrap: 'break-word' }}>{b.file_name}</td>
               <td>{formatDateTime(b.uploaded_at)}</td>
               <td>
-                <span className={`badge badge-${b.status === 'completed' ? 'success' : b.status === 'failed' ? 'danger' : 'warning'}`}>{b.status}</span>
+                <span className={`badge badge-${b.status === 'completed' ? 'success' : b.status === 'failed' ? 'danger' : 'warning'}`}>{STATUS_TH[b.status] ?? b.status}</span>
               </td>
               <td style={{ fontWeight: 700 }}>{b.new_orders == null ? '–' : b.new_orders.toLocaleString()}</td>
               <td title="ออเดอร์ที่มีอยู่ในระบบแล้ว (Warehouse + Order No + วันที่ออเดอร์ ตรงกัน) — ไม่สร้างใหม่ แต่อัปเดตรายการสินค้าจากไฟล์">
@@ -108,7 +110,7 @@ export function RecentImportsTable({ rows }: { rows: ImportBatch[] }) {
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={8} style={{ color: 'var(--color-text-secondary)' }}>
-                No imports yet.
+                ยังไม่มีการ Import
               </td>
             </tr>
           )}

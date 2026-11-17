@@ -150,24 +150,24 @@ export function ProductivityBoard({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <Leaderboard
           title="Top 10 Above Target"
-          subtitle={`${formatDate(date)} · > ${targetPcsPerHour.toLocaleString()} pcs/hr`}
+          subtitle={`Picker ที่เกินเป้า · ${formatDate(date)} · เป้า ${targetPcsPerHour.toLocaleString()} ชิ้น/ชม.`}
           rows={topAboveTarget}
           valueColor="#16A34A"
-          emptyText="No picker exceeded target on this date."
+          emptyText="ไม่มี Picker ที่เกินเป้าในวันนี้"
         />
         <Leaderboard
           title="Bottom 10 Pickers"
-          subtitle={`${formatDate(date)} · lowest pcs/hr among pickers who worked`}
+          subtitle={`Picker ที่อัตราหยิบต่ำสุด · ${formatDate(date)}`}
           rows={bottomPerformers}
           valueColor="#DC2626"
-          emptyText="No completions on this date yet."
+          emptyText="ยังไม่มีงานที่เสร็จในวันนี้"
         />
       </div>
 
       <div className="card" style={{ flex: 1 }}>
         <div className="card-header" style={{ marginBottom: 10 }}>
           <span className="card-title">Picker Productivity</span>
-          <span className="card-subtitle">ประสิทธิผลผู้หยิบสินค้า · {formatDate(date)} · click a column to sort</span>
+          <span className="card-subtitle">ประสิทธิผลผู้หยิบสินค้า · {formatDate(date)}</span>
           <ExportExcelButton href={productivityExportHref} style={{ marginLeft: 'auto' }} />
         </div>
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -252,7 +252,7 @@ export function ProductivityBoard({
                 <td style={{ fontWeight: p.pcsPerHour ? 700 : 400, color: p.pcsPerHour ? undefined : '#6B7280' }}>{p.pcsPerHour ?? '—'}</td>
                 <td>{p.completed}</td>
                 <td>{p.rounds}</td>
-                <td>{p.avgIdleMinutes !== null ? `${p.avgIdleMinutes} min` : '—'}</td>
+                <td>{p.avgIdleMinutes !== null ? `${p.avgIdleMinutes} นาที` : '—'}</td>
                 <td>{p.piecesCompleted.toLocaleString()}</td>
                 <td>{p.slaPct !== null ? `${p.slaPct}%` : '—'}</td>
                 <td>{p.shortRate !== null ? `${p.shortRate}%` : '—'}</td>
@@ -261,7 +261,7 @@ export function ProductivityBoard({
             {pickerPageRows.length === 0 && (
               <tr>
                 <td colSpan={10} style={{ color: 'var(--color-text-secondary)' }}>
-                  No active pickers found for {warehouseCode}.
+                  ไม่พบ Picker ที่ใช้งานอยู่ใน {warehouseCode}
                 </td>
               </tr>
             )}

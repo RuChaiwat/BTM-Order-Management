@@ -6,6 +6,7 @@ import { formatDate } from '../../lib/formatDate'
 import { productivityMeta } from '../../lib/pickerProductivity'
 import { Spinner } from '../Spinner'
 import { Pagination } from '../Pagination'
+import { Legend } from '../Legend'
 import { apiFetch } from '../../lib/apiFetch'
 
 const TARGET = 300
@@ -61,9 +62,9 @@ interface Picker {
 }
 
 const BAND_META: Record<Band, { label: string; color: string; bg: string }> = {
-  green: { label: 'Green — Easy', color: '#16A34A', bg: '#F0FDF4' },
-  yellow: { label: 'Yellow — Balanced', color: '#B45309', bg: '#FFFBEB' },
-  red: { label: 'Red — Hard', color: '#DC2626', bg: '#FEF2F2' },
+  green: { label: 'เขียว — ง่าย', color: '#16A34A', bg: '#F0FDF4' },
+  yellow: { label: 'เหลือง — ปานกลาง', color: '#B45309', bg: '#FFFBEB' },
+  red: { label: 'แดง — ยาก', color: '#DC2626', bg: '#FEF2F2' },
 }
 
 const SORT_LABELS: { key: SortColumn; label: string }[] = [
@@ -74,10 +75,10 @@ const SORT_LABELS: { key: SortColumn; label: string }[] = [
 ]
 
 function workloadBandFor(pieces: number) {
-  if (pieces === 0 || pieces < LOW_MAX) return { name: 'Low', color: '#2563EB' }
-  if (pieces <= TARGET) return { name: 'Target', color: '#16A34A' }
-  if (pieces <= ACCEPTABLE_MAX) return { name: 'Acceptable Over', color: '#F59E0B' }
-  return { name: 'Over', color: '#DC2626' }
+  if (pieces === 0 || pieces < LOW_MAX) return { name: 'ต่ำ', color: '#2563EB' }
+  if (pieces <= TARGET) return { name: 'ตามเป้า', color: '#16A34A' }
+  if (pieces <= ACCEPTABLE_MAX) return { name: 'เกินเป้าเล็กน้อย', color: '#F59E0B' }
+  return { name: 'เกินกำลัง', color: '#DC2626' }
 }
 
 /** Zones common to every currently-selected order -- null means "no constraint yet" (nothing
@@ -389,7 +390,7 @@ export function WorkAssignmentBoard({
             เกณฑ์การเลือกออเดอร์
           </div>
 
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', marginBottom: 6 }}>1. BACKLOG BY ORDER DATE</div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', marginBottom: 6 }}>1. งานค้างตามวันที่ Order</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14, maxHeight: 220, overflowY: 'auto' }}>
             {backlogByDate.map((d) => (
               <button
@@ -411,18 +412,18 @@ export function WorkAssignmentBoard({
               >
                 <span style={{ fontWeight: 700 }}>{formatDate(d.orderDate)}</span>
                 <span style={{ fontSize: 11, opacity: 0.85 }}>
-                  {d.orders.toLocaleString()} ord · {d.pieces.toLocaleString()} pcs
+                  {d.orders.toLocaleString()} order · {d.pieces.toLocaleString()} ชิ้น
                 </span>
               </button>
             ))}
-            {backlogByDate.length === 0 && <span style={{ color: '#6B7280', fontSize: 12 }}>No backlog — pool is empty.</span>}
+            {backlogByDate.length === 0 && <span style={{ color: '#6B7280', fontSize: 12 }}>ไม่มีงานค้าง</span>}
           </div>
 
           {orderDate && (
             <>
               <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', marginBottom: 6 }}>2. ZONE</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14, maxHeight: 200, overflowY: 'auto' }}>
-                {loadingZones && <span style={{ color: '#6B7280', fontSize: 12 }}>Loading…</span>}
+                {loadingZones && <span style={{ color: '#6B7280', fontSize: 12 }}>กำลังโหลด…</span>}
                 {!loadingZones &&
                   zoneDensity.map((z) => (
                     <button
@@ -444,18 +445,18 @@ export function WorkAssignmentBoard({
                     >
                       <span style={{ fontWeight: 700 }}>Zone {z.zone}</span>
                       <span style={{ fontSize: 11, opacity: 0.85 }}>
-                        {z.orders} ord · {z.sumQty.toLocaleString()} pcs
+                        {z.orders} order · {z.sumQty.toLocaleString()} ชิ้น
                       </span>
                     </button>
                   ))}
-                {!loadingZones && zoneDensity.length === 0 && <span style={{ color: '#6B7280', fontSize: 12 }}>No zones resolved for this date.</span>}
+                {!loadingZones && zoneDensity.length === 0 && <span style={{ color: '#6B7280', fontSize: 12 }}>ไม่พบ Zone ของวันที่นี้</span>}
               </div>
             </>
           )}
 
           {zoneCode && complexity && (
             <>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', marginBottom: 6 }}>3. ORDER COMPLEXITY</div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', marginBottom: 6 }}>3. ความยากของ Order</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
                 {(['green', 'yellow', 'red'] as const).map((band) => {
                   const meta = BAND_META[band]
@@ -479,7 +480,7 @@ export function WorkAssignmentBoard({
                     >
                       <span style={{ width: 9, height: 9, borderRadius: '50%', background: meta.color, flex: 'none' }} />
                       <span style={{ fontSize: 12, fontWeight: 700, color: meta.color, flex: 1 }}>{meta.label}</span>
-                      <span style={{ fontSize: 11.5, color: '#374151' }}>{stat.count} ord</span>
+                      <span style={{ fontSize: 11.5, color: '#374151' }}>{stat.count} order</span>
                     </button>
                   )
                 })}
@@ -487,12 +488,12 @@ export function WorkAssignmentBoard({
             </>
           )}
 
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', marginBottom: 6 }}>4. OR SCAN ORDER BARCODE</div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', marginBottom: 6 }}>4. หรือ Scan Barcode ของ Order</div>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               ref={orderScanInputRef}
               className="control"
-              placeholder="Scan order barcode…"
+              placeholder="Scan Barcode ของ Order…"
               value={orderScanValue}
               onChange={(e) => setOrderScanValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleOrderScan()}
@@ -510,8 +511,8 @@ export function WorkAssignmentBoard({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <span className="card-title">Unassigned Order Pool</span>
             <span className="card-subtitle">
-              ออเดอร์ที่ยังไม่มอบหมาย ·{' '}
-              {orderDate && zoneCode ? `${poolTotal.toLocaleString()} orders · ${formatDate(orderDate)} · Zone ${zoneCode}${bandFilter ? ` · ${BAND_META[bandFilter].label}` : ''}` : 'Select a date and zone to see orders'}
+              ออเดอร์ที่ยังไม่มอบหมาย
+              {orderDate && zoneCode ? ` · ${poolTotal.toLocaleString()} order · ${formatDate(orderDate)} · Zone ${zoneCode}${bandFilter ? ` · ${BAND_META[bandFilter].label}` : ''}` : ''}
             </span>
           </div>
           {poolSelectError && <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--color-danger)' }}>{poolSelectError}</div>}
@@ -537,7 +538,7 @@ export function WorkAssignmentBoard({
               {loadingPool && (
                 <tr>
                   <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                    Loading…
+                    กำลังโหลด…
                   </td>
                 </tr>
               )}
@@ -565,7 +566,7 @@ export function WorkAssignmentBoard({
               {!loadingPool && poolOrders.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                    {orderDate && zoneCode ? 'No orders match the current criteria.' : 'No orders loaded yet — pick a date and zone, or scan an order barcode.'}
+                    {orderDate && zoneCode ? 'ไม่มี Order ตามเกณฑ์ที่เลือก' : 'เลือกวันที่และ Zone หรือ Scan Barcode ของ Order'}
                   </td>
                 </tr>
               )}
@@ -583,18 +584,27 @@ export function WorkAssignmentBoard({
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontSize: 34, fontWeight: 700, color: workloadBand.color }}>{plannedPieces}</span>
             <span style={{ fontSize: 12.5, color: '#6B7280' }}>
-              of {TARGET} target · {selectedOrders.length} orders
+              จากเป้า {TARGET} ชิ้น · {selectedOrders.length} order
             </span>
           </div>
           <div style={{ height: 10, borderRadius: 5, background: '#F3F4F6', overflow: 'hidden', margin: '10px 0 8px' }}>
             <span style={{ display: 'block', height: '100%', width: `${Math.min(100, (plannedPieces / 360) * 100)}%`, background: workloadBand.color }} />
           </div>
           <div style={{ background: '#F9FAFB', border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#374151' }}>
-            Workload band: <strong style={{ color: workloadBand.color }}>{workloadBand.name}</strong>. Thresholds are configuration-driven (§12.1).
+            ระดับงาน: <strong style={{ color: workloadBand.color }}>{workloadBand.name}</strong>
+            <Legend
+              style={{ marginTop: 6, fontSize: 11.5 }}
+              items={[
+                { color: '#2563EB', label: `ต่ำ < ${LOW_MAX}` },
+                { color: '#16A34A', label: `ตามเป้า ${LOW_MAX}–${TARGET}` },
+                { color: '#F59E0B', label: `เกินเป้าเล็กน้อย ${TARGET + 1}–${ACCEPTABLE_MAX}` },
+                { color: '#DC2626', label: `เกินกำลัง > ${ACCEPTABLE_MAX}` },
+              ]}
+            />
           </div>
 
           <div style={{ marginTop: 16, fontSize: 12, color: '#374151', fontWeight: 500, marginBottom: 6 }}>
-            Assign to picker <span style={{ color: '#DC2626' }}>*</span>
+            มอบหมายให้ Picker <span style={{ color: '#DC2626' }}>*</span>
           </div>
           {scannedPicker ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '10px 12px' }}>
@@ -604,7 +614,7 @@ export function WorkAssignmentBoard({
                   {(() => {
                     const meta = productivityMeta(scannedPicker.productivity_level)
                     return (
-                      <span className="badge" style={{ background: meta.bg, color: meta.color, fontWeight: 700, fontSize: 10.5 }} title={scannedPicker.productivity_pcs_per_hour ? `${scannedPicker.productivity_pcs_per_hour.toLocaleString()} pcs/hr avg` : undefined}>
+                      <span className="badge" style={{ background: meta.bg, color: meta.color, fontWeight: 700, fontSize: 10.5 }} title={scannedPicker.productivity_pcs_per_hour ? `เฉลี่ย ${scannedPicker.productivity_pcs_per_hour.toLocaleString()} ชิ้น/ชม.` : undefined}>
                         {meta.label}
                       </span>
                     )
@@ -631,7 +641,7 @@ export function WorkAssignmentBoard({
               <input
                 ref={pickerScanInputRef}
                 className="control"
-                placeholder="Scan picker ID…"
+                placeholder="Scan รหัส Picker…"
                 disabled={pickerScanBusy}
                 value={pickerScanValue}
                 onChange={(e) => setPickerScanValue(e.target.value)}
@@ -645,16 +655,16 @@ export function WorkAssignmentBoard({
           )}
           {pickerScanError && <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--color-danger)' }}>{pickerScanError}</div>}
 
-          <div style={{ marginTop: 16, fontSize: 12, color: '#374151', fontWeight: 500, marginBottom: 8 }}>Selected orders</div>
+          <div style={{ marginTop: 16, fontSize: 12, color: '#374151', fontWeight: 500, marginBottom: 8 }}>Order ที่เลือก</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, maxHeight: 160, overflowY: 'auto' }}>
             {selectedOrders.map((o) => (
               <div key={o.orderId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <span>{o.orderNo}</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#6B7280' }}>{o.plannedPieces} pcs</span>
+                  <span style={{ color: '#6B7280' }}>{o.plannedPieces} ชิ้น</span>
                   <button
                     onClick={() => removeSelection(o.orderId)}
-                    title="Remove"
+                    title="นำออก"
                     style={{ border: '1px solid var(--color-border)', background: '#fff', borderRadius: 4, width: 20, height: 20, lineHeight: '18px', cursor: 'pointer', color: 'var(--color-danger)', padding: 0 }}
                   >
                     −
@@ -662,16 +672,16 @@ export function WorkAssignmentBoard({
                 </span>
               </div>
             ))}
-            {selectedOrders.length === 0 && <span style={{ color: '#6B7280' }}>No orders selected.</span>}
+            {selectedOrders.length === 0 && <span style={{ color: '#6B7280' }}>ยังไม่ได้เลือก Order</span>}
           </div>
 
           {submitError && <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-danger)' }}>{submitError}</div>}
 
           <div className="mt-auto" style={{ paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button className="btn btn-primary" disabled={selectedOrders.length === 0 || !scannedPicker || !effectiveZone} onClick={() => setShowConfirm(true)}>
-              Confirm Assignment · เริ่มจับเวลา
+              ยืนยันมอบหมายงาน (เริ่มจับเวลา)
             </button>
-            <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'center' }}>Timer starts only on Admin confirm. Assignment is confined to Zone {effectiveZone ?? '—'}.</div>
+            <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'center' }}>เริ่มจับเวลาเมื่อกดยืนยันเท่านั้น · มอบหมายได้เฉพาะใน Zone {effectiveZone ?? '—'}</div>
           </div>
         </div>
       </div>
@@ -679,18 +689,18 @@ export function WorkAssignmentBoard({
       {showConfirm && scannedPicker && (
         <Modal title="Confirm assignment?" subtitle="ยืนยันการมอบหมายงาน" onSubmit={confirmAssignment}>
           <div className="modal-body">
-            {selectedOrders.length} orders · {plannedPieces} planned pieces to picker <strong>{scannedPicker.name_th || scannedPicker.name_en}</strong> in Zone {effectiveZone}. The Order timer starts now.
+            มอบหมาย {selectedOrders.length} order · {plannedPieces} ชิ้น ให้ Picker <strong>{scannedPicker.name_th || scannedPicker.name_en}</strong> ใน Zone {effectiveZone} · เริ่มจับเวลาทันที
           </div>
           <div className="modal-grid">
             <div>
-              <div className="modal-grid-label">Workload level</div>
+              <div className="modal-grid-label">ระดับงาน</div>
               <div className="modal-grid-value" style={{ color: workloadBand.color }}>
                 {workloadBand.name} ({plannedPieces})
               </div>
             </div>
             <div>
-              <div className="modal-grid-label">Order selection method</div>
-              <div className="modal-grid-value">{orderScanUsed ? 'Barcode Scan' : 'List Selection'}</div>
+              <div className="modal-grid-label">วิธีเลือก Order</div>
+              <div className="modal-grid-value">{orderScanUsed ? 'Scan Barcode' : 'เลือกจากรายการ'}</div>
             </div>
           </div>
           <ModalFooter>

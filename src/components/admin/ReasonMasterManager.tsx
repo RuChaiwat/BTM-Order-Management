@@ -50,7 +50,7 @@ export function ReasonMasterManager({ reasons }: { reasons: ReasonRow[] }) {
     <div className="card">
       <div className="card-title">Reason Master</div>
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        สาเหตุการหยิบขาด + ยกเลิกออเดอร์ · Short Pick + Cancel reasons — maintainable without a code change (§17.1)
+        สาเหตุการหยิบขาด + ยกเลิกออเดอร์
       </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
@@ -73,12 +73,12 @@ export function ReasonMasterManager({ reasons }: { reasons: ReasonRow[] }) {
           {reasons.map((r) => (
             <tr key={r.reason_code}>
               <td style={{ fontWeight: 700 }}>{r.reason_code}</td>
-              <td>{r.reason_type}</td>
+              <td>{r.reason_type === 'short_pick' ? 'หยิบขาด' : r.reason_type === 'cancel' ? 'ยกเลิก' : r.reason_type}</td>
               <td style={{ overflowWrap: 'break-word' }}>
                 {r.label_en}
                 {r.label_th && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{r.label_th}</div>}
               </td>
-              <td>{r.active ? <span className="badge badge-success">Active</span> : <span className="badge badge-neutral">Inactive</span>}</td>
+              <td>{r.active ? <span className="badge badge-success">ใช้งาน</span> : <span className="badge badge-neutral">ปิดใช้งาน</span>}</td>
               <td>
                 <button className="btn btn-secondary btn-sm" style={{ height: 28, padding: '0 10px' }} onClick={() => toggleActive(r.reason_code, r.active)}>
                   {r.active ? 'Deactivate' : 'Activate'}
@@ -91,22 +91,22 @@ export function ReasonMasterManager({ reasons }: { reasons: ReasonRow[] }) {
 
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px dashed var(--color-border)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
         <div className="field">
-          <label className="field-label">Code</label>
+          <label className="field-label">รหัส</label>
           <input className="field-input" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <div className="field">
-          <label className="field-label">Type</label>
+          <label className="field-label">ประเภท</label>
           <select className="field-input" value={type} onChange={(e) => setType(e.target.value as 'short_pick' | 'cancel')} style={{ border: '1px solid var(--color-border)' }}>
-            <option value="short_pick">Short Pick</option>
-            <option value="cancel">Cancel</option>
+            <option value="short_pick">หยิบขาด</option>
+            <option value="cancel">ยกเลิก</option>
           </select>
         </div>
         <div className="field">
-          <label className="field-label">Label (EN)</label>
+          <label className="field-label">ชื่อ (อังกฤษ)</label>
           <input className="field-input" value={labelEn} onChange={(e) => setLabelEn(e.target.value)} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <div className="field">
-          <label className="field-label">Label (TH)</label>
+          <label className="field-label">ชื่อ (ไทย)</label>
           <input className="field-input" value={labelTh} onChange={(e) => setLabelTh(e.target.value)} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <button className="btn btn-primary btn-sm" disabled={!code || !labelEn || busy} onClick={addReason}>

@@ -32,9 +32,9 @@ export function ConfigHistoryPanel({ versions }: { versions: ConfigVersionRow[] 
     <div className="card">
       <div className="card-title">Configuration History</div>
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        ประวัติการแก้ไขค่าตั้งค่า · แสดงเฉพาะค่าก่อนหน้าล่าสุด 1 ครั้ง
+        ประวัติการแก้ไขค่าตั้งค่า
       </div>
-      {changedCategories.length === 0 && <div style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>No settings have been changed from their defaults yet.</div>}
+      {changedCategories.length === 0 && <div style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>ยังไม่มีการแก้ไขค่าตั้งค่า</div>}
       {changedCategories.map(({ cat, fields }) => (
         <div key={cat.id} style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>

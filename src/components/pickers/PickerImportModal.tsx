@@ -25,7 +25,7 @@ export function PickerImportModal({ warehouseCode, onClose, onImported }: { ware
       const sheetRows = await parseSpreadsheet(file)
       const headers = Object.keys(sheetRows[0] ?? {})
       const hasId = sheetRows.length === 0 || col(Object.fromEntries(headers.map((h) => [h, 'x'])), C.pickerId) !== ''
-      if (!hasId) throw new Error(`The first sheet has no "${C.pickerId}" column — use the template from "Download template" · ไฟล์ไม่ตรงกับ Template`)
+      if (!hasId) throw new Error(`ไฟล์ไม่ตรงกับ Template — ชีตแรกไม่มีคอลัมน์ "${C.pickerId}" กรุณาใช้ไฟล์จากปุ่ม "Download template"`)
       const rows: PickerImportRow[] = sheetRows.map((r, i) => ({
         rowNumber: i + 2,
         picker_id: col(r, C.pickerId),
@@ -58,7 +58,7 @@ export function PickerImportModal({ warehouseCode, onClose, onImported }: { ware
     <Modal title="Upload pickers from Excel" subtitle="นำเข้ารายชื่อพนักงานหยิบสินค้าจากไฟล์ Excel" onSubmit={upload}>
       <div style={{ padding: '16px 24px 0', display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
         <div style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>
-          ใช้ไฟล์จากปุ่ม <b>Download template</b> · Picker ID ที่มีอยู่แล้ว = แก้ไขข้อมูล, Picker ID ใหม่ = เพิ่มพนักงาน (Active) · ถ้ามีแถวใดผิด ระบบจะไม่นำเข้าทั้งไฟล์
+          ใช้ไฟล์จากปุ่ม <b>Download template</b> · Picker ID ที่มีอยู่แล้ว = แก้ไขข้อมูล, Picker ID ใหม่ = เพิ่มพนักงาน (ใช้งาน) · ถ้ามีแถวใดผิด ระบบจะไม่นำเข้าทั้งไฟล์
         </div>
         <input
           type="file"

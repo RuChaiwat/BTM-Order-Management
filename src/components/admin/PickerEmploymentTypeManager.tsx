@@ -51,7 +51,7 @@ export function PickerEmploymentTypeManager({ types }: { types: EmploymentTypeRo
     <div className="card">
       <div className="card-title">Picker Employment Type</div>
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        ประเภทการจ้างงานของพนักงานหยิบสินค้า · shown on Picker List and Add Picker
+        ประเภทการจ้างงานของพนักงานหยิบสินค้า
       </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
@@ -76,7 +76,7 @@ export function PickerEmploymentTypeManager({ types }: { types: EmploymentTypeRo
                 {t.label_en}
                 {t.label_th && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{t.label_th}</div>}
               </td>
-              <td>{t.active ? <span className="badge badge-success">Active</span> : <span className="badge badge-neutral">Inactive</span>}</td>
+              <td>{t.active ? <span className="badge badge-success">ใช้งาน</span> : <span className="badge badge-neutral">ปิดใช้งาน</span>}</td>
               <td>
                 <button className="btn btn-secondary btn-sm" style={{ height: 28, padding: '0 10px' }} onClick={() => toggleActive(t.type_code, t.active)}>
                   {t.active ? 'Deactivate' : 'Activate'}
@@ -87,7 +87,7 @@ export function PickerEmploymentTypeManager({ types }: { types: EmploymentTypeRo
           {types.length === 0 && (
             <tr>
               <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
-                No employment types yet.
+                ยังไม่มีประเภทการจ้างงาน
               </td>
             </tr>
           )}
@@ -96,15 +96,15 @@ export function PickerEmploymentTypeManager({ types }: { types: EmploymentTypeRo
 
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px dashed var(--color-border)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
         <div className="field">
-          <label className="field-label">Code</label>
+          <label className="field-label">รหัส</label>
           <input className="field-input" value={code} onChange={(e) => setCode(e.target.value.toLowerCase().replace(/\s+/g, '_'))} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <div className="field">
-          <label className="field-label">Label (EN)</label>
+          <label className="field-label">ชื่อ (อังกฤษ)</label>
           <input className="field-input" value={labelEn} onChange={(e) => setLabelEn(e.target.value)} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <div className="field">
-          <label className="field-label">Label (TH)</label>
+          <label className="field-label">ชื่อ (ไทย)</label>
           <input className="field-input" value={labelTh} onChange={(e) => setLabelTh(e.target.value)} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <button className="btn btn-primary btn-sm" disabled={!code || !labelEn || busy} onClick={addType}>

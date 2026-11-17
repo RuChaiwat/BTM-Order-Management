@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
 import { KpiCard } from '@/components/KpiCard'
 import { ExportExcelButton } from '@/components/ExportExcelButton'
+import { Legend } from '@/components/Legend'
 import { PackDateFilter } from '@/components/packing/PackDateFilter'
 import { HourBars } from '@/components/packing/BarList'
 import { PackerProductivityTable, StationProductivityTable } from '@/components/packing/PackProductivityTables'
@@ -51,23 +52,33 @@ export default async function PackingProductivityPage({ searchParams }: { search
         <div className="card">
           <div className="card-title">Packer productivity</div>
           <div className="card-subtitle" style={{ marginBottom: 10 }}>
-            รายคน · ชิ้น/ชม. = ชิ้นที่นับได้ ÷ เวลาแพ็กจริง (scan เริ่ม → ปิดงาน) รวมทุก Station ที่ทำ · เทียบเป้า {target.toLocaleString()} ชิ้น/ชม. · กดหัวคอลัมน์เพื่อเรียงลำดับ
+            ประสิทธิผลราย Packer
           </div>
           <PackerProductivityTable packers={d.packers} target={target} />
+          <Legend
+            style={{ marginTop: 10 }}
+            note={`ชิ้น/ชม. = ชิ้นที่นับได้ ÷ เวลาแพ็กจริง (scan เริ่ม → ปิดงาน) รวมทุก Station · เป้า ${target.toLocaleString()} ชิ้น/ชม.`}
+            items={[
+              { color: pctColor(100)!, label: 'ถึงเป้า (100% ขึ้นไป)' },
+              { color: pctColor(80)!, label: '80–99% ของเป้า' },
+              { color: pctColor(0)!, label: 'ต่ำกว่า 80% ของเป้า' },
+            ]}
+          />
         </div>
 
         <div className="card">
           <div className="card-title">Pieces packed per hour</div>
           <div className="card-subtitle" style={{ marginBottom: 10 }}>
-            จำนวนชิ้นที่แพ็กเสร็จรายชั่วโมง (นับตามเวลาที่ปิดงาน) · ทั้งวัน
+            จำนวนชิ้นที่แพ็กเสร็จรายชั่วโมง
           </div>
           <HourBars rows={d.hourly.map((h) => ({ hour: h.hour, value: h.pieces, orders: h.orders }))} color="var(--color-success)" />
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}>นับตามเวลาที่ปิดงาน</div>
         </div>
 
         <div className="card">
           <div className="card-title">By station</div>
           <div className="card-subtitle" style={{ marginBottom: 10 }}>
-            ราย Station · กดหัวคอลัมน์เพื่อเรียงลำดับ
+            ประสิทธิผลราย Station
           </div>
           <StationProductivityTable stations={d.stations} />
         </div>

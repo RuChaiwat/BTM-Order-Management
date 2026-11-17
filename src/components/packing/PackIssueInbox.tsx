@@ -300,13 +300,13 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
             </section>
 
             <section>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>2. History งาน Pick</div>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>2. ประวัติงาน Pick</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, fontSize: 12.5, marginBottom: 8 }}>
                 {[
                   ['Picker', detail.pick.pickerName ? `${detail.pick.pickerName} (${detail.pick.pickerId})` : '—'],
                   ['Zone ที่มอบหมาย', detail.pick.zone ?? '—'],
                   ['มอบหมาย', `${dt(detail.pick.assignedTime)}${detail.pick.assignedBy ? ` · ${detail.pick.assignedBy}` : ''}`],
-                  ['Pick เสร็จ', `${dt(detail.pick.completedTime)}${detail.pick.result ? ` · ${detail.pick.result === '100_percent' ? '100%' : 'Short'}` : ''}`],
+                  ['Pick เสร็จ', `${dt(detail.pick.completedTime)}${detail.pick.result ? ` · ${detail.pick.result === '100_percent' ? '100%' : 'ไม่ครบ'}` : ''}`],
                 ].map(([k, v]) => (
                   <div key={k} style={{ background: 'var(--color-surface-muted)', borderRadius: 8, padding: '8px 10px' }}>
                     <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{k}</div>
@@ -363,7 +363,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
             </section>
 
             <section>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>3. History งาน Pack</div>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>3. ประวัติงาน Pack</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5 }}>
                 {detail.packSessions.map((s) => (
                   <div key={s.session_id}>

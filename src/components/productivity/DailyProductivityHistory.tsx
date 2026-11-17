@@ -64,7 +64,7 @@ export function DailyProductivityHistory({ rows, selectedDate }: { rows: DailyRo
     <div className="card" style={{ flex: 1 }}>
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Daily Productivity</span>
-        <span className="card-subtitle">ประสิทธิผลรายวัน · เดือนนี้ · click a column to sort</span>
+        <span className="card-subtitle">ประสิทธิผลรายวัน · เดือนนี้</span>
         <ExportExcelButton href="/api/productivity/daily-export" style={{ marginLeft: 'auto' }} />
       </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -169,7 +169,7 @@ export function DailyProductivityHistory({ rows, selectedDate }: { rows: DailyRo
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={7} style={{ color: 'var(--color-text-secondary)' }}>
-                No completions yet this month.
+                ยังไม่มีงานที่เสร็จในเดือนนี้
               </td>
             </tr>
           )}

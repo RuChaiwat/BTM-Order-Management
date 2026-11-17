@@ -10,15 +10,15 @@
  * for any batch that reached it before this change; new batches never stop there.
  */
 export const BATCH_STATUS_LABELS: Record<string, string> = {
-  candidate: 'Pending Approval',
-  review: 'Pending Approval',
-  approved: 'Approved',
-  report_released: 'Approved',
-  picking: 'Picking',
-  at_consolidation: 'At Consolidation',
-  sorting: 'Sorting',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
+  candidate: 'รออนุมัติ',
+  review: 'รออนุมัติ',
+  approved: 'อนุมัติแล้ว',
+  report_released: 'อนุมัติแล้ว',
+  picking: 'กำลังหยิบ',
+  at_consolidation: 'อยู่ที่ Consolidation',
+  sorting: 'กำลังคัดแยก',
+  completed: 'เสร็จสิ้น',
+  cancelled: 'ยกเลิก',
 }
 
 export const BATCH_STATUS_TONE: Record<string, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {

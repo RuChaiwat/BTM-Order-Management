@@ -4,6 +4,8 @@ import { formatDate } from '../../lib/formatDate'
 import { PickerProductivityTable } from './PickerProductivityTable'
 import { ActivePickerRosterTable } from './ActivePickerRosterTable'
 import { RISK_COLOR } from '../../lib/alertColors'
+import { PRODUCTIVITY_LEVEL_META } from '../../lib/pickerProductivity'
+import { Legend } from '../Legend'
 
 interface BacklogRow {
   orderDate: string
@@ -96,7 +98,7 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
         <div className="card" style={{ borderLeft: '4px solid #DC2626' }}>
           <div className="card-header" style={{ marginBottom: 10 }}>
             <span className="card-title">Backlog by Order Date</span>
-            <span className="card-subtitle">งานค้างแยกตามวันที่ออเดอร์ · ยังไม่ปิดงาน (Admin Verified) · เก่าสุดก่อน</span>
+            <span className="card-subtitle">งานค้างแยกตามวันที่ Order</span>
           </div>
           <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
@@ -136,7 +138,7 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
                   <tr key={row.orderDate}>
                     <td style={{ fontWeight: 700 }}>{formatDate(row.orderDate)}</td>
                     <td>
-                      <span style={{ color: color.text, fontWeight: 700 }}>{row.daysOld === 0 ? 'Today' : `${row.daysOld}d`}</span>
+                      <span style={{ color: color.text, fontWeight: 700 }}>{row.daysOld === 0 ? 'วันนี้' : `${row.daysOld} วัน`}</span>
                     </td>
                     <td style={{ fontWeight: 700 }}>{row.orders.toLocaleString()}</td>
                     <td>{row.pieces.toLocaleString()}</td>
@@ -145,6 +147,7 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
               })}
             </tbody>
           </table>
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>นับเฉพาะ Order ที่ยังไม่ปิดงาน (Admin ยังไม่ยืนยัน)</div>
         </div>
       )}
 
@@ -208,7 +211,7 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
       <div className="card">
         <div className="card-header" style={{ marginBottom: 10 }}>
           <span className="card-title">Zone Status</span>
-          <span className="card-subtitle">สถานะโซน · Pieces Pending drops once the picker submits · red/yellow = pickers running late in that zone · คลิกเพื่อดูรายละเอียดโซน</span>
+          <span className="card-subtitle">สถานะโซน</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {data.zoneStatus.map((z) => {
@@ -219,7 +222,7 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
             // still stands out now that the "On track / N overdue" label is gone (it moved to the tooltip).
             const pctDone = z.totalPieces > 0 ? Math.round(((z.totalPieces - z.pendingPieces) / z.totalPieces) * 1000) / 10 : 0
             const riskLabel =
-              z.riskLevel === 'red' ? `${z.criticalCount} critical` : z.riskLevel === 'yellow' ? `${z.overdueCount} overdue` : 'On track'
+              z.riskLevel === 'red' ? `วิกฤต ${z.criticalCount} order` : z.riskLevel === 'yellow' ? `เกินกำหนด ${z.overdueCount} order` : 'ตามกำหนด'
             return (
               <Link
                 key={z.zone}
@@ -239,18 +242,28 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
               >
                 <div style={{ fontSize: 14, fontWeight: 700 }}>Zone {z.zone}</div>
                 <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3 }}>{z.pendingPieces.toLocaleString()}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>pieces pending</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>ชิ้นค้าง</div>
                 <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.3, marginTop: 4 }}>{z.totalPieces.toLocaleString()}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>total pieces</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>ชิ้นทั้งหมด</div>
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center' }}>
                   <span className={`badge ${z.riskLevel === 'red' ? 'badge-danger' : z.riskLevel === 'yellow' ? 'badge-warning' : 'badge-success'}`} style={{ fontWeight: 700 }}>
-                    {pctDone}% completed
+                    เสร็จ {pctDone}%
                   </span>
                 </div>
               </Link>
             )
           })}
-          {data.zoneStatus.length === 0 && <span style={{ color: 'var(--color-text-secondary)' }}>No zones found — import Location Master data first.</span>}
+          {data.zoneStatus.length === 0 && <span style={{ color: 'var(--color-text-secondary)' }}>ไม่พบโซน — กรุณา Import ข้อมูล Location Master ก่อน</span>}
+        </div>
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>ชิ้นค้างจะลดลงเมื่อ Picker ส่งงาน · คลิกการ์ดเพื่อดูรายละเอียดโซน</div>
+          <Legend
+            items={[
+              { color: RISK_COLOR.green, label: 'ตามกำหนด' },
+              { color: RISK_COLOR.yellow, label: 'มี Order เกินกำหนด' },
+              { color: RISK_COLOR.red, label: 'มี Order วิกฤต' },
+            ]}
+          />
         </div>
       </div>
 
@@ -258,19 +271,27 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
         <div className="card">
           <div className="card-title">Today&apos;s Picker Productivity</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            ประสิทธิผลผู้หยิบสินค้า · pieces per hour · click a column to sort
+            ประสิทธิผลผู้หยิบสินค้า (ชิ้น/ชม.)
           </div>
           <PickerProductivityTable pickers={data.pickerProductivity} targetPcsPerHour={data.targetPcsPerHour} />
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed var(--color-border)', fontSize: 11.5, color: 'var(--color-text-secondary)' }}>
-            Target {data.targetPcsPerHour.toLocaleString()} pcs/hr · dark green above target, green 80–100%, yellow 60–80%, red below 60% — adjustable via Configuration
-            (picker_productivity.target_pcs_per_hour)
+            <Legend
+              note={`เป้าหมาย ${data.targetPcsPerHour.toLocaleString()} ชิ้น/ชม.`}
+              items={[
+                { color: PRODUCTIVITY_LEVEL_META.above_target.color, label: 'เกินเป้า' },
+                { color: PRODUCTIVITY_LEVEL_META.target.color, label: '80–100%' },
+                { color: PRODUCTIVITY_LEVEL_META.yellow.color, label: '60–80%' },
+                { color: PRODUCTIVITY_LEVEL_META.red.color, label: 'ต่ำกว่า 60%' },
+              ]}
+            />
+            <div style={{ marginTop: 4 }}>ปรับเป้าได้ที่หน้า Configuration</div>
           </div>
         </div>
 
         <div className="card">
           <div className="card-title">Active Pickers — In Progress Now</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            ผู้หยิบที่กำลังดำเนินการอยู่ · orders &amp; pieces still in hand · sorted by longest-held order · click a column to sort
+            ผู้หยิบที่กำลังดำเนินการอยู่
           </div>
           <ActivePickerRosterTable pickers={data.activePickerRoster} />
         </div>
@@ -282,12 +303,12 @@ export function OperationsDashboardBoard({ data }: { data: DashboardData }) {
           รายการที่ต้องดำเนินการ
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-          <ActionRow icon="!" iconBg="#DC2626" title="Critical orders" count={data.actionRequired.critical} border="#FECACA" bg="#FEF2F2" countColor="#DC2626" />
-          <ActionRow icon="⌛" iconBg="#F59E0B" title="Overdue orders" count={data.actionRequired.overdue} border="#FED7AA" bg="#FFFBEB" countColor="#B45309" />
-          <ActionRow icon="✓" iconBg="#2563EB" title="Waiting admin verification" count={data.actionRequired.waitingVerification} border="#E5E7EB" bg="#fff" />
-          <ActionRow icon="↺" iconBg="#7C3AED" title="Rejected / correction in progress" count={data.actionRequired.correctionInProgress} border="#E5E7EB" bg="#fff" />
-          <ActionRow icon="✕" iconBg="#6B7280" title="Invalid Bin Code in error queue" count={data.actionRequired.invalidBinCode} border="#E5E7EB" bg="#fff" />
-          {!hasActions && <span style={{ color: 'var(--color-text-secondary)', gridColumn: '1 / -1' }}>Nothing needs attention right now.</span>}
+          <ActionRow icon="!" iconBg="#DC2626" title="Order วิกฤต" count={data.actionRequired.critical} border="#FECACA" bg="#FEF2F2" countColor="#DC2626" />
+          <ActionRow icon="⌛" iconBg="#F59E0B" title="Order เกินกำหนด" count={data.actionRequired.overdue} border="#FED7AA" bg="#FFFBEB" countColor="#B45309" />
+          <ActionRow icon="✓" iconBg="#2563EB" title="รอ Admin ยืนยัน" count={data.actionRequired.waitingVerification} border="#E5E7EB" bg="#fff" />
+          <ActionRow icon="↺" iconBg="#7C3AED" title="ถูกตีกลับ / กำลังแก้ไข" count={data.actionRequired.correctionInProgress} border="#E5E7EB" bg="#fff" />
+          <ActionRow icon="✕" iconBg="#6B7280" title="Bin Code ไม่ถูกต้อง (รอแก้ไข)" count={data.actionRequired.invalidBinCode} border="#E5E7EB" bg="#fff" />
+          {!hasActions && <span style={{ color: 'var(--color-text-secondary)', gridColumn: '1 / -1' }}>ไม่มีรายการที่ต้องดำเนินการในขณะนี้</span>}
         </div>
       </div>
     </div>

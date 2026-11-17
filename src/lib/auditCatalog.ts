@@ -101,24 +101,24 @@ export function auditDetail(row: RawAuditRow, lookups: AuditLookups): string {
     case 'configuration.update': {
       const key = asString(after.key)
       const field = CONFIG_FIELD_BY_KEY.get(key)
-      const name = field?.labelEn ?? key
+      const name = field?.labelTh ?? key
       const newVal = field ? toDisplayValue(field.kind, after.value) : asString(after.value)
       const unit = field?.unit ?? ''
       const oldVal = before?.value !== undefined && field ? toDisplayValue(field.kind, before.value) : null
-      return oldVal !== null && oldVal !== '' ? `${name}: ${oldVal} → ${newVal} ${unit}`.trim() : `${name}: set to ${newVal} ${unit}`.trim()
+      return oldVal !== null && oldVal !== '' ? `${name}: ${oldVal} → ${newVal} ${unit}`.trim() : `${name}: ตั้งเป็น ${newVal} ${unit}`.trim()
     }
     case 'order.cancel':
-      return `${orderRef(row.entity_id, lookups)} — reason: ${asString(after.reason) || '—'}`
+      return `${orderRef(row.entity_id, lookups)} — เหตุผล: ${asString(after.reason) || '—'}`
     case 'picker_completion.create':
-      return `${orderRef(row.entity_id, lookups)} — ${asString(after.result)} by picker ${asString(after.picker_id)}`
+      return `${orderRef(row.entity_id, lookups)} — ${asString(after.result)} โดย Picker ${asString(after.picker_id)}`
     case 'consolidation_batch.auto_complete':
-      return `${batchRef(row.entity_id, lookups)} closed automatically — last order confirmed via Pick Completion`
+      return `${batchRef(row.entity_id, lookups)} ปิดงานอัตโนมัติ — order สุดท้ายยืนยันหยิบเสร็จแล้ว`
     case 'picker.create':
     case 'picker.delete':
       return `${asString((after.name_th ?? before.name_th ?? after.name_en ?? before.name_en) ?? row.entity_id)} (${row.entity_id ?? '—'})`
     case 'picker.update': {
       const activeChanged = typeof after.active === 'boolean' && after.active !== before.active
-      return `${row.entity_id ?? '—'}${activeChanged ? (after.active ? ' — activated' : ' — deactivated') : ''}`
+      return `${row.entity_id ?? '—'}${activeChanged ? (after.active ? ' — เปิดใช้งาน' : ' — ปิดใช้งาน') : ''}`
     }
     case 'reason_master.create':
     case 'reason_master.update':
@@ -131,30 +131,30 @@ export function auditDetail(row: RawAuditRow, lookups: AuditLookups): string {
     case 'matching.order_link_failed':
       return asString(after.error) || '—'
     case 'matching.run':
-      return `${asString(after.order_date)} · ${asString(after.warehouse_code)} — eligible ${asString(after.eligible)}, excluded ${asString(after.excluded_over_max_sku)}`
+      return `${asString(after.order_date)} · ${asString(after.warehouse_code)} — เข้าเงื่อนไข ${asString(after.eligible)}, ไม่นำมาจับคู่ ${asString(after.excluded_over_max_sku)}`
     case 'orders.import':
-      return `created ${asString(after.orders_created)}, updated ${asString(after.orders_updated)}, lines ${asString(after.lines_upserted)}, errors ${asString(after.errors)}`
+      return `order ใหม่ ${asString(after.orders_created)}, อัปเดต ${asString(after.orders_updated)}, รายการสินค้า ${asString(after.lines_upserted)}, ข้อผิดพลาด ${asString(after.errors)}`
     case 'locations.create':
     case 'locations.activate':
     case 'locations.deactivate':
       return `${row.entity_id ?? '—'}`
     case 'locations.import':
-      return `${asString(after.row_count)} row(s) from ${asString(after.file_name)}`
+      return `${asString(after.row_count)} แถว จากไฟล์ ${asString(after.file_name)}`
     case 'picker.productivity_recalc':
-      return `${asString(after.updated)} picker(s) updated — target ${asString(after.target_pcs_per_hour)} pcs/hr`
+      return `อัปเดต Picker ${asString(after.updated)} คน — เป้าหมาย ${asString(after.target_pcs_per_hour)} ชิ้น/ชม.`
     case 'consolidation_batch.approve':
-      return `${batchRef(row.entity_id, lookups)} — assigned to picker ${asString(after.picker_id ?? after.assignment_batch_id)}`
+      return `${batchRef(row.entity_id, lookups)} — มอบหมายให้ Picker ${asString(after.picker_id ?? after.assignment_batch_id)}`
     case 'consolidation_batch.complete':
-      return `${batchRef(row.entity_id, lookups)} — ${asString(after.result)}, ${asString(after.orders_completed)} order(s)`
+      return `${batchRef(row.entity_id, lookups)} — ${asString(after.result)}, ${asString(after.orders_completed)} order`
     case 'consolidation_batch.cancel':
       return `${batchRef(row.entity_id, lookups)}`
     case 'admin_verification.final_close':
       return `${orderRef(row.entity_id, lookups)} — ${asString(after.newStatus)}`
     case 'admin_verification.reject':
-      return `${orderRef(row.entity_id, lookups)} — reason: ${asString(after.reject_reason) || '—'}`
+      return `${orderRef(row.entity_id, lookups)} — เหตุผล: ${asString(after.reject_reason) || '—'}`
     case 'assignment.create': {
       const orderCount = Array.isArray(after.order_ids) ? after.order_ids.length : null
-      return `Zone ${asString(after.zone_code)}, picker ${asString(after.picker_id)}${orderCount !== null ? `, ${orderCount} order(s)` : ''}`
+      return `Zone ${asString(after.zone_code)}, Picker ${asString(after.picker_id)}${orderCount !== null ? `, ${orderCount} order` : ''}`
     }
     default: {
       const dump = asString(after) || asString(before)

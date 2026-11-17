@@ -31,9 +31,9 @@ interface ConsolidationBatch {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  assigned: 'Assigned',
-  in_progress: 'In Progress',
-  correction_in_progress: 'Returned for correction',
+  assigned: 'มอบหมายแล้ว',
+  in_progress: 'กำลังหยิบ',
+  correction_in_progress: 'ส่งกลับแก้ไข',
 }
 
 type DocType = 'pick_slip' | 'pick_sheet'
@@ -164,7 +164,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
     <div className="card" style={{ flex: 1 }}>
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Print & Reprint</span>
-        <span className="card-subtitle">พิมพ์ / พิมพ์ซ้ำเอกสาร · เปิดจากเครื่องที่ไม่ใช่ Kiosk เพื่อเลือกเครื่องพิมพ์เอง</span>
+        <span className="card-subtitle">พิมพ์ / พิมพ์ซ้ำเอกสาร</span>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -186,7 +186,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
               <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Picker</span>
               <input
                 className="control"
-                placeholder="Scan or type Picker ID… (blank = all)"
+                placeholder="Scan หรือพิมพ์รหัส Picker… (ว่าง = ทั้งหมด)"
                 value={pickerIdInput}
                 onChange={(e) => {
                   setPickerIdInput(e.target.value)
@@ -195,7 +195,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
                 }}
                 style={{ width: 220 }}
               />
-              {pickerQuery && <span style={{ fontSize: 12, color: matchedPicker ? 'var(--color-text-secondary)' : 'var(--color-danger)' }}>{matchedPicker ? matchedPicker.name_th || matchedPicker.name_en : 'No picker with this ID'}</span>}
+              {pickerQuery && <span style={{ fontSize: 12, color: matchedPicker ? 'var(--color-text-secondary)' : 'var(--color-danger)' }}>{matchedPicker ? matchedPicker.name_th || matchedPicker.name_en : 'ไม่พบ Picker รหัสนี้'}</span>}
             </div>
             <button className="btn btn-primary btn-sm" disabled={selected.size === 0} onClick={printSelected}>
               Print {docType === 'pick_sheet' ? 'Pick Sheet' : 'Pick Slip'} ({selected.size})
@@ -237,7 +237,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
               {orderPageRows.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                    No open orders{pickerQuery ? ' for this picker' : ''} right now.
+                    ตอนนี้ไม่มี order ที่ยังเปิดอยู่{pickerQuery ? 'ของ Picker คนนี้' : ''}
                   </td>
                 </tr>
               )}
@@ -250,7 +250,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
           <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
             <input
               className="control"
-              placeholder="Search Batch No…"
+              placeholder="ค้นหา Batch No…"
               value={batchQuery}
               onChange={(e) => setBatchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && searchBatches()}
@@ -311,7 +311,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
               {batchPageRows.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
-                    Search for a Batch No to find its report.
+                    ค้นหาด้วย Batch No เพื่อเปิดรายงาน
                   </td>
                 </tr>
               )}
@@ -320,6 +320,7 @@ export function PrintReprintBoard({ orders, pickers }: { orders: OpenOrder[]; pi
           {sortedBatches.length > 0 && <Pagination page={batchPage} totalPages={batchTotalPages} onChange={setBatchPage} />}
         </>
       )}
+      <div style={{ marginTop: 12, fontSize: 12, color: 'var(--color-text-secondary)' }}>เปิดหน้านี้จากเครื่องที่ไม่ใช่ Kiosk เพื่อเลือกเครื่องพิมพ์เองได้</div>
     </div>
   )
 }

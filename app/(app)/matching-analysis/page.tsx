@@ -33,7 +33,7 @@ export default async function MatchingAnalysisPage({ searchParams }: { searchPar
   return (
     <>
       <AutoRefresh />
-      <TopBar title="Matching Analysis & Batch Review" subtitle={`วิเคราะห์การจับคู่ / ตรวจแบตช์ · ${warehouseCode}`} />
+      <TopBar title="Matching Analysis & Batch Review" subtitle={`วิเคราะห์การจับคู่ / ตรวจ Batch ·${warehouseCode}`} />
       <MatchingBoard batches={batches} warehouseCode={warehouseCode} unmatchedPendingCount={unmatchedPendingCount} orderDate={orderDate} pickers={pickers} />
     </>
   )

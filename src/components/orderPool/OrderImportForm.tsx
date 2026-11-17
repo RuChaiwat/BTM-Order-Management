@@ -186,7 +186,7 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
     <div className="card">
       <div className="card-title">Import WMS orders</div>
       <div className="card-subtitle" style={{ marginBottom: 14 }}>
-        {hint}
+        นำเข้า order จาก WMS
       </div>
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <FilePicker
@@ -215,9 +215,10 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
       </div>
       {!busy && (transferFile ? !pickLinesFile : !!pickLinesFile) && (
         <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          เลือกไฟล์ให้ครบทั้ง 2 ไฟล์ก่อนกด Upload · Choose both files to upload
+          เลือกไฟล์ให้ครบทั้ง 2 ไฟล์ก่อนกด Upload
         </div>
       )}
+      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>{hint}</div>
 
       {busy && (
         <div style={{ marginTop: 14 }}>

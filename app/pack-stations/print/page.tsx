@@ -32,7 +32,7 @@ export default async function PackStationPrintPage({ searchParams }: { searchPar
       <style>{CSS}</style>
       <div className="no-print" style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
         <PrintButton />
-        <span style={{ color: '#6B7280', fontSize: 13 }}>{(stations ?? []).length} station(s)</span>
+        <span style={{ color: '#6B7280', fontSize: 13 }}>{(stations ?? []).length} Station</span>
       </div>
       <div className="station-sheet">
         {(stations ?? []).map((s) => (

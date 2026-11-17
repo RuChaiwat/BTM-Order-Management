@@ -16,7 +16,7 @@ export default async function PackVerificationPage() {
 
   return (
     <>
-      <TopBar title="Admin Pack Verify" subtitle={`ยืนยันการแพ็กหลังทำ Confirm Pack ใน WMS · ${queue.length.toLocaleString()} orders`} />
+      <TopBar title="Admin Pack Verify" subtitle={`ยืนยันการแพ็ก · ${queue.length.toLocaleString()} order`} />
       <PackVerifyBoard queue={queue} />
     </>
   )

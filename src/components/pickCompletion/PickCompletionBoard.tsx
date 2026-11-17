@@ -22,9 +22,9 @@ interface PickerOrder {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  assigned: 'Assigned',
-  in_progress: 'In Progress',
-  correction_in_progress: 'Returned for correction',
+  assigned: 'มอบหมายแล้ว',
+  in_progress: 'กำลังหยิบ',
+  correction_in_progress: 'ส่งกลับแก้ไข',
 }
 
 /** "How long have I had this order" for the picker's own reference (§Productivity follow-up --
@@ -34,10 +34,10 @@ const STATUS_LABEL: Record<string, string> = {
 function formatElapsed(assignedTime: string | null, now: number): string {
   if (!assignedTime) return '—'
   const minutes = Math.max(0, (now - new Date(assignedTime).getTime()) / 60000)
-  if (minutes < 60) return `${Math.floor(minutes)} min`
+  if (minutes < 60) return `${Math.floor(minutes)} นาที`
   const hours = Math.floor(minutes / 60)
   const mins = Math.floor(minutes % 60)
-  return `${hours}h ${mins}m`
+  return `${hours} ชม. ${mins} นาที`
 }
 
 /**
@@ -246,13 +246,13 @@ export function PickCompletionBoard({
         <div className="card">
           <div className="card-title">Scan Picker ID</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            สแกนหรือพิมพ์รหัส Picker เพื่อดูรายการงานที่มอบหมายให้พนักงานคนนั้น
+            สแกนรหัส Picker
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
               ref={scanInputRef}
               className="control"
-              placeholder="Scan or type Picker ID…"
+              placeholder="Scan หรือพิมพ์รหัส Picker…"
               value={scanValue}
               onChange={(e) => setScanValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && lookupPicker()}
@@ -287,7 +287,7 @@ export function PickCompletionBoard({
                   className="btn btn-info btn-sm"
                   disabled={orders.length === 0}
                   onClick={() => reprintSlip(orders.map((o) => o.order_id))}
-                  title="Reprint every currently-assigned order's Pick Slip -- paper jam, empty roll, or the picker lost it"
+                  title="พิมพ์ Pick Slip ซ้ำทุก order ที่มอบหมายอยู่ (กระดาษติด กระดาษหมด หรือ Picker ทำหาย)"
                 >
                   Reprint All ({orders.length})
                 </button>
@@ -297,7 +297,7 @@ export function PickCompletionBoard({
                   className="btn btn-danger btn-sm"
                   disabled={orders.length === 0 || submitting || unassigning}
                   onClick={() => setShowUnassignAll(true)}
-                  title="Send every order on this picker's list back to the pool for a different picker"
+                  title="ส่งทุก order ของ Picker คนนี้กลับเข้า Pool เพื่อมอบหมายให้คนอื่น"
                 >
                   Unassign All ({orders.length})
                 </button>
@@ -311,7 +311,7 @@ export function PickCompletionBoard({
             </div>
           </div>
           <div className="card-subtitle" style={{ marginTop: 8 }}>
-            {orders.length} order(s) assigned and awaiting pick completion
+            รอปิดงานหยิบ · {orders.length} order
           </div>
         </div>
 
@@ -352,11 +352,11 @@ export function PickCompletionBoard({
               </div>
               <div style={{ flex: '0 0 auto', textAlign: 'center' }}>
                 <div style={{ fontSize: 17, fontWeight: 700 }}>{o.planned_pieces}</div>
-                <div style={{ fontSize: 11, color: '#6B7280' }}>planned pcs</div>
+                <div style={{ fontSize: 11, color: '#6B7280' }}>ชิ้นตามแผน</div>
               </div>
               <div style={{ flex: '0 0 auto', textAlign: 'center' }}>
                 <div style={{ fontSize: 17, fontWeight: 700 }}>{formatElapsed(o.assigned_time, now)}</div>
-                <div style={{ fontSize: 11, color: '#6B7280' }}>time held</div>
+                <div style={{ fontSize: 11, color: '#6B7280' }}>เวลาที่รับงาน</div>
               </div>
               <div style={{ flex: '0 0 auto' }}>
                 <span className={`badge badge-${o.status === 'correction_in_progress' ? 'warning' : 'info'}`}>{STATUS_LABEL[o.status] ?? o.status}</span>
@@ -367,7 +367,7 @@ export function PickCompletionBoard({
                     className="btn btn-info-outline"
                     style={{ padding: '12px 18px', fontSize: 14, flex: '0 0 auto' }}
                     onClick={() => reprintSlip([o.order_id])}
-                    title="Reprint this order's Pick Slip"
+                    title="พิมพ์ Pick Slip ของ order นี้ซ้ำ"
                   >
                     Reprint
                   </button>
@@ -378,7 +378,7 @@ export function PickCompletionBoard({
                     style={{ padding: '12px 18px', fontSize: 14, flex: '0 0 auto' }}
                     disabled={submitting}
                     onClick={() => setUnassignTarget(o.order_id)}
-                    title="Send this order back to the pool for a different picker"
+                    title="ส่ง order นี้กลับเข้า Pool เพื่อมอบหมายให้ Picker คนอื่น"
                   >
                     Unassign
                   </button>
@@ -402,23 +402,23 @@ export function PickCompletionBoard({
               </div>
             </div>
           ))}
-          {orders.length === 0 && <div className="card" style={{ color: 'var(--color-text-secondary)' }}>Nothing assigned to {picker.name_th || picker.name_en} right now.</div>}
+          {orders.length === 0 && <div className="card" style={{ color: 'var(--color-text-secondary)' }}>ตอนนี้ไม่มีงานที่มอบหมายให้ {picker.name_th || picker.name_en}</div>}
         </div>
       </div>
 
       {pending && (
         <Modal
           title={pending.result === '100_percent' ? 'Confirm Completed?' : 'Confirm Completed with Short?'}
-          subtitle="ยืนยันผลการหยิบ · หยุดเวลา"
+          subtitle="ยืนยันผลการหยิบ"
           onSubmit={() => submitOne(pending.orderId, pending.result)}
         >
           <div className="modal-body">
-            {orders.find((o) => o.order_id === pending.orderId)?.order_no}
+            Order {orders.find((o) => o.order_id === pending.orderId)?.order_no}
             {pending.result === '100_percent'
-              ? ' will be marked fully picked and sent to Admin Verification.'
-              : ' will be marked short-picked and sent to Admin Verification, where the short quantity and reason are recorded.'}
+              ? ' จะถูกบันทึกว่าหยิบครบ และส่งต่อไปหน้า Admin Verification'
+              : ' จะถูกบันทึกว่าหยิบไม่ครบ (Short Pick) และส่งต่อไปหน้า Admin Verification เพื่อบันทึกจำนวนและสาเหตุที่ขาด'}
             {' '}
-            This stops the order&apos;s clock and cannot be edited afterward.
+            · ระบบจะหยุดจับเวลา และแก้ไขภายหลังไม่ได้
           </div>
           <ModalFooter>
             <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setPending(null)}>
@@ -441,8 +441,8 @@ export function PickCompletionBoard({
       {showCompletedAll && (
         <Modal title={`Mark all ${orders.length} orders Completed?`} subtitle="ยืนยันปิดงานทั้งหมด (100%)" onSubmit={completeAll}>
           <div className="modal-body">
-            Every order currently assigned to <strong>{picker.name_th || picker.name_en}</strong> will be marked fully picked (100%) and sent to Admin Verification. Use this only when nothing was short-picked
-            today — a short-picked order should be confirmed individually with &quot;Completed with Short&quot; instead.
+            ทุก order ที่มอบหมายให้ <strong>{picker.name_th || picker.name_en}</strong> จะถูกบันทึกว่าหยิบครบ (100%) และส่งต่อไปหน้า Admin Verification · ใช้เฉพาะเมื่อไม่มี order ที่หยิบไม่ครบ
+            ถ้ามี order ที่หยิบไม่ครบ ให้ยืนยันทีละ order ด้วยปุ่ม &quot;Completed with Short&quot;
           </div>
           <ModalFooter>
             <button type="button" className="modal-footer-btn btn-secondary" onClick={() => setShowCompletedAll(false)}>
@@ -460,11 +460,7 @@ export function PickCompletionBoard({
         <Modal title={`Unassign all ${orders.length} orders?`} subtitle="ยกเลิกการมอบหมายงานทั้งหมดของ Picker คนนี้" onSubmit={unassignAll}>
           <div className="modal-body">
             <div>
-              Stops the timer and sends every order assigned to {picker?.name_th || picker?.name_en} back to the pool for another picker. Orders that are part of a
-              Consolidation Batch are skipped and listed afterwards. This cannot be undone.
-            </div>
-            <div style={{ marginTop: 6, color: '#6B7280' }}>
-              หยุดจับเวลาและส่งทุก Order ของ Picker คนนี้กลับเข้า Pool เพื่อมอบหมายให้คนอื่น (Order ที่อยู่ใน Consolidation Batch จะถูกข้ามและแจ้งให้ทราบ) ไม่สามารถย้อนกลับได้
+              หยุดจับเวลาและส่งทุก Order ของ {picker?.name_th || picker?.name_en} กลับเข้า Pool เพื่อมอบหมายให้คนอื่น (Order ที่อยู่ใน Consolidation Batch จะถูกข้ามและแจ้งให้ทราบ) ไม่สามารถย้อนกลับได้
             </div>
           </div>
           <ModalFooter>
@@ -482,8 +478,7 @@ export function PickCompletionBoard({
       {unassignTarget && (
         <Modal title="Unassign this order?" subtitle="ยกเลิกการมอบหมายงาน" onSubmit={confirmUnassign}>
           <div className="modal-body">
-            <div>Stops the timer and sends {orders.find((o) => o.order_id === unassignTarget)?.order_no} back to the pool for another picker. This cannot be undone.</div>
-            <div style={{ marginTop: 6, color: '#6B7280' }}>หยุดจับเวลาและส่ง Order นี้กลับเข้า Pool เพื่อมอบหมายให้ Picker คนอื่น ไม่สามารถย้อนกลับได้</div>
+            <div>หยุดจับเวลาและส่ง Order {orders.find((o) => o.order_id === unassignTarget)?.order_no} กลับเข้า Pool เพื่อมอบหมายให้ Picker คนอื่น ไม่สามารถย้อนกลับได้</div>
           </div>
           {unassignError && <div style={{ margin: '0 24px', fontSize: 12, color: 'var(--color-danger)' }}>{unassignError}</div>}
           <ModalFooter>

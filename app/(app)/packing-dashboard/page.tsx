@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { TopBar } from '@/components/TopBar'
 import { AutoRefresh } from '@/components/AutoRefresh'
 import { KpiCard } from '@/components/KpiCard'
+import { Legend } from '@/components/Legend'
 import { BarList, HourBars } from '@/components/packing/BarList'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -51,6 +52,15 @@ export default async function PackingDashboardPage() {
     const b = packTimeBand(m, bands)
     return b === 'green' ? undefined : RISK_COLOR[b]
   }
+  const timeLegend = (
+    <Legend
+      style={{ marginTop: 10 }}
+      items={[
+        { color: RISK_COLOR.yellow, label: `${Y}–${R - 1} นาที` },
+        { color: RISK_COLOR.red, label: `${R} นาทีขึ้นไป` },
+      ]}
+    />
+  )
 
   // One open session per station is the norm; if a station somehow has two, its longest one counts.
   const stationMinutes = new Map<string, number>()
@@ -124,7 +134,7 @@ export default async function PackingDashboardPage() {
             value={activeStations.toLocaleString()}
             sub={
               <>
-                Idle <b>{monitor.idleStations.length.toLocaleString()}</b> Station · {link(22, '/pack-monitor', 'Live monitor')}
+                ว่าง <b>{monitor.idleStations.length.toLocaleString()}</b> Station · {link(22, '/pack-monitor', 'Live monitor')}
               </>
             }
             compact
@@ -150,14 +160,16 @@ export default async function PackingDashboardPage() {
           <div className="card">
             <div className="card-title">Pack backlog aging</div>
             <div className="card-subtitle" style={{ marginBottom: 14 }}>
-              อายุของ order ที่รอแพ็ก นับจากเวลาที่ผ่าน Admin Verification
+              อายุของ order ที่รอแพ็ก
             </div>
             <BarList rows={d.aging.map((a) => ({ label: a.label, value: a.count }))} color="var(--color-warning)" />
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>นับจากเวลาที่ผ่าน Admin Verification</div>
           </div>
           <div className="card">
             <div className="card-title">Pieces packed per hour (today)</div>
-            <div className="card-subtitle">จำนวนชิ้นที่แพ็กเสร็จรายชั่วโมง (ไม่นับชิ้นที่แจ้งปัญหา)</div>
+            <div className="card-subtitle">จำนวนชิ้นที่แพ็กเสร็จรายชั่วโมง</div>
             <HourBars rows={d.hourly.map((h) => ({ hour: h.hour, value: h.pieces, orders: h.orders }))} color="var(--color-success)" />
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}>ไม่นับชิ้นที่แจ้งปัญหา</div>
           </div>
         </div>
 
@@ -168,7 +180,7 @@ export default async function PackingDashboardPage() {
               {link(24, '/pack-issues', `ดูทั้งหมด (${openIssueCount.toLocaleString()} issue)`)}
             </div>
             <div className="card-subtitle" style={{ marginBottom: 10 }}>
-              ปัญหาที่ยังไม่ปิด · เรียงจากเปิดค้างนานที่สุด
+              ปัญหาที่ยังไม่ปิด
             </div>
             <table className="table" style={{ tableLayout: 'fixed', width: '100%', fontSize: 12.5 }}>
               <colgroup>
@@ -210,12 +222,13 @@ export default async function PackingDashboardPage() {
                 {topIssues.length === 0 && (
                   <tr>
                     <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
-                      ไม่มีปัญหาค้าง · No open issues
+                      ไม่มีปัญหาค้าง
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            {timeLegend}
           </div>
 
           <div className="card">
@@ -224,7 +237,7 @@ export default async function PackingDashboardPage() {
               {link(23, '/pack-verification', `ดูทั้งหมด (${verifyQueue.length.toLocaleString()} order)`)}
             </div>
             <div className="card-subtitle" style={{ marginBottom: 10 }}>
-              แพ็กเสร็จแล้ว รอ Admin Pack Verify · เรียงจากรอนานที่สุด
+              รอ Admin Pack Verify
             </div>
             <table className="table" style={{ tableLayout: 'fixed', width: '100%', fontSize: 12.5 }}>
               <colgroup>
@@ -258,7 +271,7 @@ export default async function PackingDashboardPage() {
                     <td style={{ fontWeight: 700, color: timeColor(o.waitMinutes) }}>{hm(o.waitMinutes)}</td>
                     <td>
                       <span className={`badge ${o.isShort ? 'badge-warning' : o.hadIssue ? 'badge-danger' : 'badge-success'}`} style={{ fontSize: 10 }}>
-                        {o.isShort ? 'Short' : o.hadIssue ? 'เคยมีปัญหา' : 'ครบ'}
+                        {o.isShort ? 'ไม่ครบ' : o.hadIssue ? 'เคยมีปัญหา' : 'ครบ'}
                       </span>
                     </td>
                   </tr>
@@ -266,12 +279,13 @@ export default async function PackingDashboardPage() {
                 {topAwaiting.length === 0 && (
                   <tr>
                     <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
-                      ไม่มี order รอยืนยัน · Nothing awaiting confirm
+                      ไม่มี order รอยืนยัน
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            {timeLegend}
           </div>
         </div>
       </div>

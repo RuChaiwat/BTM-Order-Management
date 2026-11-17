@@ -9,6 +9,7 @@ import { ALERT_COLOR, ALERT_LABEL_COLOR, ALERT_BADGE_TONE } from '@/lib/alertCol
 import { requireMenuAccess } from '@/lib/pageAccess'
 import { getRefreshIntervalMs } from '@/lib/queries/config'
 import { AUTO_REFRESH_KEYS } from '@/lib/configCatalog'
+import { Legend } from '@/components/Legend'
 
 // Every read here goes through supabase-js, which calls the global fetch() -- Next.js 14 caches
 // fetch() results by default (force-cache) INDEPENDENT of whether the route renders per-request,
@@ -22,6 +23,8 @@ const ZONE_ROW_STYLE: Record<string, { background?: string }> = {
   warning: { background: 'var(--color-warning-bg)' },
   none: {},
 }
+
+const ALERT_TH: Record<'warning' | 'overdue' | 'critical', string> = { warning: 'ใกล้เกินกำหนด', overdue: 'เกินกำหนด', critical: 'วิกฤต' }
 
 export default async function ControlTowerPage() {
   const user = await getSessionUser()
@@ -131,7 +134,7 @@ export default async function ControlTowerPage() {
             value={data.kpis.waitingVerifyPieces.toLocaleString()}
             valueColor={data.worstVerificationAlert ? ALERT_COLOR[data.worstVerificationAlert] : data.kpis.waitingVerifyPieces > 0 ? '#2563EB' : undefined}
             accentColor={data.worstVerificationAlert ? ALERT_COLOR[data.worstVerificationAlert] : undefined}
-            sub={`${data.kpis.waitingVerifyOrders.toLocaleString()} order · ${data.worstVerificationAlert ? { warning: 'ใกล้เกินกำหนด', overdue: 'เกินกำหนด', critical: 'วิกฤต' }[data.worstVerificationAlert] ?? data.worstVerificationAlert : 'ตามกำหนด'}`}
+            sub={`${data.kpis.waitingVerifyOrders.toLocaleString()} order · ${data.worstVerificationAlert ? ALERT_TH[data.worstVerificationAlert] ?? data.worstVerificationAlert : 'ตามกำหนด'}`}
             compact
             style={{ padding: 14, textAlign: 'center' }}
           />
@@ -146,7 +149,7 @@ export default async function ControlTowerPage() {
           <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone Overview</span>
-              <span className="card-subtitle">ภาพรวมโซน · Orders/Pieces Touching Zone — do not sum across zones · row highlighted if the zone has a Warning, Overdue, or Critical order</span>
+              <span className="card-subtitle">ภาพรวมโซน</span>
             </div>
             <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
@@ -189,10 +192,20 @@ export default async function ControlTowerPage() {
                 ))}
               </tbody>
             </table>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>นับ Order/ชิ้นที่ผ่านแต่ละโซน — ห้ามรวมข้ามโซน</div>
+            <Legend
+              style={{ marginTop: 6 }}
+              note="สีแถว:"
+              items={[
+                { color: ZONE_ROW_STYLE.warning.background ?? '', label: 'มี Order ใกล้เกินกำหนด' },
+                { color: ZONE_ROW_STYLE.overdue.background ?? '', label: 'มี Order เกินกำหนด' },
+                { color: ZONE_ROW_STYLE.critical.background ?? '', label: 'มี Order วิกฤต' },
+              ]}
+            />
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '18px 0 10px' }}>
               <span className="card-title">Top Overdue Picks</span>
-              <span className="card-subtitle">ออเดอร์ที่กำลังหยิบล่าช้าที่สุด · Picking only, not Admin Verification · top 20 by elapsed time, longest first</span>
+              <span className="card-subtitle">Order ที่หยิบล่าช้าที่สุด · 20 อันดับ</span>
             </div>
             <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
@@ -224,16 +237,16 @@ export default async function ControlTowerPage() {
                       {o.pickerEmploymentType && <div style={{ fontSize: 11, color: '#6B7280' }}>{o.pickerEmploymentType}</div>}
                     </td>
                     <td style={{ overflowWrap: 'break-word' }}>{o.zones.join(', ') || '—'}</td>
-                    <td>{Math.round(o.alert?.elapsed_minutes ?? 0)} min</td>
+                    <td>{Math.round(o.alert?.elapsed_minutes ?? 0)} นาที</td>
                     <td>
-                      <span className={`badge badge-${o.alert?.time_alert === 'critical' ? 'danger' : 'warning'}`}>{o.alert?.time_alert}</span>
+                      <span className={`badge badge-${o.alert?.time_alert === 'critical' ? 'danger' : 'warning'}`}>{o.alert?.time_alert ? ALERT_TH[o.alert.time_alert as 'warning' | 'overdue' | 'critical'] ?? o.alert.time_alert : ''}</span>
                     </td>
                   </tr>
                 ))}
                 {data.topOverdueOrders.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                      Nothing overdue right now.
+                      ไม่มี Order ที่เกินกำหนดในขณะนี้
                     </td>
                   </tr>
                 )}
@@ -244,7 +257,7 @@ export default async function ControlTowerPage() {
           <div className="card">
             <div className="card-header">
               <span className="card-title">Top Pending Confirmations</span>
-              <span className="card-subtitle">รายการรอ Admin ยืนยันสูงสุด · top 20, most critical first</span>
+              <span className="card-subtitle">รายการรอ Admin ยืนยัน · 20 อันดับ</span>
             </div>
             <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
@@ -272,12 +285,12 @@ export default async function ControlTowerPage() {
                       {o.pickerEmploymentType && <div style={{ fontSize: 11, color: '#6B7280' }}>{o.pickerEmploymentType}</div>}
                     </td>
                     <td>{o.pieces.toLocaleString()}</td>
-                    <td>{o.waitMinutes} min</td>
+                    <td>{o.waitMinutes} นาที</td>
                     <td>
                       {o.timeAlert ? (
-                        <span className={`badge badge-${ALERT_BADGE_TONE[o.timeAlert]}`}>{o.timeAlert}</span>
+                        <span className={`badge badge-${ALERT_BADGE_TONE[o.timeAlert]}`}>{ALERT_TH[o.timeAlert] ?? o.timeAlert}</span>
                       ) : (
-                        <span className="badge badge-success">On track</span>
+                        <span className="badge badge-success">ตามกำหนด</span>
                       )}
                     </td>
                   </tr>
@@ -285,7 +298,7 @@ export default async function ControlTowerPage() {
                 {data.pendingVerification.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
-                      No orders waiting on Admin verification.
+                      ไม่มี Order ที่รอ Admin ยืนยัน
                     </td>
                   </tr>
                 )}

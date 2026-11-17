@@ -152,7 +152,7 @@ export function PackerProductivityTable({ packers, target }: { packers: PackerPr
           {pageRows.length === 0 && (
             <tr>
               <td colSpan={9} style={{ color: 'var(--color-text-secondary)' }}>
-                {packers.length ? 'ไม่พบพนักงานที่ค้นหา' : 'ไม่มีงานแพ็กที่ปิดในวันนี้ · No packing finished on this date.'}
+                {packers.length ? 'ไม่พบพนักงานที่ค้นหา' : 'ไม่มีงานแพ็กที่ปิดในวันนี้'}
               </td>
             </tr>
           )}

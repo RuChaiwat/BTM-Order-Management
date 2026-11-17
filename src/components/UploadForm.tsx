@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation'
 interface UploadFormProps {
   endpoint: string
   label: string
+  /** Thai name shown as the card subtitle. */
+  subtitle?: string
+  /** Short Thai note shown under the upload control (e.g. required columns). */
   hint: string
 }
 
@@ -33,7 +36,7 @@ type Phase = 'idle' | 'uploading' | 'processing' | 'done' | 'error'
  * — fetch() has no upload-progress event. Progress tracks the file transfer only; there's no
  * signal for server-side processing time after the file lands, so that phase shows as an
  * indeterminate "Processing…" state rather than a fake number. */
-export function UploadForm({ endpoint, label, hint }: UploadFormProps) {
+export function UploadForm({ endpoint, label, subtitle = 'นำเข้าข้อมูลจากไฟล์', hint }: UploadFormProps) {
   const router = useRouter()
   const [file, setFile] = useState<File | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
@@ -95,7 +98,7 @@ export function UploadForm({ endpoint, label, hint }: UploadFormProps) {
     <div className="card">
       <div className="card-title">{label}</div>
       <div className="card-subtitle" style={{ marginBottom: 14 }}>
-        {hint}
+        {subtitle}
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <input
@@ -114,6 +117,7 @@ export function UploadForm({ endpoint, label, hint }: UploadFormProps) {
           {busy ? 'Uploading…' : 'Upload'}
         </button>
       </div>
+      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>{hint}</div>
 
       {busy && (
         <div style={{ marginTop: 14 }}>

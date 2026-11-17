@@ -113,7 +113,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Orders with an identical item list are grouped automatically. This sets the minimum total pieces for that group to qualify as Priority 1 (highest priority).',
     descriptionTh: 'ออเดอร์ที่มีรายการสินค้าเหมือนกันทุกชิ้นจะถูกจัดกลุ่มอัตโนมัติ ค่านี้กำหนดจำนวนชิ้นรวมขั้นต่ำของกลุ่ม เพื่อจัดเป็น Priority 1 (สำคัญสูงสุด)',
     kind: 'integer',
-    unit: 'pieces',
+    unit: 'ชิ้น',
     min: 0,
   },
   {
@@ -136,7 +136,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Minimum total pieces for a Priority 2 group to be created.',
     descriptionTh: 'จำนวนชิ้นรวมขั้นต่ำของกลุ่ม เพื่อสร้างเป็น Priority 2',
     kind: 'integer',
-    unit: 'pieces',
+    unit: 'ชิ้น',
     min: 0,
   },
   {
@@ -159,7 +159,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Minimum total pieces for a Priority 3 group to be created.',
     descriptionTh: 'จำนวนชิ้นรวมขั้นต่ำของกลุ่ม เพื่อสร้างเป็น Priority 3',
     kind: 'integer',
-    unit: 'pieces',
+    unit: 'ชิ้น',
     min: 0,
   },
   {
@@ -182,7 +182,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Minimum total pieces for a Priority 4 group. Also used on the Matching Dashboard to flag unusually large ("oversized") orders.',
     descriptionTh: 'จำนวนชิ้นรวมขั้นต่ำของกลุ่ม Priority 4 และใช้เป็นเกณฑ์แจ้งเตือนออเดอร์ขนาดใหญ่ผิดปกติในหน้า Matching Dashboard ด้วย',
     kind: 'integer',
-    unit: 'pieces',
+    unit: 'ชิ้น',
     min: 0,
   },
   {
@@ -193,7 +193,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Minimum number of different stores that must be in a group before it can be consolidated into one batch.',
     descriptionTh: 'จำนวนร้านค้าขั้นต่ำที่ต้องอยู่ในกลุ่ม ก่อนจะรวมเป็น 1 Batch ได้',
     kind: 'integer',
-    unit: 'stores',
+    unit: 'ร้าน',
     min: 1,
   },
   {
@@ -204,7 +204,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Preferred number of stores per consolidated batch — a large group is split into batches of about this size.',
     descriptionTh: 'จำนวนร้านค้าต่อ Batch ที่ต้องการโดยประมาณ หากกลุ่มใหญ่เกินไปจะถูกแบ่งเป็นหลาย Batch ตามจำนวนนี้',
     kind: 'integer',
-    unit: 'stores',
+    unit: 'ร้าน',
     min: 1,
   },
   {
@@ -215,7 +215,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Maximum number of stores allowed in a single consolidated batch.',
     descriptionTh: 'จำนวนร้านค้าสูงสุดที่อนุญาตให้อยู่ใน 1 Batch',
     kind: 'integer',
-    unit: 'stores',
+    unit: 'ร้าน',
     min: 1,
   },
   {
@@ -226,7 +226,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Maximum number of orders allowed in a single consolidated batch. Leave blank for no limit.',
     descriptionTh: 'จำนวนออเดอร์สูงสุดที่อนุญาตให้อยู่ใน 1 Batch เว้นว่างไว้หากไม่ต้องการจำกัด',
     kind: 'nullable_integer',
-    unit: 'orders',
+    unit: 'order',
     min: 1,
   },
   {
@@ -237,7 +237,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Orders with more unique items (SKUs) than this are excluded from consolidation and picked individually instead.',
     descriptionTh: 'ออเดอร์ที่มีจำนวนรายการสินค้า (SKU) มากกว่าค่านี้ จะไม่ถูกนำไปรวม และจะถูกหยิบแยกเป็นออเดอร์เดี่ยวแทน',
     kind: 'integer',
-    unit: 'items',
+    unit: 'รายการ',
     min: 1,
   },
   {
@@ -248,7 +248,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Orders averaging at least this many pieces per item are marked Simple (green) on the Order Pool.',
     descriptionTh: 'ออเดอร์ที่มีจำนวนชิ้นเฉลี่ยต่อรายการสินค้าอย่างน้อยเท่านี้ จะถูกจัดเป็นออเดอร์ง่าย (สีเขียว) ในหน้า Order Pool',
     kind: 'integer',
-    unit: 'pcs/item',
+    unit: 'ชิ้น/รายการ',
     min: 0,
   },
   {
@@ -259,7 +259,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Orders averaging this many pieces per item or fewer are marked Complex (red) on the Order Pool.',
     descriptionTh: 'ออเดอร์ที่มีจำนวนชิ้นเฉลี่ยต่อรายการสินค้าเท่านี้หรือน้อยกว่า จะถูกจัดเป็นออเดอร์ซับซ้อน (สีแดง) ในหน้า Order Pool',
     kind: 'integer',
-    unit: 'pcs/item',
+    unit: 'ชิ้น/รายการ',
     min: 0,
   },
   {
@@ -270,7 +270,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'An order still being picked this long after assignment is flagged Warning on Pending Action Monitor, the Operations Dashboard, and Control Tower.',
     descriptionTh: 'ออเดอร์ที่ยังอยู่ระหว่าง Picking นานเกินเวลานี้นับจากมอบหมายงาน จะถูกตั้งค่าสถานะ Warning ในหน้า Pending Action Monitor, Operations Dashboard และ Control Tower',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
   },
   {
@@ -281,7 +281,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'An order still being picked this long after assignment is flagged Overdue.',
     descriptionTh: 'ออเดอร์ที่ยังอยู่ระหว่าง Picking นานเกินเวลานี้นับจากมอบหมายงาน จะถูกตั้งค่าสถานะ Overdue',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
   },
   {
@@ -292,7 +292,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'An order still being picked this long after assignment is flagged Critical -- the highest-priority alert.',
     descriptionTh: 'ออเดอร์ที่ยังอยู่ระหว่าง Picking นานเกินเวลานี้นับจากมอบหมายงาน จะถูกตั้งค่าสถานะ Critical ซึ่งเป็นระดับแจ้งเตือนสูงสุด',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
   },
   {
@@ -303,7 +303,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'An order still waiting on Admin Verification this long after the picker submitted it is flagged Warning.',
     descriptionTh: 'ออเดอร์ที่รอ Admin ตรวจสอบนานเกินเวลานี้นับจาก Picker ส่งงาน จะถูกตั้งค่าสถานะ Warning',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
   },
   {
@@ -314,7 +314,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'An order still waiting on Admin Verification this long after the picker submitted it is flagged Overdue.',
     descriptionTh: 'ออเดอร์ที่รอ Admin ตรวจสอบนานเกินเวลานี้นับจาก Picker ส่งงาน จะถูกตั้งค่าสถานะ Overdue',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
   },
   {
@@ -325,7 +325,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'An order still waiting on Admin Verification this long after the picker submitted it is flagged Critical -- the highest-priority alert.',
     descriptionTh: 'ออเดอร์ที่รอ Admin ตรวจสอบนานเกินเวลานี้นับจาก Picker ส่งงาน จะถูกตั้งค่าสถานะ Critical ซึ่งเป็นระดับแจ้งเตือนสูงสุด',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
   },
   {
@@ -336,7 +336,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Target picking speed used to rate picker productivity (Picker Management) and to rank Top/Bottom pickers on the Productivity page.',
     descriptionTh: 'เป้าหมายความเร็วในการหยิบสินค้า ใช้ให้คะแนนประสิทธิผลพนักงาน (หน้าจัดการพนักงานหยิบสินค้า) และจัดอันดับ Top/Bottom Pickers ในหน้า Productivity',
     kind: 'integer',
-    unit: 'pcs/hr',
+    unit: 'ชิ้น/ชม.',
     min: 0,
     step: 50,
   },
@@ -349,7 +349,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
       'Closed/cancelled orders older than this many days (and everything recorded against them) can be permanently purged — only after a weekly export has already covered that period (Housekeeping, below).',
     descriptionTh: 'ออเดอร์ที่ปิดงาน/ยกเลิกแล้ว ซึ่งเก่ากว่าจำนวนวันนี้ (และข้อมูลที่บันทึกไว้กับออเดอร์นั้น) จะถูกลบถาวรได้ — ก็ต่อเมื่อมี Weekly Export ที่ครอบคลุมช่วงเวลานั้นแล้วเท่านั้น (ดู Housekeeping ด้านล่าง)',
     kind: 'integer',
-    unit: 'days',
+    unit: 'วัน',
     min: 1,
   },
   {
@@ -375,7 +375,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'How often an open Operations Dashboard page re-loads its data by itself (no full page reload; selections and filters stay). Applies to every user.',
     descriptionTh: 'หน้า Operations Dashboard ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ไม่โหลดหน้าใหม่ทั้งหน้า สิ่งที่เลือกไว้ไม่หาย) ใช้กับผู้ใช้ทุกคน',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
     max: 60,
     defaultValue: '5',
@@ -388,7 +388,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'How often an open Zone Dashboard page re-loads its data by itself (no full page reload; selections and filters stay). Applies to every user.',
     descriptionTh: 'หน้า Zone Dashboard ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ไม่โหลดหน้าใหม่ทั้งหน้า สิ่งที่เลือกไว้ไม่หาย) ใช้กับผู้ใช้ทุกคน',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
     max: 60,
     defaultValue: '5',
@@ -401,7 +401,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'How often an open Matching Dashboard page re-loads its data by itself (no full page reload; selections and filters stay). Applies to every user.',
     descriptionTh: 'หน้า Matching Dashboard ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ไม่โหลดหน้าใหม่ทั้งหน้า สิ่งที่เลือกไว้ไม่หาย) ใช้กับผู้ใช้ทุกคน',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
     max: 60,
     defaultValue: '5',
@@ -414,7 +414,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'How often an open Control Tower page re-loads its data by itself (no full page reload; selections and filters stay). Applies to every user.',
     descriptionTh: 'หน้า Control Tower ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ไม่โหลดหน้าใหม่ทั้งหน้า สิ่งที่เลือกไว้ไม่หาย) ใช้กับผู้ใช้ทุกคน',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
     max: 60,
     defaultValue: '5',
@@ -428,7 +428,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
       'On the Pack Handheld, an order can only be finished (Completed or Completed with Short) once at least this long has passed since its start scan -- stops a packer from scanning start and finish back to back.',
     descriptionTh: 'บนหน้า Handheld แพ็ก จะปิดงาน (Completed หรือ Completed with Short) ได้ก็ต่อเมื่อผ่านเวลานี้แล้วนับจากการ scan เริ่ม — กันการ scan เปิดแล้วปิดทันที',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 0,
     max: 120,
     defaultValue: String(5),
@@ -443,7 +443,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionTh:
       'หน้า Pick หรือ Pack บนเครื่อง Handheld ที่ไม่มีการแตะหรือ scan นานเท่านี้ จะกลับไปหน้าเมนูเอง คนที่มารับเครื่องต่อจะเริ่มจากเมนูและ scan รหัสของตัวเอง — ไม่กลับระหว่างกำลังจับเวลาแพ็ก · 0 = ปิด (ข้ามวันก็กลับเมนูเช่นกัน)',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 0,
     max: 480,
     defaultValue: String(HANDHELD_IDLE_DEFAULT),
@@ -456,7 +456,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Green below this, yellow from this. Used on Packing Dashboard, Live Packing Monitor and the Pack Handheld timer.',
     descriptionTh: 'ต่ำกว่าค่านี้ = สีเขียว · ตั้งแต่ค่านี้ = สีเหลือง · ใช้กับ Packing Dashboard, Live Packing Monitor และแถบเวลาบน Handheld',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
     max: 480,
     defaultValue: String(PACKING_LONG_SESSION_DEFAULT),
@@ -469,7 +469,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'Red from this. Must be more than the yellow threshold.',
     descriptionTh: 'ตั้งแต่ค่านี้ = สีแดง · ต้องมากกว่าค่าสีเหลือง',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 2,
     max: 1440,
     defaultValue: String(PACKING_RED_DEFAULT),
@@ -482,7 +482,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'One target for every packer. Packing Productivity compares each packer against it (pieces packed per hour of packing time; pieces reported as a problem are not counted).',
     descriptionTh: 'เป้าหมายเดียวใช้กับพนักงานแพ็กทุกคน หน้า Packing Productivity เทียบผลงานแต่ละคนกับค่านี้ (ชิ้นต่อชั่วโมงของเวลาแพ็กจริง ไม่นับชิ้นที่แจ้งปัญหา)',
     kind: 'integer',
-    unit: 'pcs/hr',
+    unit: 'ชิ้น/ชม.',
     min: 0,
     step: 10,
     defaultValue: String(100),
@@ -495,7 +495,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'How often an open Packing Dashboard page re-loads its data by itself. Applies to every user.',
     descriptionTh: 'หน้า Packing Dashboard ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที ใช้กับผู้ใช้ทุกคน',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
     max: 60,
     defaultValue: '5',
@@ -508,7 +508,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     descriptionEn: 'How often an open Live Packing Monitor re-loads who is packing what (the elapsed timers tick every second regardless). Applies to every user.',
     descriptionTh: 'หน้า Live Packing Monitor ที่เปิดค้างไว้จะดึงข้อมูลใหม่เองทุก ๆ กี่นาที (ตัวนับเวลาเดินทุกวินาทีอยู่แล้ว) ใช้กับผู้ใช้ทุกคน',
     kind: 'integer',
-    unit: 'min',
+    unit: 'นาที',
     min: 1,
     max: 60,
     defaultValue: '1',
@@ -542,6 +542,6 @@ export function fromDisplayValue(kind: ConfigFieldKind, display: string): { ok: 
  * number its display value plus unit. A choice with no stored row yet reads as its default. */
 export function formatConfigValue(field: ConfigFieldMeta, raw: unknown): string {
   const v = toDisplayValue(field.kind, raw) || field.defaultValue || ''
-  if (field.kind === 'choice') return field.options?.find((o) => o.value === v)?.labelEn ?? v
+  if (field.kind === 'choice') return field.options?.find((o) => o.value === v)?.labelTh ?? v
   return `${v} ${field.unit}`.trim()
 }

@@ -148,7 +148,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, color: PRIORITY_COLOR[p.priority] }}>{p.priority}</span>
                     <span>
-                      {p.orders} orders · {p.pieces.toLocaleString()} pcs · {p.batches} batch(es) ({pct}%)
+                      {p.orders} order · {p.pieces.toLocaleString()} ชิ้น · {p.batches} batch ({pct}%)
                     </span>
                   </div>
                   <div style={{ height: 8, borderRadius: 4, background: '#F3F4F6', overflow: 'hidden' }}>
@@ -158,8 +158,8 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
               )
             })}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, paddingTop: 4, borderTop: '1px solid var(--color-border)' }}>
-              <span style={{ color: '#6B7280' }}>Single Order (no group)</span>
-              <span>{data.kpis.singleOrders} orders</span>
+              <span style={{ color: '#6B7280' }}>Order เดี่ยว (ไม่จับกลุ่ม)</span>
+              <span>{data.kpis.singleOrders} order</span>
             </div>
           </div>
         </div>
@@ -167,7 +167,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
         <div className="card">
           <div className="card-title">Order Distribution by Zone</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            กระจายออเดอร์ตามโซน (ชิ้น) · matched orders only · zones an order touches, don&apos;t sum across zones
+            กระจายออเดอร์ตามโซน (ชิ้น)
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {data.zoneDistribution.map((z) => (
@@ -176,11 +176,16 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
                 <div style={{ flex: 1, height: 16, borderRadius: 4, background: '#F3F4F6', overflow: 'hidden' }}>
                   <span style={{ display: 'block', height: '100%', width: `${(z.pieces / maxZonePieces) * 100}%`, background: '#2563EB' }} />
                 </div>
-                <span style={{ width: 70, textAlign: 'right' }}>{z.pieces.toLocaleString()} pcs</span>
+                <span style={{ width: 70, textAlign: 'right' }}>{z.pieces.toLocaleString()} ชิ้น</span>
               </div>
             ))}
-            {data.zoneDistribution.length === 0 && <span style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>No order lines for this date yet.</span>}
+            {data.zoneDistribution.length === 0 && <span style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>ยังไม่มีรายการสินค้าของวันที่นี้</span>}
           </div>
+          {data.zoneDistribution.length > 0 && (
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              นับเฉพาะ order ที่จับคู่แล้ว · order ที่อยู่หลาย Zone จะนับในทุก Zone จึงไม่ควรรวมยอดข้าม Zone
+            </div>
+          )}
         </div>
       </div>
 
@@ -193,7 +198,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
         <div className="card">
           <div className="card-header" style={{ marginBottom: 10 }}>
             <span className="card-title">Top Batches</span>
-            <span className="card-subtitle">Batch ที่มีจำนวนชิ้นมากที่สุด · ranked by pieces</span>
+            <span className="card-subtitle">Batch ที่มีจำนวนชิ้นมากที่สุด</span>
             <Link href="/matching-analysis" className="link" style={{ marginLeft: 'auto', fontSize: 12.5 }}>
               View all →
             </Link>
@@ -238,7 +243,7 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
               {data.topBatches.length === 0 && (
                 <tr>
                   <td colSpan={7} style={{ color: 'var(--color-text-secondary)' }}>
-                    No batches for {formatDate(data.orderDate)} yet — run matching in Matching Analysis &amp; Batch Review.
+                    ยังไม่มี Batch ของวันที่ {formatDate(data.orderDate)} · สั่งจับคู่ได้ที่หน้า Matching Analysis &amp; Batch Review
                   </td>
                 </tr>
               )}
@@ -252,10 +257,10 @@ export function MatchingDashboardBoard({ data }: { data: OverviewData }) {
             <span className="card-subtitle">รายการที่ต้องดำเนินการ</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5 }}>
-            {data.actionRequired.awaitingApproval > 0 && <ActionRow color="#F59E0B" text={`${data.actionRequired.awaitingApproval} batch(es) awaiting approval`} />}
-            {data.actionRequired.lowMatchRateBatches > 0 && <ActionRow color="#DC2626" text={`${data.actionRequired.lowMatchRateBatches} batch(es) with match rate < 50%`} />}
-            {data.actionRequired.oversizedSingleOrders > 0 && <ActionRow color="#EA580C" text={`${data.actionRequired.oversizedSingleOrders} single order(s) over the size threshold`} />}
-            {!hasActions && <span style={{ color: 'var(--color-text-secondary)' }}>Nothing needs attention for {formatDate(data.orderDate)}.</span>}
+            {data.actionRequired.awaitingApproval > 0 && <ActionRow color="#F59E0B" text={`${data.actionRequired.awaitingApproval} batch รออนุมัติ`} />}
+            {data.actionRequired.lowMatchRateBatches > 0 && <ActionRow color="#DC2626" text={`${data.actionRequired.lowMatchRateBatches} batch จับคู่ได้ต่ำกว่า 50%`} />}
+            {data.actionRequired.oversizedSingleOrders > 0 && <ActionRow color="#EA580C" text={`${data.actionRequired.oversizedSingleOrders} order เดี่ยวมีขนาดเกินเกณฑ์`} />}
+            {!hasActions && <span style={{ color: 'var(--color-text-secondary)' }}>ไม่มีรายการที่ต้องดำเนินการของวันที่ {formatDate(data.orderDate)}</span>}
           </div>
         </div>
       </div>

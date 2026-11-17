@@ -25,7 +25,7 @@ type Filter = 'all' | PackTimeBand | 'idle' | 'issue'
 function IssueMark() {
   return (
     <span
-      title="มีการแจ้งปัญหาที่ยังไม่ปิด · Open pack issue"
+      title="มีการแจ้งปัญหาที่ยังไม่ปิด"
       style={{ position: 'absolute', top: 10, right: 4, width: 20, height: 20, borderRadius: '50%', background: '#DC2626', color: '#fff', fontSize: 12, fontWeight: 700, lineHeight: '20px', textAlign: 'center', boxShadow: '0 0 0 2px #fff' }}
     >
       !
@@ -117,8 +117,7 @@ export function LivePackMonitor({ live, idleStations, bands, issueStations, canC
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
           <span className="card-title">Pack stations</span>
           <span className="card-subtitle">
-            กำลังแพ็ก {(tiles.length - counts.idle).toLocaleString()} (Station) · ว่าง {counts.idle.toLocaleString()} (Station) · เรียงตามรหัส Station แถวละ {PER_ROW}
-            {canCancel ? ' · กดที่กล่องเพื่อดูรายละเอียด / ยกเลิกงาน' : ''}
+            แผนผัง Pack Station · กำลังแพ็ก {(tiles.length - counts.idle).toLocaleString()} Station · ว่าง {counts.idle.toLocaleString()} Station
           </span>
         </div>
 
@@ -190,6 +189,7 @@ export function LivePackMonitor({ live, idleStations, bands, issueStations, canC
           })}
           {tiles.length === 0 && <div style={{ gridColumn: '1 / -1', color: 'var(--color-text-secondary)', fontSize: 13 }}>ยังไม่มี Pack Station ที่ Active · ตั้งค่าได้ที่ Pack Settings</div>}
         </div>
+        {canCancel && tiles.length > 0 && <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>กดที่กล่องเพื่อดูรายละเอียด / ยกเลิกงาน</div>}
       </div>
 
       {selected && (

@@ -88,13 +88,13 @@ export function LocationTable({ locations }: { locations: Location[] }) {
               <td>{l.level}</td>
               <td>{l.block}</td>
               <td>{l.pick_sequence}</td>
-              <td>{l.active ? <span className="badge badge-success">Active</span> : <span className="badge badge-neutral">Inactive</span>}</td>
+              <td>{l.active ? <span className="badge badge-success">ใช้งาน</span> : <span className="badge badge-neutral">ปิดใช้งาน</span>}</td>
             </tr>
           ))}
           {locations.length === 0 && (
             <tr>
               <td colSpan={10} style={{ color: 'var(--color-text-secondary)' }}>
-                No locations match — try a different search, or none imported yet.
+                ไม่พบตำแหน่งจัดเก็บ — ลองค้นหาใหม่ หรือยังไม่ได้ Import ข้อมูล
               </td>
             </tr>
           )}
@@ -125,7 +125,7 @@ export function LocationTable({ locations }: { locations: Location[] }) {
           </div>
 
           <div style={{ marginBottom: 14 }}>
-            <span className={`badge badge-${selected.active ? 'success' : 'neutral'}`}>{selected.active ? 'Active' : 'Inactive'}</span>
+            <span className={`badge badge-${selected.active ? 'success' : 'neutral'}`}>{selected.active ? 'ใช้งาน' : 'ปิดใช้งาน'}</span>
           </div>
 
           {error && <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
@@ -134,7 +134,7 @@ export function LocationTable({ locations }: { locations: Location[] }) {
             {busy ? 'Saving…' : selected.active ? 'Deactivate this Location' : 'Activate this Location'}
           </button>
           <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-secondary)' }}>
-            Inactive locations are skipped by imports (Invalid Bin Code) and excluded from Zone/Pick Sequence lookups.
+            ตำแหน่งที่ปิดใช้งานจะถูกข้ามตอน Import (Bin Code ไม่ถูกต้อง) และไม่ถูกนำไปหา Zone / Pick Sequence
           </div>
         </div>
       )}

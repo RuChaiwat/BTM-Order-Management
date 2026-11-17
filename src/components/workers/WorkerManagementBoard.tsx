@@ -10,6 +10,7 @@ import { NAV_GROUPS } from '../../data/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { USER_ID_MAX_LENGTH } from '../../lib/authEmail'
 import { formatDateTime } from '../../lib/formatDate'
+import { actionMeta } from '../../lib/auditCatalog'
 
 interface WorkerRow {
   user_id: string
@@ -55,7 +56,7 @@ function RoleScopeReference() {
   return (
     <div className="card">
       <div className="card-title">Role &amp; Scope</div>
-      <div className="card-subtitle" style={{ marginBottom: 12 }}>คำอธิบายสิทธิ์การใช้งานของแต่ละ Role — Scope คือหน้าจอที่เข้าได้/เข้าไม่ได้ (คนละเรื่องกับ Scope ของโซนในตาราง User List ด้านบน)</div>
+      <div className="card-subtitle" style={{ marginBottom: 12 }}>สิทธิ์การใช้งานของแต่ละ Role</div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
           <col style={{ width: '24%' }} />
@@ -91,6 +92,7 @@ function RoleScopeReference() {
           })}
         </tbody>
       </table>
+      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>Scope คือหน้าจอที่เข้าได้ / เข้าไม่ได้ (คนละเรื่องกับโซนที่รับผิดชอบ)</div>
     </div>
   )
 }
@@ -190,7 +192,7 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span className="card-title">User List</span>
-          <span className="card-subtitle">{users.length} users · {warehouseCode}</span>
+          <span className="card-subtitle">รายชื่อผู้ใช้งาน · {users.length} คน · {warehouseCode}</span>
           <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setShowAdd(true)}>
             + Add user
           </button>
@@ -221,13 +223,13 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
                 <td>
                   <span className="badge badge-info">{ROLE_LABELS[u.role] ?? u.role}</span>
                 </td>
-                <td>{u.active ? <span style={{ color: '#16A34A' }}>● Active</span> : <span style={{ color: '#9CA3AF' }}>● Inactive</span>}</td>
+                <td>{u.active ? <span style={{ color: '#16A34A' }}>● ใช้งาน</span> : <span style={{ color: '#9CA3AF' }}>● ปิดใช้งาน</span>}</td>
               </tr>
             ))}
             {pageRows.length === 0 && (
               <tr>
                 <td colSpan={4} style={{ color: 'var(--color-text-secondary)' }}>
-                  No users yet — add one to get started.
+                  ยังไม่มีผู้ใช้งาน — กด + Add user เพื่อเพิ่ม
                 </td>
               </tr>
             )}
@@ -265,7 +267,7 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
               </div>
             ) : (
               <div style={{ marginBottom: 16, fontSize: 11.5, color: 'var(--color-text-secondary)' }}>
-                Only a System Admin can edit or deactivate another System Admin account.
+                เฉพาะ System Admin เท่านั้นที่แก้ไขหรือปิดใช้งานบัญชี System Admin ได้
               </div>
             )}
 
@@ -273,14 +275,14 @@ export function WorkerManagementBoard({ users, warehouseCode, currentUserRole }:
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               {auditTrail.map((a) => (
                 <div key={a.id}>
-                  {formatDateTime(a.created_at)} · {a.action}
+                  {formatDateTime(a.created_at)} · {actionMeta(a.action).labelTh}
                 </div>
               ))}
-              {auditTrail.length === 0 && <span style={{ color: '#6B7280' }}>No recorded actions.</span>}
+              {auditTrail.length === 0 && <span style={{ color: '#6B7280' }}>ยังไม่มีประวัติ</span>}
             </div>
           </>
         ) : (
-          <span style={{ color: '#6B7280' }}>No users yet — add one to get started.</span>
+          <span style={{ color: '#6B7280' }}>ยังไม่มีผู้ใช้งาน — กด + Add user เพื่อเพิ่ม</span>
         )}
       </div>
     </div>
@@ -325,11 +327,11 @@ function UserModal({
     setError(null)
     const missing: string[] = []
     if (!form.user_id) missing.push('User ID')
-    if (!form.name_en) missing.push('Name (EN)')
+    if (!form.name_en) missing.push('ชื่อ (อังกฤษ)')
     if (!form.role) missing.push('Role')
-    if (!isEdit && !form.password) missing.push('Temporary password')
+    if (!isEdit && !form.password) missing.push('รหัสผ่านชั่วคราว')
     if (missing.length > 0) {
-      setError(`กรุณากรอกข้อมูลที่จำเป็น — Required: ${missing.join(', ')}`)
+      setError(`กรุณากรอกข้อมูลที่จำเป็น: ${missing.join(', ')}`)
       return
     }
 
@@ -354,7 +356,7 @@ function UserModal({
       <div style={{ padding: '16px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="field">
           <label className="field-label">
-            User ID <span className="field-label-required">*</span> {!isEdit && <span className="field-hint">used to sign in — max {USER_ID_MAX_LENGTH} characters</span>}
+            User ID <span className="field-label-required">*</span> {!isEdit && <span className="field-hint">ใช้เข้าสู่ระบบ · ไม่เกิน {USER_ID_MAX_LENGTH} ตัวอักษร</span>}
           </label>
           <input
             className="field-input"
@@ -362,14 +364,14 @@ function UserModal({
             maxLength={USER_ID_MAX_LENGTH}
             disabled={isEdit}
             onChange={(e) => setForm({ ...form, user_id: e.target.value.toUpperCase() })}
-            placeholder="e.g. U0005"
+            placeholder="เช่น U0005"
             style={{ border: '1px solid var(--color-border)' }}
             autoFocus={!isEdit}
           />
         </div>
         <div className="field">
           <label className="field-label">
-            Name (EN) <span className="field-label-required">*</span>
+            ชื่อ (อังกฤษ) <span className="field-label-required">*</span>
           </label>
           <input
             className="field-input"
@@ -381,20 +383,20 @@ function UserModal({
         </div>
         <div className="field">
           <label className="field-label">
-            Name (TH) <span className="field-hint">optional</span>
+            ชื่อ (ไทย) <span className="field-hint">ไม่บังคับ</span>
           </label>
           <input className="field-input" value={form.name_th} onChange={(e) => setForm({ ...form, name_th: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         <div className="field">
           <label className="field-label">
-            Email <span className="field-hint">optional — contact only, not used to sign in</span>
+            อีเมล <span className="field-hint">ไม่บังคับ · ใช้ติดต่อเท่านั้น ไม่ใช้เข้าสู่ระบบ</span>
           </label>
           <input className="field-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
         </div>
         {!isEdit && (
           <div className="field">
             <label className="field-label">
-              Temporary password <span className="field-label-required">*</span>
+              รหัสผ่านชั่วคราว <span className="field-label-required">*</span>
             </label>
             <input className="field-input" type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} style={{ border: '1px solid var(--color-border)' }} />
           </div>

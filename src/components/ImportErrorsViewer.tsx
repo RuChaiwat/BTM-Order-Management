@@ -39,15 +39,15 @@ export function ImportErrorsViewer({ importId, errorCount }: { importId: string;
       </button>
       {open && (
         <div style={{ marginTop: 8, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 8, minWidth: 320 }}>
-          {loading && <div style={{ padding: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>Loading…</div>}
-          {!loading && errors && errors.length === 0 && <div style={{ padding: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>No error detail found.</div>}
+          {loading && <div style={{ padding: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>กำลังโหลด…</div>}
+          {!loading && errors && errors.length === 0 && <div style={{ padding: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>ไม่พบรายละเอียดข้อผิดพลาด</div>}
           {!loading &&
             errors?.map((e) => (
               <div key={e.error_id} style={{ padding: '6px 10px', fontSize: 11.5, borderBottom: '1px solid var(--color-border)' }}>
                 <span className={`badge badge-${e.severity === 'blocking' ? 'danger' : 'warning'}`} style={{ marginRight: 6 }}>
                   {e.severity === 'blocking' ? 'ต้องแก้ไข' : 'คำเตือน'}
                 </span>
-                Row {e.row_number}: {e.error_reason}
+                แถว {e.row_number}: {e.error_reason}
               </div>
             ))}
         </div>

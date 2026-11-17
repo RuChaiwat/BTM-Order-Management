@@ -19,7 +19,7 @@ export default async function PackSettingsPage() {
 
   return (
     <>
-      <TopBar title="Pack Settings" subtitle="ตั้งค่างานแพ็ก · Pack Station และรายการปัญหา" />
+      <TopBar title="Pack Settings" subtitle="ตั้งค่างานแพ็ก" />
       <PackSettingsBoard stations={stations ?? []} reasons={reasons ?? []} />
     </>
   )

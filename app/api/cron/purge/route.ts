@@ -56,7 +56,7 @@ export async function GET(request: Request) {
       result: 'failed',
       executed_by: 'system',
     })
-    return NextResponse.json({ status: 'blocked', reason: `No successful weekly export covers the retention cutoff (${cutoffDateStr}) — purge safety gate not satisfied (§20.2)` }, { status: 409 })
+    return NextResponse.json({ status: 'blocked', reason: `ยังไม่มี Export รายสัปดาห์ที่สำเร็จครอบคลุมวันตัดข้อมูล (${cutoffDateStr}) จึงยังลบข้อมูลไม่ได้` }, { status: 409 })
   }
 
   const purgeCounts: Record<string, number> = {}

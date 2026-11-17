@@ -24,7 +24,7 @@ export default async function HandheldPickCompletionPage() {
   return (
     <div className="app-shell">
       <div className="app-main">
-        <TopBar title="Pick Completion" subtitle="ปิดงานหยิบของฉัน · สแกนรหัส Picker ของตัวเอง">
+        <TopBar title="Pick Completion" subtitle="ปิดงานหยิบของฉัน">
           <HandheldNav idleMinutes={idleMinutes} />
         </TopBar>
         <PickCompletionBoard apiBase="/api/handheld/picker-completions" showReprint={false} showUnassign={false} />

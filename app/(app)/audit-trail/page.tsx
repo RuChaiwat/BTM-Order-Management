@@ -24,7 +24,7 @@ export default async function AuditTrailPage({ searchParams }: { searchParams: {
 
   return (
     <>
-      <TopBar title="Audit Trail" subtitle={`ประวัติการตรวจสอบ (§23) · ${formatDate(date)} · ${rows.length} action(s)`}>
+      <TopBar title="Audit Trail" subtitle={`ประวัติการตรวจสอบ · ${formatDate(date)} · ${rows.length} รายการ`}>
         <AuditTrailDateFilter date={date} />
       </TopBar>
       <div className="page-body">
@@ -35,9 +35,12 @@ export default async function AuditTrailPage({ searchParams }: { searchParams: {
         <div className="card" style={{ flex: 1 }}>
           <div className="card-title">Audit Trail</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
-            Immutable — System Admin / Warehouse Manager only. Purged after the configured retention window (Configuration page), same as other transactional data.
+            ประวัติการเปลี่ยนแปลงในระบบ
           </div>
           <AuditTrailBoard rows={rows} />
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+            แก้ไขไม่ได้ · ดูได้เฉพาะ System Admin / Warehouse Manager · ลบอัตโนมัติเมื่อครบระยะเวลาเก็บข้อมูล (ปรับได้ที่หน้า Configuration)
+          </div>
         </div>
       </div>
     </>

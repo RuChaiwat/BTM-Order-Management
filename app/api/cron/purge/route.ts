@@ -20,7 +20,8 @@ import { getSessionUser } from '@/lib/auth'
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
-  const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`
+  // Public path (middleware): only a real, non-empty CRON_SECRET counts -- never "Bearer undefined".
+  const isCron = !!process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`
   if (!isCron) {
     const user = await getSessionUser()
     if (!user || user.role !== 'system_admin') {

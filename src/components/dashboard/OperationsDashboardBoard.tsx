@@ -371,11 +371,7 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
         <div className="card">
           <div className="card-header" style={{ marginBottom: 10 }}>
             <span className="card-title">Action required · Pick</span>
-            {p.access.backlog && (
-              <Link href="/backlog" className="card-link" style={{ fontSize: 12 }}>
-                Pending Actions Monitor →
-              </Link>
-            )}
+            <span className="card-subtitle">สีของกล่องตาม order ที่รอนานที่สุดในกล่อง</span>
           </div>
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
             <ActionBox
@@ -418,11 +414,11 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
               { color: C.red, label: `นานเกินไป (≥ ${R} นาที)` },
             ]}
           />
-          <div style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-secondary)' }}>สีของกล่องตาม order ที่รอนานที่สุดในกล่อง</div>
         </div>
         <div className="card">
           <div className="card-header" style={{ marginBottom: 10 }}>
             <span className="card-title">Action required · Pack</span>
+            <span className="card-subtitle">สีของกล่องตามรายการที่รอนานที่สุดในกล่อง</span>
           </div>
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
             <ActionBox
@@ -448,7 +444,6 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
           </div>
           <Legend
             style={{ marginTop: 10 }}
-            note="สีของกล่องตามรายการที่รอนานที่สุดในกล่อง ·"
             items={[
               { color: C.green, label: `ปกติ (< ${Y} นาที)` },
               { color: C.amber, label: `เริ่มนาน (${Y}–${R - 1} นาที)` },

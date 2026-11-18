@@ -310,7 +310,7 @@ export function PackHandheldBoard() {
         result === 'completed'
           ? `✓ ${order?.order_no} แพ็กเสร็จ (${mmss(elapsedSec)})`
           : result === 'completed_short'
-            ? `✓ ${order?.order_no} ปิดงานแบบ Completed with Short (${mmss(elapsedSec)}) · Admin จะระบุรายการที่ขาด`
+            ? `✓ ${order?.order_no} ปิดงานแบบ Completed with Short (${mmss(elapsedSec)}) · Admin จะระบุรายการที่ไม่ครบ`
             : `⚠ ${order?.order_no} แจ้งปัญหาให้ Supervisor แล้ว (${issues.length} รายการ)`
       resetAll(doneMsg)
     } catch (err) {

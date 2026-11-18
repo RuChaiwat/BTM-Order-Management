@@ -260,7 +260,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
                     return (
                       <tr key={l.line_id} className={st.isShort ? 'row-flag' : undefined}>
                         <td>
-                          <button onClick={() => toggleShort(l)} className={`checkbox-box${st.isShort ? ' checked' : ''}`} style={{ border: st.isShort ? 'none' : undefined, cursor: 'pointer', padding: 0 }} title="แพ็กขาด?">
+                          <button onClick={() => toggleShort(l)} className={`checkbox-box${st.isShort ? ' checked' : ''}`} style={{ border: st.isShort ? 'none' : undefined, cursor: 'pointer', padding: 0 }} title="แพ็กไม่ครบ?">
                             {st.isShort ? '✓' : ''}
                           </button>
                         </td>
@@ -297,7 +297,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
                   )}
                 </tbody>
               </table>
-              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>ติ๊กรายการที่แพ็กขาด แล้วระบุเหตุผลและจำนวนที่แพ็กจริง · ตรวจสอบกับระบบ WMS</div>
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>ติ๊กรายการที่แพ็กไม่ครบ แล้วระบุเหตุผลและจำนวนที่แพ็กจริง · ตรวจสอบกับระบบ WMS</div>
             </>
           ) : (
             <span style={{ color: 'var(--color-text-secondary)' }}>เลือก order จากคิวด้านซ้าย</span>
@@ -321,14 +321,14 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
                 {tile('รอยืนยัน', `${selected.waitMinutes.toLocaleString()} นาที`)}
               </div>
               <div style={{ marginBottom: 12 }}>
-                <span className={`badge badge-${shortLines.length > 0 ? 'warning' : 'success'}`}>{shortLines.length > 0 ? `แพ็กขาด ${shortLines.length} รายการ` : 'แพ็กครบ 100%'}</span>
+                <span className={`badge badge-${shortLines.length > 0 ? 'warning' : 'success'}`}>{shortLines.length > 0 ? `แพ็กไม่ครบ ${shortLines.length} รายการ` : 'แพ็กครบ 100%'}</span>
               </div>
               {overridingShort && (
                 <div style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--color-warning-dark)', background: 'var(--color-warning-bg)', borderRadius: 8, padding: '8px 10px' }}>
-                  พนักงานแจ้ง <b>Completed with Short</b> — ถ้าตรวจใน WMS แล้วครบ กดยืนยันเต็มจำนวนได้ ถ้าขาดจริง ให้ติ๊กรายการที่ขาดตรงกลาง
+                  พนักงานแจ้ง <b>Completed with Short</b> — ถ้าตรวจใน WMS แล้วครบ กดยืนยันเต็มจำนวนได้ ถ้าไม่ครบจริง ให้ติ๊กรายการที่ไม่ครบตรงกลาง
                 </div>
               )}
-              {lineErrors.length > 0 && <div style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--color-danger)' }}>รายการที่ติ๊กขาด ต้องเลือกเหตุผล และจำนวนต้องน้อยกว่าจำนวนที่ต้องแพ็ก</div>}
+              {lineErrors.length > 0 && <div style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--color-danger)' }}>รายการที่ติ๊กว่าไม่ครบ ต้องเลือกเหตุผล และจำนวนต้องน้อยกว่าจำนวนที่ต้องแพ็ก</div>}
               <button
                 className="btn btn-success btn-block"
                 disabled={working || !lines || lines.length === 0 || lineErrors.length > 0}
@@ -352,7 +352,7 @@ export function PackVerifyBoard({ queue }: { queue: PackVerifyQueueItem[] }) {
           <div className="modal-body">
             {shortLines.length > 0 ? (
               <>
-                บันทึกว่าแพ็กขาด <strong>{shortLines.length} รายการ</strong> รวม <strong>{(totalExpected - totalPacked).toLocaleString()} ชิ้น</strong> — ตรวจให้ตรงกับที่ Confirm ใน WMS · ย้อนกลับไม่ได้
+                บันทึกว่าแพ็กไม่ครบ <strong>{shortLines.length} รายการ</strong> รวม <strong>{(totalExpected - totalPacked).toLocaleString()} ชิ้น</strong> — ตรวจให้ตรงกับที่ Confirm ใน WMS · ย้อนกลับไม่ได้
               </>
             ) : overridingShort ? (
               <>

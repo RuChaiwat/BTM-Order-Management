@@ -50,7 +50,7 @@ export function ReasonMasterManager({ reasons }: { reasons: ReasonRow[] }) {
     <div className="card">
       <div className="card-title">Reason Master</div>
       <div className="card-subtitle" style={{ marginBottom: 12 }}>
-        สาเหตุการหยิบขาด + ยกเลิกออเดอร์
+        สาเหตุการหยิบไม่ครบ + ยกเลิกออเดอร์
       </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
@@ -73,7 +73,7 @@ export function ReasonMasterManager({ reasons }: { reasons: ReasonRow[] }) {
           {reasons.map((r) => (
             <tr key={r.reason_code}>
               <td style={{ fontWeight: 700 }}>{r.reason_code}</td>
-              <td>{r.reason_type === 'short_pick' ? 'หยิบขาด' : r.reason_type === 'cancel' ? 'ยกเลิก' : r.reason_type}</td>
+              <td>{r.reason_type === 'short_pick' ? 'หยิบไม่ครบ' : r.reason_type === 'cancel' ? 'ยกเลิก' : r.reason_type}</td>
               <td style={{ overflowWrap: 'break-word' }}>
                 {r.label_en}
                 {r.label_th && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{r.label_th}</div>}
@@ -97,7 +97,7 @@ export function ReasonMasterManager({ reasons }: { reasons: ReasonRow[] }) {
         <div className="field">
           <label className="field-label">ประเภท</label>
           <select className="field-input" value={type} onChange={(e) => setType(e.target.value as 'short_pick' | 'cancel')} style={{ border: '1px solid var(--color-border)' }}>
-            <option value="short_pick">หยิบขาด</option>
+            <option value="short_pick">หยิบไม่ครบ</option>
             <option value="cancel">ยกเลิก</option>
           </select>
         </div>

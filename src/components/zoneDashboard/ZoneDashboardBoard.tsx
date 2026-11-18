@@ -51,10 +51,10 @@ const STATUS_LABEL: Record<string, string> = {
   assigned: 'มอบหมายงานแล้ว',
   in_progress: 'กำลังหยิบ',
   picker_completed_100: 'Picker ยืนยันเสร็จ (ครบ)',
-  picker_completed_short: 'Picker ยืนยันเสร็จ (ขาด)',
+  picker_completed_short: 'Picker ยืนยันเสร็จ (ไม่ครบ)',
   correction_in_progress: 'กำลังแก้ไข',
   final_closed_100: 'ปิดงานแล้ว (ครบ)',
-  final_closed_short: 'ปิดงานแล้ว (ขาด)',
+  final_closed_short: 'ปิดงานแล้ว (ไม่ครบ)',
   cancelled: 'ยกเลิกแล้ว',
 }
 
@@ -223,7 +223,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
             />
             <KpiCard
               label="QTY SHORT (PCS)"
-              labelTh="ชิ้นที่ขาด · Short (ชิ้น)"
+              labelTh="ชิ้นที่หยิบไม่ครบ (ชิ้น)"
               value={selected.qtyShortPieces.toLocaleString()}
               valueColor={selected.qtyShortPieces > 0 ? '#DC2626' : undefined}
               sub={`${selected.qtyShortOrders.toLocaleString()} order`}
@@ -292,7 +292,7 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
           <div className="card">
             <div className="card-header" style={{ marginBottom: 10 }}>
               <span className="card-title">Zone {selected.zone} — Confirmed Short Picks</span>
-              <span className="card-subtitle">รายการที่ยืนยันว่าหยิบขาดในโซนนี้ · {shortTable.total} รายการ</span>
+              <span className="card-subtitle">รายการที่ยืนยันว่าหยิบไม่ครบในโซนนี้ · {shortTable.total} รายการ</span>
             </div>
             <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <colgroup>

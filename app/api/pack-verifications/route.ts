@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       const packed = Number(l.packed_qty)
       if (!Number.isFinite(packed) || packed < 0 || packed > exp) return NextResponse.json({ error: `จำนวนที่แพ็กต้องอยู่ระหว่าง 0 ถึง ${exp}` }, { status: 400 })
       const isShort = packed < exp
-      if (isShort && (!l.short_reason_code || !validReasons.has(l.short_reason_code))) return NextResponse.json({ error: 'ต้องเลือกเหตุผลของรายการที่ขาด' }, { status: 400 })
+      if (isShort && (!l.short_reason_code || !validReasons.has(l.short_reason_code))) return NextResponse.json({ error: 'ต้องเลือกเหตุผลของรายการที่ไม่ครบ' }, { status: 400 })
       rows.push({ line_id: l.line_id, expected_qty: exp, packed_qty: packed, is_short: isShort, short_reason_code: isShort ? l.short_reason_code! : null, remark: isShort ? l.remark?.trim() || null : null })
     }
     if (rows.length !== expected.length || new Set(rows.map((r) => r.line_id)).size !== expected.length) {
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     const session = await latestSession(admin, orderId)
     if (session?.result === 'completed_short') {
       const { data: o } = await admin.from('orders').select('order_no').eq('order_id', orderId).maybeSingle()
-      failed.push(`${o?.order_no ?? orderId} (Short — ต้องเปิดยืนยันทีละ order)`)
+      failed.push(`${o?.order_no ?? orderId} (ไม่ครบ — ต้องเปิดยืนยันทีละ order)`)
       continue
     }
     const row = await flip(orderId)

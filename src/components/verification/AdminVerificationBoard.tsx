@@ -231,7 +231,7 @@ export function AdminVerificationBoard({
                     {o.order_no}
                   </span>
                   <span className={`badge badge-${o.completion?.result === '100_percent' ? 'success' : 'warning'}`} style={{ fontSize: 10 }}>
-                    {o.completion?.result === '100_percent' ? '100%' : 'Short Pick'}
+                    {o.completion?.result === '100_percent' ? '100%' : 'ไม่ครบ'}
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: '#6B7280' }}>
@@ -254,7 +254,7 @@ export function AdminVerificationBoard({
                   </span>
                 </div>
                 <span className={`badge badge-${selected.completion?.result === '100_percent' ? 'success' : 'warning'}`} style={{ marginLeft: 'auto' }}>
-                  {selected.completion?.result === '100_percent' ? 'Picker ปิดงาน 100%' : 'Picker ปิดงาน Short Pick'}
+                  {selected.completion?.result === '100_percent' ? 'Picker ปิดงาน 100%' : 'Picker ปิดงานไม่ครบ'}
                 </span>
               </div>
               <div style={{ marginBottom: 12 }} />
@@ -292,7 +292,7 @@ export function AdminVerificationBoard({
                             onClick={() => toggleShort(l.line_id, l.qty)}
                             className={`checkbox-box${st.isShort ? ' checked' : ''}`}
                             style={{ border: st.isShort ? 'none' : undefined, cursor: 'pointer', padding: 0 }}
-                            title="หยิบขาด?"
+                            title="หยิบไม่ครบ?"
                           >
                             {st.isShort ? '✓' : ''}
                           </button>
@@ -347,7 +347,7 @@ export function AdminVerificationBoard({
                 </tbody>
               </table>
               <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                ทำเครื่องหมายรายการที่หยิบขาด แล้วระบุเหตุผลและจำนวนจริง · ตรวจสอบกับระบบ WMS
+                ทำเครื่องหมายรายการที่หยิบไม่ครบ แล้วระบุเหตุผลและจำนวนจริง · ตรวจสอบกับระบบ WMS
               </div>
             </>
           ) : (
@@ -381,7 +381,7 @@ export function AdminVerificationBoard({
                 </div>
               </div>
               <div style={{ marginBottom: 14 }}>
-                <span className={`badge badge-${shortLines.length > 0 ? 'warning' : 'success'}`}>{shortLines.length > 0 ? `ขาด ${shortLines.length} รายการ` : 'หยิบครบ 100%'}</span>
+                <span className={`badge badge-${shortLines.length > 0 ? 'warning' : 'success'}`}>{shortLines.length > 0 ? `ไม่ครบ ${shortLines.length} รายการ` : 'หยิบครบ 100%'}</span>
               </div>
               {error && <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--color-danger)' }}>{error}</div>}
               <div className="mt-auto" style={{ paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -430,7 +430,7 @@ export function AdminVerificationBoard({
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="เช่น ยังไม่ได้ตรวจจำนวนที่ขาดที่ Bin"
+              placeholder="เช่น ยังไม่ได้ตรวจจำนวนที่ไม่ครบที่ Bin"
               style={{ width: '100%', minHeight: 76, border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 13.5, fontFamily: 'inherit' }}
               autoFocus
             />

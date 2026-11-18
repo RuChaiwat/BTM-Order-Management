@@ -201,7 +201,7 @@ export function ConsolidationPickReportBoard({ batches }: { batches: Batch[] }) 
         <Modal title={`Mark ${completeBatch.batch_no} completed`} subtitle="ยืนยันผลการหยิบของทั้ง Batch">
           <div className="modal-body">
             ทั้ง {completeBatch.orders_count} order ใน Batch นี้จะถูกปิดงานหยิบ หยุดจับเวลา และส่งต่อไปหน้า Admin Verification · เลือก 100% เฉพาะเมื่อหยิบครบทุก order ไม่เช่นนั้นให้เลือก Completed with Short
-            (Admin จะบันทึกจำนวนและสาเหตุที่ขาดของแต่ละ order ตอนตรวจสอบ) · หาก Batch มีทั้งครบและขาดปนกัน ให้ยืนยันทีละ order ที่หน้า Pick Completion แทน แล้ว Batch จะปิดเองเมื่อยืนยันครบทุก order
+            (Admin จะบันทึกจำนวนและสาเหตุที่ไม่ครบของแต่ละ order ตอนตรวจสอบ) · หาก Batch มีทั้งครบและไม่ครบปนกัน ให้ยืนยันทีละ order ที่หน้า Pick Completion แทน แล้ว Batch จะปิดเองเมื่อยืนยันครบทุก order
           </div>
           <ModalFooter>
             <button type="button" className="modal-footer-btn btn-secondary" disabled={busyBatch === completeTarget} onClick={() => setCompleteTarget(null)}>

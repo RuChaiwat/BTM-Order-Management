@@ -416,7 +416,7 @@ export function PickCompletionBoard({
             Order {orders.find((o) => o.order_id === pending.orderId)?.order_no}
             {pending.result === '100_percent'
               ? ' จะถูกบันทึกว่าหยิบครบ และส่งต่อไปหน้า Admin Verification'
-              : ' จะถูกบันทึกว่าหยิบไม่ครบ (Short Pick) และส่งต่อไปหน้า Admin Verification เพื่อบันทึกจำนวนและสาเหตุที่ขาด'}
+              : ' จะถูกบันทึกว่าหยิบไม่ครบ และส่งต่อไปหน้า Admin Verification เพื่อบันทึกจำนวนและสาเหตุที่ไม่ครบ'}
             {' '}
             · ระบบจะหยุดจับเวลา และแก้ไขภายหลังไม่ได้
           </div>

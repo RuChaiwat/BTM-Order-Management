@@ -62,7 +62,7 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
           />
           <KpiCard
             label="SHORT PICK RATE"
-            labelTh="อัตราหยิบขาด · Short Pick (%)"
+            labelTh="อัตราหยิบไม่ครบ (%)"
             value={data.kpis.shortRatePct !== null ? `${data.kpis.shortRatePct}%` : '—'}
             valueColor={data.kpis.shortRatePct !== null && data.kpis.shortRatePct > 5 ? '#F59E0B' : undefined}
             sub={`${data.kpis.completedOrders.toLocaleString()} order ที่ทำเสร็จ`}

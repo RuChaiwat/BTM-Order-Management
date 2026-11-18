@@ -37,12 +37,12 @@ const ORDER_STATUS_TH: Record<string, string> = {
   assigned: 'มอบหมายงานแล้ว',
   in_progress: 'กำลังหยิบ',
   picker_completed_100: 'Picker ยืนยันเสร็จ (ครบ)',
-  picker_completed_short: 'Picker ยืนยันเสร็จ (ขาด)',
+  picker_completed_short: 'Picker ยืนยันเสร็จ (ไม่ครบ)',
   waiting_admin_verification: 'รอ Admin ตรวจสอบ',
   admin_rejected: 'Admin ส่งกลับแก้ไข',
   correction_in_progress: 'กำลังแก้ไข',
   final_closed_100: 'ปิดงานแล้ว (ครบ)',
-  final_closed_short: 'ปิดงานแล้ว (ขาด)',
+  final_closed_short: 'ปิดงานแล้ว (ไม่ครบ)',
   cancelled: 'ยกเลิกแล้ว',
 }
 

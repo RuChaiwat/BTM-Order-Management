@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       }
       const isShort = pickedQty < orderedQty
       if (isShort && !line.short_reason_code) {
-        return NextResponse.json({ error: 'กรุณาเลือกเหตุผลของรายการที่หยิบขาด' }, { status: 400 })
+        return NextResponse.json({ error: 'กรุณาเลือกเหตุผลของรายการที่หยิบไม่ครบ' }, { status: 400 })
       }
       completionLines.push({ line_id: line.line_id, ordered_qty: orderedQty, picked_qty: pickedQty, is_short: isShort, short_reason_code: isShort ? line.short_reason_code! : null, remark: line.remark ?? null })
     }

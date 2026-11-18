@@ -7,6 +7,7 @@ import { getActiveConfig } from './config'
 import { bangkokDateKey } from '../formatDate'
 import { bandForPct, computeRoundBasedRate, type RoundCompletion } from '../pickerProductivity'
 import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
+import { PICK_STAGES, pickStageOf, type PickStage } from '../pickBacklog'
 
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
 // assignment_batches.status is not a reliable "is this picker still working" signal: nothing in
@@ -39,7 +40,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     fetchAllRows((from, to) =>
       db
         .from('orders')
-        .select('order_id, status, planned_pieces, original_order_date, assigned_time, picker_completed_time, assignment_batch_id, consolidation_batch_id')
+        .select('order_id, status, planned_pieces, original_order_date, assigned_time, picker_completed_time, assignment_batch_id, consolidation_batch_id, created_at')
         .eq('warehouse_code', warehouseCode)
         .range(from, to),
     ),
@@ -254,6 +255,52 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const activePickerTotalPieces = [...activePickerWork.values()].reduce((s, w) => s + w.pieces, 0)
   const activePickerTotalOrders = [...activePickerWork.values()].reduce((s, w) => s + w.orders, 0)
 
+  // Pick backlog by order date, split by stage (รอหยิบ / กำลังหยิบ incl. Admin send-backs / รอ Admin
+  // ยืนยัน). Same orders as backlogByDate above; "oldest" = longest time since the order was imported.
+  const nowMs = Date.now()
+  type StageCounts = Record<PickStage, { orders: number; pieces: number }>
+  const emptyStages = () => Object.fromEntries(PICK_STAGES.map((s) => [s, { orders: 0, pieces: 0 }])) as StageCounts
+  const pickBacklogMap = new Map<string, { orderDate: string; orders: number; pieces: number; byStage: StageCounts; oldestMinutes: number }>()
+  const pickBacklogTotal = { orders: 0, pieces: 0, byStage: emptyStages() }
+  for (const o of activeOrders) {
+    const stage = pickStageOf(o.status)
+    if (!stage) continue
+    const pcs = o.planned_pieces ?? 0
+    let row = pickBacklogMap.get(o.original_order_date)
+    if (!row) {
+      row = { orderDate: o.original_order_date, orders: 0, pieces: 0, byStage: emptyStages(), oldestMinutes: 0 }
+      pickBacklogMap.set(o.original_order_date, row)
+    }
+    for (const r of [row, pickBacklogTotal]) {
+      r.orders++
+      r.pieces += pcs
+      r.byStage[stage].orders++
+      r.byStage[stage].pieces += pcs
+    }
+    if (o.created_at) row.oldestMinutes = Math.max(row.oldestMinutes, Math.round(Math.max(0, nowMs - new Date(o.created_at).getTime()) / 60000))
+  }
+  const pickBacklog = [...pickBacklogMap.values()].sort((a, b) => a.orderDate.localeCompare(b.orderDate))
+
+  // Orders still being picked (assigned / in progress) by their SLA alert -- same thresholds and
+  // alert as Zone Dashboard / Control Tower.
+  const pickInProgress = { warning: 0, overdue: 0, critical: 0 }
+  for (const o of activeOrders) {
+    if (o.status !== 'assigned' && o.status !== 'in_progress') continue
+    const a = alertByOrder.get(o.order_id)?.time_alert
+    if (a) pickInProgress[a]++
+  }
+
+  // Pieces pickers actually submitted in the last 60 minutes (whole team), and when today's first
+  // submission happened -- the forecast only shows once a full hour of work exists.
+  let pickLastHourPieces = 0
+  let pickFirstTodayMs: number | null = null
+  for (const c of completions) {
+    if (!c.picker_completed_time || bangkokDateKey(c.picker_completed_time) !== todayBangkok) continue
+    const t = new Date(c.picker_completed_time).getTime()
+    pickFirstTodayMs = pickFirstTodayMs === null ? t : Math.min(pickFirstTodayMs, t)
+    if (nowMs - t <= 3600000) pickLastHourPieces += c.actual_pieces ?? 0
+  }
+
   const pickerIds = [...new Set([...pickerTotals.keys(), ...activePickerWork.keys()])]
   const [pickerNamesRes, employmentTypeRows] = await Promise.all([
     pickerIds.length
@@ -320,6 +367,11 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
       activePickerTotalPieces,
     },
     backlogByDate,
+    pickBacklog,
+    pickBacklogTotal,
+    pickInProgress,
+    pickLastHour: { pieces: pickLastHourPieces, firstAt: pickFirstTodayMs === null ? null : new Date(pickFirstTodayMs).toISOString() },
+    pickThresholds: { warning: thresholds.pickWarningMinutes, overdue: thresholds.pickOverdueMinutes, critical: thresholds.pickCriticalMinutes },
     statusCounts: Object.fromEntries(statusCounts),
     zoneStatus,
     pickerProductivity,

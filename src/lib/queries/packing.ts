@@ -156,7 +156,14 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
   const hourly = Array.from({ length: 24 }, (_, h) => ({ hour: h, pieces: 0, orders: 0 }))
   let piecesToday = 0
   const packers = new Set<string>()
+  // Credited pieces finished in the last 60 minutes (whole team) and today's first finish -- the
+  // Operations Dashboard forecast only shows once a full hour of work exists.
+  let lastHourPieces = 0
+  let firstFinishMs: number | null = null
   for (const s of todaySessions.data ?? []) {
+    const t = new Date(s.finished_at!).getTime()
+    firstFinishMs = firstFinishMs === null ? t : Math.min(firstFinishMs, t)
+    if (now - t <= 3600000) lastHourPieces += creditedPieces(s)
     const h = Number(new Date(s.finished_at!).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false }).slice(0, 2)) % 24
     const pcs = creditedPieces(s)
     hourly[h].pieces += pcs
@@ -173,6 +180,7 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
     backlogTotal,
     oldestMinutes: Math.round(oldestMinutes),
     hourly,
+    lastHour: { pieces: lastHourPieces, firstAt: firstFinishMs === null ? null : new Date(firstFinishMs).toISOString() },
   }
 }
 

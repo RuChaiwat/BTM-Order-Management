@@ -15,7 +15,7 @@ import { requireMenuAccess } from '@/lib/pageAccess'
 // this route (and its data) to always be fresh.
 export const dynamic = 'force-dynamic'
 
-export default async function BacklogPage() {
+export default async function BacklogPage({ searchParams }: { searchParams: { filter?: string } }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   requireMenuAccess(user.role, 11)
@@ -66,7 +66,7 @@ export default async function BacklogPage() {
             style={{ padding: 14 }}
           />
         </div>
-        <BacklogBoard rows={data.rows} />
+        <BacklogBoard rows={data.rows} initialFilter={searchParams.filter === 'picking' || searchParams.filter === 'verification' ? searchParams.filter : 'all'} />
       </div>
     </>
   )

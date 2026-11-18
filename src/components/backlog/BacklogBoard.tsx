@@ -84,8 +84,9 @@ function orderHref(r: BacklogRow): string | null {
   return `/pick-completion?${params.toString()}`
 }
 
-export function BacklogBoard({ rows }: { rows: BacklogRow[] }) {
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>('all')
+/** initialFilter comes from ?filter= (e.g. Operations Dashboard's "Picking pending" box). */
+export function BacklogBoard({ rows, initialFilter = 'all' }: { rows: BacklogRow[]; initialFilter?: (typeof FILTERS)[number]['key'] }) {
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>(initialFilter)
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'elapsed', dir: 'desc' })
   const [page, setPage] = useState(1)
 

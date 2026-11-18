@@ -22,12 +22,24 @@ export interface OperationsDashboardProps {
   /** Pending Actions Monitor's own counts, so the numbers match that page. */
   pending: { pickingOrders: number; pickingPieces: number; verificationOrders: number; verificationPieces: number }
   access: { backlog: boolean; verification: boolean; packVerify: boolean; packIssues: boolean }
+  /** Worst time status among each Action required box's orders (the longest-waiting one) and its wait. */
+  actionAlerts: {
+    picking: { level: PickLevel; oldest: number }
+    verify: { level: PickLevel; oldest: number }
+    awaiting: { level: PackLevel; oldest: number }
+    issues: { level: PackLevel; oldest: number }
+  }
   todayKey: string
   nowMs: number
 }
 
+export type PickLevel = 'green' | 'warning' | 'overdue' | 'critical'
+export type PackLevel = 'green' | 'yellow' | 'red'
+
 const ORANGE = '#F59E0B'
 const C = { green: '#16A34A', amber: '#F59E0B', orange: '#EA580C', red: '#DC2626' }
+const PICK_LEVEL_COLOR: Record<PickLevel, string> = { green: C.green, warning: C.amber, overdue: C.orange, critical: C.red }
+const PACK_LEVEL_COLOR: Record<PackLevel, string> = { green: C.green, yellow: C.amber, red: C.red }
 
 function pctColor(pct: number | null) {
   if (pct === null) return undefined
@@ -38,6 +50,8 @@ function hm(minutes: number) {
   const m = Math.max(0, Math.round(minutes))
   return m >= 60 ? `${Math.floor(m / 60)} ชม. ${m % 60} นาที` : `${m} นาที`
 }
+
+const waitText = (oldest: number) => (oldest > 0 ? ` · รอนานสุด ${hm(oldest)}` : '')
 
 function Section({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
   return (
@@ -64,7 +78,25 @@ function BandBox({ color, label, count, highlight }: { color: string; label: str
 }
 
 /** Action required box -- a link to the page where the work gets done (plain box without access). */
-function ActionBox({ href, label, labelTh, value, sub, color, linkText }: { href: string | null; label: string; labelTh: string; value: number; sub: string; color?: string; linkText: string }) {
+function ActionBox({
+  href,
+  label,
+  labelTh,
+  value,
+  sub,
+  color,
+  stripe,
+  linkText,
+}: {
+  href: string | null
+  label: string
+  labelTh: string
+  value: number
+  sub: string
+  color?: string
+  stripe: string
+  linkText: string
+}) {
   const body = (
     <>
       <div className="kpi-label">{label}</div>
@@ -76,7 +108,7 @@ function ActionBox({ href, label, labelTh, value, sub, color, linkText }: { href
       {href && <div style={{ marginTop: 'auto', paddingTop: 8, fontSize: 12, color: 'var(--color-info)' }}>{linkText} →</div>}
     </>
   )
-  const style: React.CSSProperties = { padding: 14, display: 'flex', flexDirection: 'column', textAlign: 'center', textDecoration: 'none', color: 'inherit' }
+  const style: React.CSSProperties = { padding: 14, display: 'flex', flexDirection: 'column', textAlign: 'center', textDecoration: 'none', color: 'inherit', borderTop: `3px solid ${stripe}` }
   return href ? (
     <Link href={href} className="kpi-card" style={style}>
       {body}
@@ -351,8 +383,9 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
               label="PICKING PENDING"
               labelTh="รอ Picker ดำเนินการ (order)"
               value={p.pending.pickingOrders}
-              sub={`${p.pending.pickingPieces.toLocaleString()} ชิ้น`}
+              sub={`${p.pending.pickingPieces.toLocaleString()} ชิ้น${waitText(p.actionAlerts.picking.oldest)}`}
               color={C.amber}
+              stripe={PICK_LEVEL_COLOR[p.actionAlerts.picking.level]}
               linkText="Pending Actions Monitor"
             />
             <ActionBox
@@ -360,11 +393,22 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
               label="VERIFICATION PENDING"
               labelTh="รอ Admin ตรวจสอบ (order)"
               value={p.pending.verificationOrders}
-              sub={`${p.pending.verificationPieces.toLocaleString()} ชิ้น`}
+              sub={`${p.pending.verificationPieces.toLocaleString()} ชิ้น${waitText(p.actionAlerts.verify.oldest)}`}
               color="#2563EB"
+              stripe={PICK_LEVEL_COLOR[p.actionAlerts.verify.level]}
               linkText="Admin Verification"
             />
           </div>
+          <Legend
+            style={{ marginTop: 10 }}
+            note="สีตาม order ที่รอนานที่สุดในกล่อง ·"
+            items={[
+              { color: C.green, label: 'ปกติ' },
+              { color: C.amber, label: 'ใกล้เกินกำหนด' },
+              { color: C.orange, label: 'เกินกำหนด' },
+              { color: C.red, label: 'วิกฤต' },
+            ]}
+          />
         </div>
         <div className="card">
           <div className="card-header" style={{ marginBottom: 10 }}>
@@ -376,8 +420,9 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
               label="AWAITING CONFIRM"
               labelTh="แพ็กเสร็จ รอยืนยัน (order)"
               value={bs.packed.orders}
-              sub={`${bs.packed.pieces.toLocaleString()} ชิ้น`}
+              sub={`${bs.packed.pieces.toLocaleString()} ชิ้น${waitText(p.actionAlerts.awaiting.oldest)}`}
               color="#8B5CF6"
+              stripe={PACK_LEVEL_COLOR[p.actionAlerts.awaiting.level]}
               linkText="Admin Pack Verify"
             />
             <ActionBox
@@ -385,11 +430,21 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
               label="OPEN ISSUES"
               labelTh="ปัญหายังไม่ปิด (issue)"
               value={pack.counts.openIssues}
-              sub={`${bs.issue.orders.toLocaleString()} order`}
+              sub={`${bs.issue.orders.toLocaleString()} order${waitText(p.actionAlerts.issues.oldest)}`}
               color={C.red}
+              stripe={PACK_LEVEL_COLOR[p.actionAlerts.issues.level]}
               linkText="ตรวจสอบปัญหา"
             />
           </div>
+          <Legend
+            style={{ marginTop: 10 }}
+            note="สีตามรายการที่รอนานที่สุดในกล่อง ·"
+            items={[
+              { color: C.green, label: `ปกติ (< ${Y} นาที)` },
+              { color: C.amber, label: `เริ่มนาน (${Y}–${R - 1} นาที)` },
+              { color: C.red, label: `นานเกินไป (≥ ${R} นาที)` },
+            ]}
+          />
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { Pagination } from '../Pagination'
 import { Legend } from '../Legend'
 import { formatDate } from '../../lib/formatDate'
+import { BACKLOG_META } from '../../lib/packBacklog'
 import type { PackQueueRow } from '../../lib/queries/packing'
 
 const PAGE_SIZE = 50
@@ -12,13 +13,14 @@ function waitText(m: number) {
   return m >= 1440 ? `${Math.floor(m / 1440)} วัน ${Math.floor((m % 1440) / 60)} ชม.` : m >= 60 ? `${Math.floor(m / 60)} ชม. ${m % 60} นาที` : `${m} นาที`
 }
 
-// Same buckets as Packing Dashboard's "Pack backlog aging".
+// Waiting time since Admin Verification: amber from 4 hours, red from 8 hours.
 function waitColor(m: number) {
   return m >= 480 ? 'var(--color-danger-dark)' : m >= 240 ? 'var(--color-warning-dark)' : undefined
 }
 
-/** Orders waiting to pack -- searchable by order no / store, paged in the browser. */
-export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
+/** Pack backlog orders -- searchable by order no / store, paged in the browser. showStatus adds
+ * the pack status column (when the list mixes statuses). */
+export function PackQueueTable({ rows, showStatus = false, title = 'Orders waiting to pack' }: { rows: PackQueueRow[]; showStatus?: boolean; title?: string }) {
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
   const filtered = useMemo(() => {
@@ -33,8 +35,8 @@ export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
     <div className="card" style={{ flex: 1 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
         <div>
-          <div className="card-title">Orders waiting to pack</div>
-          <div className="card-subtitle">order รอแพ็ก</div>
+          <div className="card-title">{title}</div>
+          <div className="card-subtitle">รอนับจากเวลาที่ผ่าน Admin Verification</div>
         </div>
         <input
           className="field-input"
@@ -49,14 +51,15 @@ export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
       </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
-          <col style={{ width: '20%' }} />
-          <col style={{ width: '14%' }} />
+          <col style={{ width: showStatus ? '18%' : '20%' }} />
+          <col style={{ width: showStatus ? '11%' : '14%' }} />
           <col style={{ width: '12%' }} />
-          <col style={{ width: '10%' }} />
-          <col style={{ width: '8%' }} />
+          {showStatus && <col style={{ width: '13%' }} />}
           <col style={{ width: '9%' }} />
-          <col style={{ width: '13%' }} />
-          <col style={{ width: '14%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '11%' }} />
+          <col style={{ width: '11%' }} />
         </colgroup>
         <thead>
           <tr>
@@ -67,6 +70,7 @@ export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
               <br />
               DATE
             </th>
+            {showStatus && <th>STATUS</th>}
             <th>
               PICK
               <br />
@@ -88,6 +92,14 @@ export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
               <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>{r.order_no}</td>
               <td style={{ overflowWrap: 'break-word' }}>{r.store_code}</td>
               <td>{formatDate(r.order_date)}</td>
+              {showStatus && (
+                <td>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: BACKLOG_META[r.pack_status].color, flex: '0 0 auto' }} />
+                    {BACKLOG_META[r.pack_status].label}
+                  </span>
+                </td>
+              )}
               <td>
                 <span className={`badge ${r.pick_status === 'final_closed_short' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: 10 }}>
                   {r.pick_status === 'final_closed_short' ? 'ไม่ครบ' : '100%'}
@@ -101,8 +113,8 @@ export function PackQueueTable({ rows }: { rows: PackQueueRow[] }) {
           ))}
           {shown.length === 0 && (
             <tr>
-              <td colSpan={8} style={{ color: 'var(--color-text-secondary)' }}>
-                {rows.length === 0 ? 'ไม่มี order รอแพ็ก' : 'ไม่พบ order ที่ค้นหา'}
+              <td colSpan={showStatus ? 9 : 8} style={{ color: 'var(--color-text-secondary)' }}>
+                {rows.length === 0 ? 'ไม่มี order ในรายการนี้' : 'ไม่พบ order ที่ค้นหา'}
               </td>
             </tr>
           )}

@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { bangkokDateKey, bangkokDayRange } from '../formatDate'
 import { CREDITED_RESULTS, ISSUE_RESULTS, creditedPieces, sessionSeconds } from '../packing'
+import { BACKLOG_STATUSES, type BacklogStatus } from '../packBacklog'
+
+export { BACKLOG_STATUSES, type BacklogStatus }
 
 /* Read side of the Packing module (migration 0035) -- Live Packing Monitor, Packing Dashboard,
  * Packing Productivity, Pack Issue Investigation and Pack Issue Dashboard. Everything is scoped to
@@ -85,10 +88,6 @@ export async function getLiveMonitorData(db: SupabaseClient, warehouseCode: stri
 
 // ---------------------------------------------------------------- Packing Dashboard
 
-/** Pack work still open, in the order the backlog card shows it. */
-export const BACKLOG_STATUSES = ['pending', 'packing', 'packed', 'issue'] as const
-export type BacklogStatus = (typeof BACKLOG_STATUSES)[number]
-
 export interface BacklogDateRow {
   orderDate: string
   orders: number
@@ -144,6 +143,15 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
     row.oldestMinutes = Math.max(row.oldestMinutes, Math.round(mins))
   }
   const backlog = [...byDate.values()].sort((a, b) => a.orderDate.localeCompare(b.orderDate))
+  const backlogTotal = { orders: 0, pieces: 0, byStatus: Object.fromEntries(BACKLOG_STATUSES.map((s) => [s, { orders: 0, pieces: 0 }])) as BacklogDateRow['byStatus'] }
+  for (const r of backlog) {
+    backlogTotal.orders += r.orders
+    backlogTotal.pieces += r.pieces
+    for (const s of BACKLOG_STATUSES) {
+      backlogTotal.byStatus[s].orders += r.byStatus[s].orders
+      backlogTotal.byStatus[s].pieces += r.byStatus[s].pieces
+    }
+  }
 
   const hourly = Array.from({ length: 24 }, (_, h) => ({ hour: h, pieces: 0, orders: 0 }))
   let piecesToday = 0
@@ -162,6 +170,7 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
     today: { orders: (todaySessions.data ?? []).length, pieces: piecesToday, packers: packers.size, confirmed: confirmedToday.count ?? 0 },
     issueFix: { resolved: fixed.length, avgMinutes: fixed.length ? Math.round(fixMinutes / fixed.length) : null },
     backlog,
+    backlogTotal,
     oldestMinutes: Math.round(oldestMinutes),
     hourly,
   }
@@ -505,20 +514,22 @@ export interface PackQueueRow {
   store_code: string
   order_date: string
   pick_status: string
+  pack_status: BacklogStatus
   pieces: number
   skus: number
   pack_ready_at: string | null
   waitMinutes: number
 }
 
-/** Every order waiting to be packed (pack_status = 'pending') in this warehouse, longest-waiting
- * first. Pieces are Admin Verification's verified pieces (what will actually be packed). */
+/** Every order in the Pack Backlog (waiting, packing, packed awaiting confirm, issue) in this
+ * warehouse, longest-waiting first -- callers filter by pack status. Pieces are Admin
+ * Verification's verified pieces (what will actually be packed). */
 export async function getPackQueue(db: SupabaseClient, warehouseCode: string): Promise<PackQueueRow[]> {
   const { data, error } = await db
     .from('orders')
-    .select('order_id, order_no, store_code, original_order_date, status, planned_pieces, unique_sku_count, pack_ready_at')
+    .select('order_id, order_no, store_code, original_order_date, status, pack_status, planned_pieces, unique_sku_count, pack_ready_at')
     .eq('warehouse_code', warehouseCode)
-    .eq('pack_status', 'pending')
+    .in('pack_status', BACKLOG_STATUSES)
     .order('pack_ready_at', { ascending: true })
     .limit(10000)
   if (error) throw new Error(error.message)
@@ -535,6 +546,7 @@ export async function getPackQueue(db: SupabaseClient, warehouseCode: string): P
     store_code: o.store_code,
     order_date: o.original_order_date,
     pick_status: o.status,
+    pack_status: o.pack_status as BacklogStatus,
     pieces: Number(pcs.get(o.order_id) ?? o.planned_pieces),
     skus: o.unique_sku_count,
     pack_ready_at: o.pack_ready_at,

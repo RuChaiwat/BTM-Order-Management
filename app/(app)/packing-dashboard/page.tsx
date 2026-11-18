@@ -9,7 +9,8 @@ import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireMenuAccess } from '@/lib/pageAccess'
 import { canAccessMenuItem } from '@/lib/roles'
-import { BACKLOG_STATUSES, getLiveMonitorData, getPackIssueList, getPackingDashboardData, type BacklogStatus } from '@/lib/queries/packing'
+import { getLiveMonitorData, getPackIssueList, getPackingDashboardData, getPackingProductivity } from '@/lib/queries/packing'
+import { BACKLOG_META, BACKLOG_STATUSES, type BacklogStatus } from '@/lib/packBacklog'
 import { bangkokDateKey, formatDate } from '@/lib/formatDate'
 import { getPackVerifyQueue } from '@/lib/queries/packVerification'
 import { RISK_COLOR } from '@/lib/alertColors'
@@ -32,18 +33,9 @@ function ageText(minutes: number) {
   return minutes >= 60 ? `${Math.floor(minutes / 60)} ชม.` : `${minutes} นาที`
 }
 
-const BACKLOG_META: Record<BacklogStatus, { label: string; color: string }> = {
-  pending: { label: 'รอแพ็ก', color: '#F59E0B' },
-  packing: { label: 'กำลังแพ็ก', color: '#3B82F6' },
-  packed: { label: 'แพ็กเสร็จ รอยืนยัน', color: '#8B5CF6' },
-  issue: { label: 'มีปัญหา', color: '#DC2626' },
-}
-
 type StatusCounts = Record<BacklogStatus, { orders: number; pieces: number }>
 
 const minsSince = (iso: string | null) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : 0)
-
-
 
 export default async function PackingDashboardPage() {
   const user = await getSessionUser()
@@ -51,7 +43,8 @@ export default async function PackingDashboardPage() {
   requireMenuAccess(user.role, 21)
   const admin = createAdminClient()
   const warehouseCode = user.warehouse_code ?? 'DC002'
-  const [d, refreshMs, monitor, issueList, verifyQueue, bands] = await Promise.all([
+  const todayKey = bangkokDateKey(new Date()) ?? ''
+  const [d, refreshMs, monitor, issueList, verifyQueue, bands, productivity] = await Promise.all([
     getPackingDashboardData(admin, warehouseCode),
     getRefreshIntervalMs(admin, AUTO_REFRESH_KEYS.packingDashboard),
     getLiveMonitorData(admin, warehouseCode),
@@ -59,6 +52,8 @@ export default async function PackingDashboardPage() {
     getPackIssueList(admin, warehouseCode, new Date().toISOString()),
     getPackVerifyQueue(admin, warehouseCode),
     getPackingSettings(admin),
+    // Same figure as Packing Productivity's AVG PCS / HOUR (pieces / actual pack time, all stations).
+    getPackingProductivity(admin, warehouseCode, todayKey),
   ])
   const { yellowMinutes: Y, redMinutes: R } = bands
   // Stations packing right now, by how long their current order has been open (Configuration > Packing).
@@ -95,20 +90,13 @@ export default async function PackingDashboardPage() {
     .slice(0, 10)
   const openIssueCount = issueList.filter((i) => i.status !== 'resolved').length
   const topAwaiting = verifyQueue.slice(0, 10)
-  const todayKey = bangkokDateKey(new Date()) ?? ''
   const daysOld = (dateKey: string) => Math.round((Date.parse(todayKey) - Date.parse(dateKey)) / 86400000)
-  const backlogTotal = d.backlog.reduce(
-    (t, r) => {
-      t.orders += r.orders
-      t.pieces += r.pieces
-      for (const st of BACKLOG_STATUSES) {
-        t.byStatus[st].orders += r.byStatus[st].orders
-        t.byStatus[st].pieces += r.byStatus[st].pieces
-      }
-      return t
-    },
-    { orders: 0, pieces: 0, byStatus: Object.fromEntries(BACKLOG_STATUSES.map((st) => [st, { orders: 0, pieces: 0 }])) as StatusCounts },
-  )
+  const backlogTotal = d.backlogTotal
+  const bs = backlogTotal.byStatus
+  const target = bands.targetPcsPerHour
+  const avgRate = productivity.totals.pcsPerHour
+  const avgPct = avgRate !== null && target > 0 ? Math.round((avgRate / target) * 100) : null
+  const avgColor = avgPct === null ? undefined : avgPct >= 100 ? 'var(--color-success-dark)' : avgPct >= 80 ? 'var(--color-warning-dark)' : 'var(--color-danger-dark)'
   // One segment per status, width by orders; hover shows that status's orders and pieces.
   const statusBar = (row: { orders: number; byStatus: StatusCounts }) => {
     const segs = BACKLOG_STATUSES.filter((st) => row.byStatus[st].orders > 0)
@@ -141,55 +129,70 @@ export default async function PackingDashboardPage() {
       <AutoRefresh intervalMs={refreshMs} />
       <TopBar title="Packing Dashboard" subtitle={`แดชบอร์ดงานแพ็ก · วันนี้ · ${warehouseCode}`} />
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
-        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
-          <Link href="/packing-dashboard/queue" title="ดูรายการ order ที่รอแพ็ก" style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
-            <KpiCard
-              label="WAITING TO PACK"
-              labelTh="รอแพ็ก (order)"
-              value={d.counts.pending.toLocaleString()}
-              sub={
-                <>
-                  {d.counts.pending ? `เก่าสุด ${hm(d.oldestMinutes)} · ` : 'ไม่มีงานค้าง · '}
-                  <span className="card-link" style={{ fontSize: 12 }}>
-                    ดูรายการ →
-                  </span>
-                </>
-              }
-              compact
-              style={{ padding: 14, height: '100%', cursor: 'pointer' }}
-            />
-          </Link>
-          <KpiCard label="PACKING NOW" labelTh="กำลังแพ็ก (order)" value={d.counts.packing.toLocaleString()} sub={link(22, '/pack-monitor', 'Live monitor')} compact style={{ padding: 14 }} />
-          <KpiCard label="AWAITING CONFIRM" labelTh="แพ็กเสร็จ รอยืนยัน (order)" value={d.counts.packed.toLocaleString()} sub={link(23, '/pack-verification', 'Admin Pack Verify')} compact style={{ padding: 14 }} />
+        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12 }}>
+          <KpiCard
+            label="BACKLOG"
+            labelTh="งานแพ็กคงค้าง (ชิ้น)"
+            value={backlogTotal.pieces.toLocaleString()}
+            valueColor={backlogTotal.pieces > 0 ? '#F59E0B' : undefined}
+            sub={`${backlogTotal.orders.toLocaleString()} order`}
+            footer={
+              <Link href="/packing-dashboard/queue?status=all" className="card-link">
+                ดูรายการ →
+              </Link>
+            }
+            compact
+            style={{ padding: 14, borderTop: '3px solid #F59E0B' }}
+          />
+          <KpiCard
+            label="WAITING TO PACK"
+            labelTh="รอแพ็ก (ชิ้น)"
+            value={bs.pending.pieces.toLocaleString()}
+            sub={`${bs.pending.orders.toLocaleString()} order`}
+            footer={
+              <Link href="/packing-dashboard/queue?status=pending" className="card-link">
+                ดูรายการ →
+              </Link>
+            }
+            compact
+            style={{ padding: 14 }}
+          />
+          <KpiCard label="PACKING NOW" labelTh="กำลังแพ็ก (ชิ้น)" value={bs.packing.pieces.toLocaleString()} sub={`${bs.packing.orders.toLocaleString()} order`} footer={link(22, '/pack-monitor', 'Live monitor')} compact style={{ padding: 14 }} />
+          <KpiCard label="AWAITING CONFIRM" labelTh="แพ็กเสร็จ รอยืนยัน (ชิ้น)" value={bs.packed.pieces.toLocaleString()} sub={`${bs.packed.orders.toLocaleString()} order`} footer={link(23, '/pack-verification', 'Admin Pack Verify')} compact style={{ padding: 14 }} />
           <KpiCard
             label="OPEN ISSUES"
             labelTh="ปัญหายังไม่ปิด (issue)"
             value={d.counts.openIssues.toLocaleString()}
             valueColor={d.counts.openIssues ? '#DC2626' : undefined}
-            sub={
-              <>
-                {link(24, '/pack-issues', 'ตรวจสอบปัญหา') ?? `${d.counts.issue.toLocaleString()} order`}
-                <div style={{ marginTop: 2 }}>
-                  ปิดวันนี้ {d.issueFix.resolved.toLocaleString()} issue · ใช้เวลาแก้เฉลี่ย {d.issueFix.avgMinutes === null ? '—' : hm(d.issueFix.avgMinutes)}
-                </div>
-              </>
-            }
+            sub={`${bs.issue.orders.toLocaleString()} order · ปิดวันนี้ ${d.issueFix.resolved.toLocaleString()} issue · ใช้เวลาแก้เฉลี่ย ${d.issueFix.avgMinutes === null ? '—' : hm(d.issueFix.avgMinutes)}`}
+            footer={link(24, '/pack-issues', 'ตรวจสอบปัญหา')}
             compact
             style={{ padding: 14 }}
           />
-          <KpiCard label="PACKED TODAY" labelTh="แพ็กเสร็จวันนี้ (ชิ้น)" value={d.today.pieces.toLocaleString()} valueColor="#16A34A" sub={`${d.today.orders.toLocaleString()} order · ${d.today.packers} คน · ยืนยันแล้ว ${d.today.confirmed.toLocaleString()} order`} compact style={{ padding: 14 }} />
         </div>
 
-        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12 }}>
+          <KpiCard label="PACKED TODAY" labelTh="แพ็กเสร็จวันนี้ (ชิ้น)" value={d.today.pieces.toLocaleString()} valueColor="#16A34A" sub={`${d.today.orders.toLocaleString()} order`} compact style={{ padding: 14 }} />
+          <KpiCard
+            label="AVG PCS / HOUR"
+            labelTh="ชิ้นต่อชั่วโมง เฉลี่ย (ชิ้น/ชม.)"
+            value={avgRate?.toLocaleString() ?? '—'}
+            valueColor={avgColor}
+            sub={`เป้า ${target.toLocaleString()} ชิ้น/ชม.${avgPct !== null ? ` · ${avgPct}%` : ''}`}
+            footer={link(25, '/packing-productivity', 'Packing Productivity')}
+            compact
+            style={{ padding: 14 }}
+          />
           <KpiCard
             label="ACTIVE STATIONS"
             labelTh="Station ที่กำลังแพ็ก (Station)"
             value={activeStations.toLocaleString()}
             sub={
               <>
-                ว่าง <b>{monitor.idleStations.length.toLocaleString()}</b> Station · {link(22, '/pack-monitor', 'Live monitor')}
+                ว่าง <b>{monitor.idleStations.length.toLocaleString()}</b> Station
               </>
             }
+            footer={link(22, '/pack-monitor', 'Live monitor')}
             compact
             style={{ padding: 14 }}
           />
@@ -213,7 +216,7 @@ export default async function PackingDashboardPage() {
           <div className="card">
             <div className="card-header" style={{ marginBottom: 2 }}>
               <span className="card-title">Pack backlog by order date</span>
-              <Link href="/packing-dashboard/queue" className="card-link" style={{ fontSize: 12 }}>
+              <Link href="/packing-dashboard/queue?status=all" className="card-link" style={{ fontSize: 12 }}>
                 ดูรายการ →
               </Link>
             </div>

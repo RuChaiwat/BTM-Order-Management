@@ -25,9 +25,9 @@ export interface OperationsDashboardProps {
   /** Worst time status among each Action required box's orders (the longest-waiting one) and its wait. */
   actionAlerts: {
     picking: { level: PickLevel; oldest: number }
-    verify: { level: PickLevel; oldest: number }
+    verify: { level: PackLevel; oldest: number }
     awaiting: { level: PackLevel; oldest: number }
-    issues: { level: PackLevel; oldest: number }
+    issues: { level: PackLevel; oldest: number; pieces: number }
   }
   todayKey: string
   nowMs: number
@@ -380,28 +380,28 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
             <ActionBox
               href={p.access.backlog ? '/backlog?filter=picking' : null}
-              label="PICKING PENDING"
-              labelTh="รอ Picker ดำเนินการ (order)"
-              value={p.pending.pickingOrders}
-              sub={`${p.pending.pickingPieces.toLocaleString()} ชิ้น${waitText(p.actionAlerts.picking.oldest)}`}
+              label="PICKING PENDING (PCS)"
+              labelTh="รอ Picker ดำเนินการ (ชิ้น)"
+              value={p.pending.pickingPieces}
+              sub={`${p.pending.pickingOrders.toLocaleString()} order${waitText(p.actionAlerts.picking.oldest)}`}
               color={C.amber}
               stripe={PICK_LEVEL_COLOR[p.actionAlerts.picking.level]}
               linkText="Pending Actions Monitor"
             />
             <ActionBox
               href={p.access.verification ? '/verification' : null}
-              label="VERIFICATION PENDING"
-              labelTh="รอ Admin ตรวจสอบ (order)"
-              value={p.pending.verificationOrders}
-              sub={`${p.pending.verificationPieces.toLocaleString()} ชิ้น${waitText(p.actionAlerts.verify.oldest)}`}
+              label="VERIFICATION PENDING (PCS)"
+              labelTh="รอ Admin ตรวจสอบ (ชิ้น)"
+              value={p.pending.verificationPieces}
+              sub={`${p.pending.verificationOrders.toLocaleString()} order${waitText(p.actionAlerts.verify.oldest)}`}
               color="#2563EB"
-              stripe={PICK_LEVEL_COLOR[p.actionAlerts.verify.level]}
+              stripe={PACK_LEVEL_COLOR[p.actionAlerts.verify.level]}
               linkText="Admin Verification"
             />
           </div>
           <Legend
             style={{ marginTop: 10 }}
-            note="สีตาม order ที่รอนานที่สุดในกล่อง ·"
+            note="Picking pending ·"
             items={[
               { color: C.green, label: 'ปกติ' },
               { color: C.amber, label: 'ใกล้เกินกำหนด' },
@@ -409,6 +409,16 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
               { color: C.red, label: 'วิกฤต' },
             ]}
           />
+          <Legend
+            style={{ marginTop: 4 }}
+            note="Verification pending ·"
+            items={[
+              { color: C.green, label: `ปกติ (< ${Y} นาที)` },
+              { color: C.amber, label: `เริ่มนาน (${Y}–${R - 1} นาที)` },
+              { color: C.red, label: `นานเกินไป (≥ ${R} นาที)` },
+            ]}
+          />
+          <div style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-secondary)' }}>สีของกล่องตาม order ที่รอนานที่สุดในกล่อง</div>
         </div>
         <div className="card">
           <div className="card-header" style={{ marginBottom: 10 }}>
@@ -417,20 +427,20 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
             <ActionBox
               href={p.access.packVerify ? '/pack-verification' : null}
-              label="AWAITING CONFIRM"
-              labelTh="แพ็กเสร็จ รอยืนยัน (order)"
-              value={bs.packed.orders}
-              sub={`${bs.packed.pieces.toLocaleString()} ชิ้น${waitText(p.actionAlerts.awaiting.oldest)}`}
+              label="AWAITING CONFIRM (PCS)"
+              labelTh="แพ็กเสร็จ รอยืนยัน (ชิ้น)"
+              value={bs.packed.pieces}
+              sub={`${bs.packed.orders.toLocaleString()} order${waitText(p.actionAlerts.awaiting.oldest)}`}
               color="#8B5CF6"
               stripe={PACK_LEVEL_COLOR[p.actionAlerts.awaiting.level]}
               linkText="Admin Pack Verify"
             />
             <ActionBox
               href={p.access.packIssues ? '/pack-issues' : null}
-              label="OPEN ISSUES"
-              labelTh="ปัญหายังไม่ปิด (issue)"
-              value={pack.counts.openIssues}
-              sub={`${bs.issue.orders.toLocaleString()} order${waitText(p.actionAlerts.issues.oldest)}`}
+              label="OPEN ISSUES (PCS)"
+              labelTh="ปัญหายังไม่ปิด (ชิ้น)"
+              value={p.actionAlerts.issues.pieces}
+              sub={`${bs.issue.orders.toLocaleString()} order · ${pack.counts.openIssues.toLocaleString()} issue${waitText(p.actionAlerts.issues.oldest)}`}
               color={C.red}
               stripe={PACK_LEVEL_COLOR[p.actionAlerts.issues.level]}
               linkText="ตรวจสอบปัญหา"
@@ -438,7 +448,7 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
           </div>
           <Legend
             style={{ marginTop: 10 }}
-            note="สีตามรายการที่รอนานที่สุดในกล่อง ·"
+            note="สีของกล่องตามรายการที่รอนานที่สุดในกล่อง ·"
             items={[
               { color: C.green, label: `ปกติ (< ${Y} นาที)` },
               { color: C.amber, label: `เริ่มนาน (${Y}–${R - 1} นาที)` },

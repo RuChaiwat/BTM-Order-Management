@@ -59,15 +59,18 @@ export default async function OperationsDashboardPage() {
     }
     return { level, oldest }
   }
+  const verifyRows = pending.rows.filter((r) => r.alert?.is_verification_backlog)
+  const openIssues = issueList.filter((i) => i.status !== 'resolved')
   const packWorst = (minutes: number[]) => {
     const oldest = minutes.length ? Math.max(...minutes) : 0
     return { level: minutes.length ? packTimeBand(oldest, packSettings) : ('green' as const), oldest }
   }
   const actionAlerts = {
     picking: pickWorst(pending.rows.filter((r) => r.alert?.is_picking_backlog)),
-    verify: pickWorst(pending.rows.filter((r) => r.alert?.is_verification_backlog)),
+    // Same colour bands as Awaiting confirm (Configuration > Packing), on the wait since the picker submitted.
+    verify: packWorst(verifyRows.map((r) => Math.round(r.alert?.elapsed_minutes ?? 0))),
     awaiting: packWorst(verifyQueue.map((o) => o.waitMinutes)),
-    issues: packWorst(issueList.filter((i) => i.status !== 'resolved').map((i) => minsSince(i.reported_at))),
+    issues: { ...packWorst(openIssues.map((i) => minsSince(i.reported_at))), pieces: openIssues.reduce((s, i) => s + i.pieces, 0) },
   }
 
   return (

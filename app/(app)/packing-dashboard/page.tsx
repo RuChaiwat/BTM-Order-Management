@@ -4,12 +4,13 @@ import { TopBar } from '@/components/TopBar'
 import { AutoRefresh } from '@/components/AutoRefresh'
 import { KpiCard } from '@/components/KpiCard'
 import { Legend } from '@/components/Legend'
-import { BarList, HourBars } from '@/components/packing/BarList'
+import { HourBars } from '@/components/packing/BarList'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireMenuAccess } from '@/lib/pageAccess'
 import { canAccessMenuItem } from '@/lib/roles'
-import { getLiveMonitorData, getPackIssueList, getPackingDashboardData } from '@/lib/queries/packing'
+import { BACKLOG_STATUSES, getLiveMonitorData, getPackIssueList, getPackingDashboardData, type BacklogStatus } from '@/lib/queries/packing'
+import { bangkokDateKey, formatDate } from '@/lib/formatDate'
 import { getPackVerifyQueue } from '@/lib/queries/packVerification'
 import { RISK_COLOR } from '@/lib/alertColors'
 import { getPackingSettings, packTimeBand } from '@/lib/packing'
@@ -21,6 +22,24 @@ export const dynamic = 'force-dynamic'
 function hm(minutes: number) {
   return minutes >= 60 ? `${Math.floor(minutes / 60)} ชม. ${minutes % 60} นาที` : `${minutes} นาที`
 }
+
+/** Wait time with days for the multi-day backlog: "2 วัน 6 ชม.", "20 ชม.", "45 นาที". */
+function ageText(minutes: number) {
+  if (minutes >= 1440) {
+    const h = Math.floor((minutes % 1440) / 60)
+    return `${Math.floor(minutes / 1440)} วัน${h ? ` ${h} ชม.` : ''}`
+  }
+  return minutes >= 60 ? `${Math.floor(minutes / 60)} ชม.` : `${minutes} นาที`
+}
+
+const BACKLOG_META: Record<BacklogStatus, { label: string; color: string }> = {
+  pending: { label: 'รอแพ็ก', color: '#F59E0B' },
+  packing: { label: 'กำลังแพ็ก', color: '#3B82F6' },
+  packed: { label: 'แพ็กเสร็จ รอยืนยัน', color: '#8B5CF6' },
+  issue: { label: 'มีปัญหา', color: '#DC2626' },
+}
+
+type StatusCounts = Record<BacklogStatus, { orders: number; pieces: number }>
 
 const minsSince = (iso: string | null) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : 0)
 
@@ -76,6 +95,40 @@ export default async function PackingDashboardPage() {
     .slice(0, 10)
   const openIssueCount = issueList.filter((i) => i.status !== 'resolved').length
   const topAwaiting = verifyQueue.slice(0, 10)
+  const todayKey = bangkokDateKey(new Date()) ?? ''
+  const daysOld = (dateKey: string) => Math.round((Date.parse(todayKey) - Date.parse(dateKey)) / 86400000)
+  const backlogTotal = d.backlog.reduce(
+    (t, r) => {
+      t.orders += r.orders
+      t.pieces += r.pieces
+      for (const st of BACKLOG_STATUSES) {
+        t.byStatus[st].orders += r.byStatus[st].orders
+        t.byStatus[st].pieces += r.byStatus[st].pieces
+      }
+      return t
+    },
+    { orders: 0, pieces: 0, byStatus: Object.fromEntries(BACKLOG_STATUSES.map((st) => [st, { orders: 0, pieces: 0 }])) as StatusCounts },
+  )
+  // One segment per status, width by orders; hover shows that status's orders and pieces.
+  const statusBar = (row: { orders: number; byStatus: StatusCounts }) => {
+    const segs = BACKLOG_STATUSES.filter((st) => row.byStatus[st].orders > 0)
+    return (
+      <div style={{ display: 'flex', height: 12 }}>
+        {segs.map((st, i) => {
+          const first = i === 0 ? 3 : 0
+          const last = i === segs.length - 1 ? 3 : 0
+          return (
+            <div
+              key={st}
+              className="seg-tip"
+              data-tip={`${BACKLOG_META[st].label}\n${row.byStatus[st].orders.toLocaleString()} order · ${row.byStatus[st].pieces.toLocaleString()} ชิ้น`}
+              style={{ width: `${(row.byStatus[st].orders / row.orders) * 100}%`, background: BACKLOG_META[st].color, borderRadius: `${first}px ${last}px ${last}px ${first}px` }}
+            />
+          )
+        })}
+      </div>
+    )
+  }
   const link = (id: number, href: string, text: string) =>
     canAccessMenuItem(user.role, id) ? (
       <Link href={href} className="card-link" style={{ fontSize: 12 }}>
@@ -158,12 +211,72 @@ export default async function PackingDashboardPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)', gap: 14, alignItems: 'start' }}>
           <div className="card">
-            <div className="card-title">Pack backlog aging</div>
-            <div className="card-subtitle" style={{ marginBottom: 14 }}>
-              อายุของ order ที่รอแพ็ก
+            <div className="card-header" style={{ marginBottom: 2 }}>
+              <span className="card-title">Pack backlog by order date</span>
+              <Link href="/packing-dashboard/queue" className="card-link" style={{ fontSize: 12 }}>
+                ดูรายการ →
+              </Link>
             </div>
-            <BarList rows={d.aging.map((a) => ({ label: a.label, value: a.count }))} color="var(--color-warning)" />
-            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>นับจากเวลาที่ผ่าน Admin Verification</div>
+            <div className="card-subtitle" style={{ marginBottom: 10 }}>
+              งานแพ็กคงค้างแยกตามวันที่ Order · {d.backlog.length.toLocaleString()} วัน · {backlogTotal.orders.toLocaleString()} order
+            </div>
+            <table className="table" style={{ tableLayout: 'fixed', width: '100%', fontSize: 12.5 }}>
+              <colgroup>
+                <col style={{ width: '28%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '26%' }} />
+                <col style={{ width: '20%' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>ORDER DATE</th>
+                  <th>ORDER</th>
+                  <th>ชิ้น</th>
+                  <th>งานที่เหลือ</th>
+                  <th>รอนานสุด</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.backlog.map((r) => {
+                  const days = daysOld(r.orderDate)
+                  return (
+                    <tr key={r.orderDate}>
+                      <td style={{ fontWeight: 700 }}>
+                        {formatDate(r.orderDate)}{' '}
+                        {days >= 2 ? (
+                          <span className="badge badge-danger" style={{ fontSize: 10 }}>
+                            {days} วัน
+                          </span>
+                        ) : days === 0 ? (
+                          <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--color-text-secondary)' }}>วันนี้</span>
+                        ) : null}
+                      </td>
+                      <td>{r.orders.toLocaleString()}</td>
+                      <td>{r.pieces.toLocaleString()}</td>
+                      <td>{statusBar(r)}</td>
+                      <td style={{ fontWeight: 700, color: r.oldestMinutes >= 480 ? '#DC2626' : undefined }}>{ageText(r.oldestMinutes)}</td>
+                    </tr>
+                  )
+                })}
+                {d.backlog.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>
+                      ไม่มีงานแพ็กค้าง
+                    </td>
+                  </tr>
+                ) : (
+                  <tr>
+                    <td style={{ fontWeight: 700 }}>รวม</td>
+                    <td style={{ fontWeight: 700 }}>{backlogTotal.orders.toLocaleString()}</td>
+                    <td style={{ fontWeight: 700 }}>{backlogTotal.pieces.toLocaleString()}</td>
+                    <td>{statusBar(backlogTotal)}</td>
+                    <td />
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <Legend style={{ marginTop: 10 }} items={BACKLOG_STATUSES.map((st) => ({ color: BACKLOG_META[st].color, label: BACKLOG_META[st].label }))} note="ชี้ที่แถบสีเพื่อดูจำนวน order และชิ้น ·" />
           </div>
           <div className="card">
             <div className="card-title">Pieces packed per hour (today)</div>

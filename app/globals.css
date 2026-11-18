@@ -361,6 +361,15 @@ table { border-collapse: collapse; width: 100%; }
 
 .card-title { font-size: 14px; font-weight: 700; }
 .card-subtitle { font-size: 11.5px; color: var(--color-text-secondary); }
+/* Stacked bar segment with a hover tooltip (data-tip), e.g. Packing Dashboard backlog by order date. */
+.seg-tip { position: relative; height: 100%; }
+.seg-tip:hover { filter: brightness(0.92); }
+.seg-tip:hover::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  white-space: pre; background: #111827; color: #fff; font-size: 11.5px; line-height: 1.5; font-weight: 400;
+  padding: 5px 8px; border-radius: 6px; z-index: 20; pointer-events: none;
+}
+
 .card-link {
   margin-left: auto;
   font-size: 12px;

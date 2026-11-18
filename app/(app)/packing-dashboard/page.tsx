@@ -175,7 +175,7 @@ export default async function PackingDashboardPage() {
           <KpiCard label="PACKED TODAY" labelTh="แพ็กเสร็จวันนี้ (ชิ้น)" value={d.today.pieces.toLocaleString()} valueColor="#16A34A" sub={`${d.today.orders.toLocaleString()} order`} compact style={{ padding: 14 }} />
           <KpiCard
             label="AVG PCS / HOUR"
-            labelTh="ชิ้นต่อชั่วโมง เฉลี่ย (ชิ้น/ชม.)"
+            labelTh="ชิ้นต่อชั่วโมงแพ็กจริง (ชิ้น/ชม.)"
             value={avgRate?.toLocaleString() ?? '—'}
             valueColor={avgColor}
             sub={`เป้า ${target.toLocaleString()} ชิ้น/ชม.${avgPct !== null ? ` · ${avgPct}%` : ''}`}

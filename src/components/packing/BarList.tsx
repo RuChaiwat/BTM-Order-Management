@@ -66,7 +66,7 @@ export function HourBars({ rows, color = 'var(--color-info)', unit = 'ชิ้�
           </b>
         </span>
         <span>
-          เฉลี่ย <b style={{ color: 'var(--color-text)' }}>{Math.round(total / workHours).toLocaleString()}</b> {unit}/ชม.
+          เฉลี่ยต่อชั่วโมงทำงาน <b style={{ color: 'var(--color-text)' }}>{Math.round(total / workHours).toLocaleString()}</b> {unit}/ชม.
         </span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))`, gap: dense ? 3 : 6, alignItems: 'end', height: 190, paddingTop: 4 }}>

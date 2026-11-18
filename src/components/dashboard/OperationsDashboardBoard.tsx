@@ -252,7 +252,8 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
         </div>
       </Section>
 
-      {/* 3-4. Backlog by order date */}
+      {/* 3-4. Backlog by order date (Pick | Pack side by side) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
       <BacklogByDateTable
         title="Pick backlog by order date"
         subtitle="งานหยิบคงค้างแยกตามวันที่ Order · รอนานสุดนับจากเวลา Import"
@@ -271,6 +272,7 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
         todayKey={p.todayKey}
         emptyText="ไม่มีงานแพ็กค้าง"
       />
+      </div>
 
       {/* 5. Capacity and forecast */}
       <Section title="Capacity and forecast" subtitle="คาดว่าจะเคลียร์งานคงค้างเสร็จเมื่อไร · อ้างอิงงานที่ทำเสร็จจริงใน 60 นาทีล่าสุด">

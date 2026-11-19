@@ -82,7 +82,9 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   // from "Completed" below, which only counts orders the admin has actually confirmed closed.
   const waitingVerifyOrdersList = activeOrders.filter((o) => o.status === 'picker_completed_100' || o.status === 'picker_completed_short')
   const waitingVerifyOrders = waitingVerifyOrdersList.length
-  const waitingVerifyPieces = waitingVerifyOrdersList.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0)
+  // Ordered (planned) pieces: a short completion has no actual_pieces until Admin enters the real
+  // count during verification, so actual_pieces would silently count those orders as 0.
+  const waitingVerifyPieces = waitingVerifyOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
 
   const completedOrdersList = activeOrders.filter(closedToday)
   const completedOrders = completedOrdersList.length

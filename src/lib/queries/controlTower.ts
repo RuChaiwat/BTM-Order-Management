@@ -206,7 +206,7 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
       pickingBacklog: pickingBacklogOrders.length,
       pickingBacklogPieces: pickingBacklogOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),
       verificationBacklog: verificationBacklogOrders.length,
-      verificationBacklogPieces: verificationBacklogOrders.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0),
+      verificationBacklogPieces: verificationBacklogOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),
       activePickers: base.kpis.activePickers,
       activePickerTotalPieces: base.kpis.activePickerTotalPieces,
       activePickerTotalOrders: base.kpis.activePickerTotalOrders,

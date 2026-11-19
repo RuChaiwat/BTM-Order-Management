@@ -4,6 +4,7 @@ import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
 import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
+import { bangkokDateKey } from '../formatDate'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists) -- every live order/batch just sits
@@ -11,9 +12,6 @@ import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
 // checks all three of these instead of trusting 'in_progress' alone.
 const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in_progress'])
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
-// "Picking done" for Pending Pieces -- see dashboard.ts's PICKING_DONE_STATUSES for the full
-// reasoning: once the picker submits, the physical picking work is done even before Admin verifies.
-const PICKING_DONE_STATUSES = new Set(['picker_completed_100', 'picker_completed_short', 'final_closed_100', 'final_closed_short'])
 
 export interface ZoneActiveOrderRow {
   orderId: string
@@ -44,7 +42,7 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
     // RPC (migration 0023) returns only the DISTINCT (order_id, zone_code) pairs this needs for the
     // "which zone(s) does this order touch" map below, instead of pulling every line.
     fetchOrderZoneTouches(db, warehouseCode),
-    fetchAllRows((from, to) => db.from('orders').select('order_id, order_no, status, assignment_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).range(from, to)),
+    fetchAllRows((from, to) => db.from('orders').select('order_id, order_no, status, assignment_batch_id, planned_pieces, created_at, pack_ready_at').eq('warehouse_code', warehouseCode).range(from, to)),
     fetchAllRows((from, to) => db.from('assignment_batches').select('assignment_batch_id, picker_id, zone_code, status').eq('warehouse_code', warehouseCode).range(from, to)),
     getActiveZoneCodes(db, warehouseCode),
   ])
@@ -72,6 +70,17 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   const piecesForOrderInZone = (orderId: string, zone: string): number => piecesByOrderZone.get(orderId)?.get(zone) ?? 0
 
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
+
+  // Same daily funnel as Operations Dashboard (dashboard.ts), per zone. Cancelled orders are left out.
+  //   Total     = imported today + not yet admin-closed (carried over) + closed today
+  //   Pending   = not yet admin-closed, whatever its date (drops when Admin Final Closes)
+  //   Assigned  = handed to a picker, not yet admin-closed
+  //   Completed = admin Final Closed today (pack_ready_at is stamped at Final Close)
+  const todayKey = bangkokDateKey(new Date())
+  type OrderRow = (typeof orders)[number]
+  const isClosed = (o: OrderRow) => TERMINAL_CLOSED_STATUSES.has(o.status ?? '')
+  const closedToday = (o: OrderRow) => isClosed(o) && bangkokDateKey(o.pack_ready_at) === todayKey
+  const inScope = (o: OrderRow) => !isClosed(o) || closedToday(o) || bangkokDateKey(o.created_at) === todayKey
   const pickerIdByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
 
   // order_alerts/picker_completions have no warehouse_code column, so both are fetched via an RPC
@@ -93,7 +102,6 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
     getSlaThresholds(db),
   ])
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, { ...a, time_alert: computeTimeAlert(orderById.get(a.order_id)?.status ?? '', a.elapsed_minutes, thresholds) }]))
-  const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const completionById = new Map(completions.map((c) => [c.completion_id, c]))
   const reasonLabelByCode = new Map(unwrap(reasonRows).map((r) => [r.reason_code, r.label_en]))
 
@@ -144,6 +152,8 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
     if (!completion) continue
     const order = orderById.get(completion.order_id)
     if (!order) continue // not this warehouse
+    // Today's view only: orders still open (e.g. waiting for Admin) or closed today.
+    if (order.status === 'cancelled' || !(closedToday(order) || !isClosed(order))) continue
     const line = lineById.get(sl.line_id)
     if (!line?.zone_code) continue
     const row: ZoneShortPickRow = {
@@ -207,16 +217,17 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   const zoneDetail = zones.map((zone) => {
     const touching = [...(zoneOrderIds.get(zone) ?? new Set())]
       .map((id) => orderById.get(id))
-      .filter((o): o is NonNullable<typeof o> => Boolean(o))
+      .filter((o): o is NonNullable<typeof o> => Boolean(o) && o!.status !== 'cancelled')
 
-    const closed = touching.filter((o) => TERMINAL_CLOSED_STATUSES.has(o.status ?? ''))
-    const pickingDone = touching.filter((o) => PICKING_DONE_STATUSES.has(o.status ?? ''))
     // Real pieces THIS zone is responsible for, not an order's whole planned_pieces repeated in
     // every zone it touches (see piecesForOrderInZone's own comment above).
-    const totalPieces = touching.reduce((s, o) => s + piecesForOrderInZone(o.order_id, zone), 0)
-    // Drops once the picker submits, not only once Admin verifies -- see dashboard.ts.
-    const pendingPieces = totalPieces - pickingDone.reduce((s, o) => s + piecesForOrderInZone(o.order_id, zone), 0)
-    const slaPct = touching.length > 0 ? Math.round((closed.length / touching.length) * 1000) / 10 : 100
+    const zonePcs = (list: OrderRow[]) => list.reduce((s, o) => s + piecesForOrderInZone(o.order_id, zone), 0)
+    const totalPieces = zonePcs(touching.filter(inScope))
+    const pendingPieces = zonePcs(touching.filter((o) => !isClosed(o)))
+    const assignedPieces = zonePcs(touching.filter((o) => o.assignment_batch_id && !isClosed(o)))
+    const completedPieces = zonePcs(touching.filter(closedToday))
+    // % completed today by pieces -- the zone card badge and the SLA box use this same figure.
+    const slaPct = totalPieces > 0 ? Math.round((completedPieces / totalPieces) * 1000) / 10 : 0
 
     const activeOrders = (activeOrdersByZone.get(zone) ?? []).sort((a, b) => b.elapsedMinutes - a.elapsedMinutes)
     const criticalCount = activeOrders.filter((o) => o.timeAlert === 'critical').length
@@ -242,11 +253,14 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
       verificationBacklog: touching.filter((o) => alertByOrder.get(o.order_id)?.is_verification_backlog).length,
       verificationBacklogPieces: touching
         .filter((o) => alertByOrder.get(o.order_id)?.is_verification_backlog)
-        .reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0),
+        // Ordered pieces in this zone: a short completion has no actual count until Admin verifies.
+        .reduce((s, o) => s + piecesForOrderInZone(o.order_id, zone), 0),
       qtyShortPieces,
       qtyShortOrders,
       totalPieces,
       pendingPieces,
+      assignedPieces,
+      completedPieces,
       slaPct,
       riskLevel,
       criticalCount,

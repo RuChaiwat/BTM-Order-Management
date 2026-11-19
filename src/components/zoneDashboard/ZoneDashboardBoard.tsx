@@ -40,6 +40,8 @@ interface ZoneDetail {
   qtyShortOrders: number
   totalPieces: number
   pendingPieces: number
+  assignedPieces: number
+  completedPieces: number
   slaPct: number
   riskLevel: 'red' | 'yellow' | 'green'
   criticalCount: number
@@ -160,17 +162,20 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
               <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{z.totalPieces.toLocaleString()}</span> ชิ้นทั้งหมด
             </div>
             <div style={{ fontSize: 11, color: '#6B7280' }}>
+              <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{z.assignedPieces.toLocaleString()}</span> ชิ้นเบิกแล้ว
+            </div>
+            <div style={{ fontSize: 11, color: '#6B7280' }}>
               <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{z.activePickers}</span> Picker ที่ทำงานอยู่ (คน)
             </div>
-            {/* % completed = picker-submitted share of the zone's pieces (total - pending), same basis
-                as Operations Dashboard's Zone Status cards. The badge keeps the risk colour; the old
+            {/* % completed today = admin-closed-today share of the zone's pieces (same figure as the SLA
+                box and Operations Dashboard). The badge keeps the risk colour; the old
                 "N critical / N overdue / On track" text moved to the tooltip. */}
             <div
               style={{ marginTop: 8, display: 'flex', gap: 6, justifyContent: 'center' }}
               title={z.criticalCount > 0 ? `วิกฤต ${z.criticalCount} order` : z.overdueCount > 0 ? `เกินกำหนด ${z.overdueCount} order` : 'ตามกำหนด'}
             >
               <span className={`badge ${z.criticalCount > 0 ? 'badge-danger' : z.overdueCount > 0 ? 'badge-warning' : 'badge-success'}`} style={{ fontWeight: 700 }}>
-                เสร็จ {z.totalPieces > 0 ? Math.round(((z.totalPieces - z.pendingPieces) / z.totalPieces) * 1000) / 10 : 0}%
+                เสร็จ {z.slaPct}%
               </span>
             </div>
           </button>
@@ -183,23 +188,25 @@ export function ZoneDashboardBoard({ zoneDetail, initialZone }: { zoneDetail: Zo
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
             <KpiCard
               label="TOTAL PIECES (PCS)"
-              labelTh="ชิ้นทั้งหมดในโซน (ชิ้น)"
+              labelTh="Import วันนี้ + ค้างจากวันก่อน (ชิ้น)"
               value={selected.totalPieces.toLocaleString()}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />
             <KpiCard
               label="PENDING PIECES (PCS)"
-              labelTh="ชิ้นที่ยังค้างอยู่ (ชิ้น)"
+              labelTh="ยังไม่ปิดงาน (ชิ้น)"
               value={selected.pendingPieces.toLocaleString()}
+              sub={`เบิกแล้ว ${selected.assignedPieces.toLocaleString()} ชิ้น`}
               valueColor={selected.pendingPieces > 0 ? '#F59E0B' : undefined}
               compact
               style={{ padding: 14, textAlign: 'center' }}
             />
             <KpiCard
               label="SLA"
-              labelTh="ปิดงานสำเร็จของโซน (%)"
+              labelTh="ปิดงานวันนี้ คิดตามชิ้น (%)"
               value={`${selected.slaPct}%`}
+              sub={`ปิดงาน ${selected.completedPieces.toLocaleString()} ชิ้น`}
               valueColor={selected.slaPct >= 85 ? '#16A34A' : '#DC2626'}
               compact
               style={{ padding: 14, textAlign: 'center' }}

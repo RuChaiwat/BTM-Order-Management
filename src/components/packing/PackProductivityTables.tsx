@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Pagination } from '@/components/Pagination'
+import { ExportExcelButton } from '@/components/ExportExcelButton'
 import { formatDate } from '@/lib/formatDate'
 import type { DailyPackingSummary, PackerProductivityRow } from '../../lib/queries/packing'
 
@@ -241,6 +242,7 @@ export function DailyPackingHistory({ rows, selectedDate, target }: { rows: Dail
       <div className="card-header" style={{ marginBottom: 10 }}>
         <span className="card-title">Daily Productivity</span>
         <span className="card-subtitle">ประสิทธิผลรายวัน · เดือนนี้</span>
+        <ExportExcelButton href="/api/packing-productivity/daily-export" style={{ marginLeft: 'auto' }} />
       </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <thead>

@@ -163,10 +163,10 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
       {/* 1. Pick overview */}
       <Section title="Pick overview" subtitle="ภาพรวมงานหยิบ">
         <div className="kpi-grid" style={grid4}>
-          <KpiCard label="TOTAL ORDERS (PCS)" labelTh="Order ทั้งหมดที่ Import (ชิ้น)" value={k.totalPieces.toLocaleString()} sub={`${k.totalOrders.toLocaleString()} order`} {...kpi} />
+          <KpiCard label="TOTAL ORDERS (PCS)" labelTh="Import วันนี้ + ค้างจากวันก่อน (ชิ้น)" value={k.totalPieces.toLocaleString()} sub={`${k.totalOrders.toLocaleString()} order`} {...kpi} />
           <KpiCard
             label="ORDERS COMPLETED (PCS)"
-            labelTh="ปิดงานแล้ว · Admin Verified (ชิ้น)"
+            labelTh="Admin ปิดงานวันนี้ (ชิ้น)"
             value={k.completedPieces.toLocaleString()}
             valueColor={C.green}
             sub={`${k.completedOrders.toLocaleString()} order`}
@@ -189,7 +189,7 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
             compact
             style={{ padding: 14, textAlign: 'center', borderTop: `3px solid ${ORANGE}` }}
           />
-          <KpiCard label="ORDERS ASSIGNED (PCS)" labelTh="มอบหมายงานแล้ว (ชิ้น)" value={k.assignedPieces.toLocaleString()} sub={`${k.assignedOrders.toLocaleString()} order`} {...kpi} />
+          <KpiCard label="ORDERS ASSIGNED (PCS)" labelTh="มอบหมายแล้ว ยังไม่ปิดงาน (ชิ้น)" value={k.assignedPieces.toLocaleString()} sub={`${k.assignedOrders.toLocaleString()} order`} {...kpi} />
           <KpiCard
             label="ACTIVE PICKERS"
             labelTh="Picker ที่มีงานในมือ (คน)"

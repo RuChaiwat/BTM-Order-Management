@@ -45,7 +45,7 @@ export default async function ControlTowerPage() {
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
           <KpiCard
             label="TOTAL ORDERS (PCS)"
-            labelTh="Order ทั้งหมดที่ Import (ชิ้น)"
+            labelTh="Import วันนี้ + ค้างจากวันก่อน (ชิ้น)"
             value={data.kpis.totalPlannedPieces.toLocaleString()}
             sub={`${data.kpis.totalOrders.toLocaleString()} order`}
             compact
@@ -53,7 +53,7 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="ORDERS COMPLETED (PCS)"
-            labelTh="ปิดงานแล้ว · Admin Verified (ชิ้น)"
+            labelTh="Admin ปิดงานวันนี้ (ชิ้น)"
             value={data.kpis.completedPieces.toLocaleString()}
             valueColor="#16A34A"
             sub={`${data.kpis.completedOrders.toLocaleString()} order`}
@@ -80,7 +80,7 @@ export default async function ControlTowerPage() {
           />
           <KpiCard
             label="ORDERS ASSIGNED (PCS)"
-            labelTh="มอบหมายงานแล้ว (ชิ้น)"
+            labelTh="มอบหมายแล้ว ยังไม่ปิดงาน (ชิ้น)"
             value={data.kpis.assignedPieces.toLocaleString()}
             sub={`${data.kpis.assignedOrders.toLocaleString()} order`}
             compact

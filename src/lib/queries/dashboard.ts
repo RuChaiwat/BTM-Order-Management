@@ -24,7 +24,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     fetchAllRows((from, to) =>
       db
         .from('orders')
-        .select('order_id, status, planned_pieces, original_order_date, assignment_batch_id, created_at')
+        .select('order_id, status, planned_pieces, original_order_date, assignment_batch_id, created_at, pack_ready_at')
         .eq('warehouse_code', warehouseCode)
         .range(from, to),
     ),
@@ -56,15 +56,24 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
   const statusByOrderId = new Map(orders.map((o) => [o.order_id, o.status]))
 
-  // §management KPI funnel: Total Orders -> Assigned -> Completed (admin-verified only) -> %
-  // Completed -> Total Backlog. Cancelled orders are excluded from every stage here -- they were
-  // deliberately taken out of the workflow, so counting them as "imported" or as "backlog" would
-  // be misleading for a decision-making view.
+  // §management KPI funnel, scoped to TODAY (Bangkok) so it resets daily instead of piling up
+  // forever. Cancelled orders are excluded from every stage -- they were deliberately taken out of
+  // the workflow, so counting them as "imported" or as "backlog" would be misleading.
+  //   Total     = imported today + everything not yet admin-closed (carried over) + closed today
+  //               (so an older order closed today still sits inside Total -> Completed <= Total)
+  //   Completed = admin Final Closed today (pack_ready_at is stamped at Final Close)
+  //   Backlog   = Total - Completed = every order not yet admin-closed, whatever its date
+  const todayKey = bangkokDateKey(new Date())
   const activeOrders = orders.filter((o) => o.status !== 'cancelled')
-  const totalOrders = activeOrders.length
-  const totalPieces = activeOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
+  const isClosed = (o: (typeof orders)[number]) => TERMINAL_CLOSED_STATUSES.has(o.status)
+  const closedToday = (o: (typeof orders)[number]) => isClosed(o) && bangkokDateKey(o.pack_ready_at) === todayKey
+  const scopeOrders = activeOrders.filter((o) => !isClosed(o) || closedToday(o) || bangkokDateKey(o.created_at) === todayKey)
+  const totalOrders = scopeOrders.length
+  const totalPieces = scopeOrders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
 
-  const assignedOrdersList = activeOrders.filter((o) => o.assignment_batch_id)
+  // Orders Assigned = handed to a picker but not yet admin-closed (still somewhere in the pick
+  // process: picking, sent back, or waiting for Admin). Drops as soon as Admin Final Closes.
+  const assignedOrdersList = activeOrders.filter((o) => o.assignment_batch_id && !isClosed(o))
   const assignedOrders = assignedOrdersList.length
   const assignedPieces = assignedOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
 
@@ -75,7 +84,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   const waitingVerifyOrders = waitingVerifyOrdersList.length
   const waitingVerifyPieces = waitingVerifyOrdersList.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0)
 
-  const completedOrdersList = activeOrders.filter((o) => TERMINAL_CLOSED_STATUSES.has(o.status))
+  const completedOrdersList = activeOrders.filter(closedToday)
   const completedOrders = completedOrdersList.length
   const completedPieces = completedOrdersList.reduce((s, o) => s + (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0), 0)
 
@@ -84,12 +93,13 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   // final_closed_short order is "issue" pieces (acknowledged missing, not simply unworked), so it
   // counts toward the percentage alongside the pieces that were fully picked. e.g. Total 100,
   // Completed 85, Issue 5 -> 90% (the remaining 10 haven't been touched at all yet).
-  const issuePieces = activeOrders
+  const issuePieces = completedOrdersList
     .filter((o) => o.status === 'final_closed_short')
     .reduce((s, o) => s + Math.max(0, (o.planned_pieces ?? 0) - (completionByOrderId.get(o.order_id)?.actual_pieces ?? 0)), 0)
   const pctPiecesCompleted = totalPieces > 0 ? Math.round(((completedPieces + issuePieces) / totalPieces) * 1000) / 10 : 0
-  const totalBacklogOrders = totalOrders - completedOrders
-  const totalBacklogPieces = totalPieces - completedPieces
+  const backlogOrdersList = activeOrders.filter((o) => !isClosed(o))
+  const totalBacklogOrders = backlogOrdersList.length
+  const totalBacklogPieces = backlogOrdersList.reduce((s, o) => s + (o.planned_pieces ?? 0), 0)
 
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, { ...a, time_alert: computeTimeAlert(statusByOrderId.get(a.order_id) ?? '', a.elapsed_minutes, thresholds) }]))
   const critical = orders.filter((o) => alertByOrder.get(o.order_id)?.time_alert === 'critical').length
@@ -150,7 +160,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
 
   // Pieces pickers actually submitted in the last 60 minutes (whole team), and when today's first
   // submission happened -- the forecast only shows once a full hour of work exists.
-  const todayBangkok = bangkokDateKey(new Date())
+  const todayBangkok = todayKey
   let pickLastHourPieces = 0
   let pickFirstTodayMs: number | null = null
   for (const c of completions) {

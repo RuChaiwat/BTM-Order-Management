@@ -2,16 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { Pagination } from '@/components/Pagination'
-import type { PackerProductivityRow } from '../../lib/queries/packing'
-
-interface StationRow {
-  station_code: string
-  orders: number
-  pieces: number
-  seconds: number
-  pcsPerHour: number | null
-  issuesReported: number
-}
+import { formatDate } from '@/lib/formatDate'
+import type { DailyPackingSummary, PackerProductivityRow } from '../../lib/queries/packing'
 
 type Sort<K> = { key: K; dir: 'asc' | 'desc' }
 
@@ -45,17 +37,22 @@ function compare(a: unknown, b: unknown, dir: 'asc' | 'desc') {
   return dir === 'asc' ? cmp : -cmp
 }
 
+const pctColor = (rate: number | null, target: number) => {
+  if (rate === null || target <= 0) return undefined
+  const pct = (rate / target) * 100
+  return pct >= 100 ? 'var(--color-success-dark)' : pct >= 80 ? 'var(--color-warning-dark)' : 'var(--color-danger-dark)'
+}
+
 const PACKER_PAGE = 20
-const STATION_PAGE = 10
+const DAILY_PAGE = 20
 
-type PackerKey = 'name' | 'orders' | 'pieces' | 'seconds' | 'pcsPerHour' | 'avgSecondsPerOrder' | 'issuesReported'
+type PackerKey = 'name' | 'employmentType' | 'orders' | 'pieces' | 'pcsPerHour' | 'avgSecondsPerOrder' | 'issuesReported'
 
+/** Same layout as Picking Productivity's Picker Productivity table, plus the search box. */
 export function PackerProductivityTable({ packers, target }: { packers: PackerProductivityRow[]; target: number }) {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
-  const [sort, toggle] = useSort<PackerKey>({ key: 'pcsPerHour', dir: 'desc' }, ['name'])
-  const pctOfTarget = (rate: number | null) => (rate !== null && target > 0 ? Math.round((rate / target) * 100) : null)
-  const pctColor = (pct: number | null) => (pct === null ? undefined : pct >= 100 ? 'var(--color-success-dark)' : pct >= 80 ? 'var(--color-warning-dark)' : 'var(--color-danger-dark)')
+  const [sort, toggle] = useSort<PackerKey>({ key: 'pcsPerHour', dir: 'desc' }, ['name', 'employmentType'])
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -74,84 +71,61 @@ export function PackerProductivityTable({ packers, target }: { packers: PackerPr
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
-        <input
-          className="field-input"
-          list="packer-suggest"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setPage(1)
-          }}
-          placeholder="ค้นหารหัส หรือชื่อพนักงาน"
-          style={{ border: '1px solid var(--color-border)', width: 320, maxWidth: '100%' }}
-          autoComplete="off"
-        />
-        <datalist id="packer-suggest">
-          {packers.map((p) => (
-            <option key={p.picker_id} value={`${p.picker_id} · ${p.name}`} />
-          ))}
-        </datalist>
-        {query && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQuery('')}>
-            ล้าง
-          </button>
-        )}
-        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          {rows.length.toLocaleString()} / {packers.length.toLocaleString()} คน
-        </span>
-      </div>
+      <PeopleSearch
+        id="packer-suggest"
+        query={query}
+        onChange={(q) => {
+          setQuery(q)
+          setPage(1)
+        }}
+        options={packers.map((p) => `${p.picker_id} · ${p.name}`)}
+        shown={rows.length}
+        total={packers.length}
+      />
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
+          <col style={{ width: '4%' }} />
           <col style={{ width: '24%' }} />
-          <col style={{ width: '8%' }} />
-          <col style={{ width: '9%' }} />
+          <col style={{ width: '13%' }} />
           <col style={{ width: '10%' }} />
-          <col style={{ width: '9%' }} />
-          <col style={{ width: '9%' }} />
-          <col style={{ width: '10%' }} />
-          <col style={{ width: '9%' }} />
+          <col style={{ width: '11%' }} />
+          <col style={{ width: '11%' }} />
           <col style={{ width: '12%' }} />
+          <col style={{ width: '15%' }} />
         </colgroup>
         <thead>
           <tr>
+            <th>#</th>
             <SortHeader label="PACKER" sortKey="name" sort={sort} onSort={onSort} />
-            <SortHeader label="ORDERS" sortKey="orders" sort={sort} onSort={onSort} />
-            <SortHeader label="PIECES" sortKey="pieces" sort={sort} onSort={onSort} />
-            <SortHeader label={<>PACK<br />TIME</>} sortKey="seconds" sort={sort} onSort={onSort} />
-            <SortHeader label={<>PCS<br />/ HOUR</>} sortKey="pcsPerHour" sort={sort} onSort={onSort} />
-            <SortHeader label={<>% OF<br />TARGET</>} sortKey="pcsPerHour" sort={sort} onSort={onSort} />
+            <SortHeader label="TYPE" sortKey="employmentType" sort={sort} onSort={onSort} />
+            <SortHeader label="PCS / HR" sortKey="pcsPerHour" sort={sort} onSort={onSort} />
+            <SortHeader label={<>ORDERS<br />COMPLETED</>} sortKey="orders" sort={sort} onSort={onSort} />
+            <SortHeader label={<>PIECES<br />COMPLETED</>} sortKey="pieces" sort={sort} onSort={onSort} />
             <SortHeader label={<>AVG<br />/ ORDER</>} sortKey="avgSecondsPerOrder" sort={sort} onSort={onSort} />
             <SortHeader label="ISSUES" sortKey="issuesReported" sort={sort} onSort={onSort} />
-            <th>STATIONS</th>
           </tr>
         </thead>
         <tbody>
-          {pageRows.map((p) => {
-            const pct = pctOfTarget(p.pcsPerHour)
-            return (
-              <tr key={p.picker_id}>
-                <td style={{ overflowWrap: 'break-word' }}>
-                  {p.name}
-                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{p.picker_id}</div>
-                </td>
-                <td>{p.orders.toLocaleString()}</td>
-                <td style={{ fontWeight: 700 }}>{p.pieces.toLocaleString()}</td>
-                <td>{dur(p.seconds)}</td>
-                <td style={{ fontWeight: 700 }}>{p.pcsPerHour?.toLocaleString() ?? '—'}</td>
-                <td style={{ fontWeight: 700, color: pctColor(pct) }}>{pct !== null ? `${pct}%` : '—'}</td>
-                <td>{dur(p.avgSecondsPerOrder)}</td>
-                <td style={{ color: p.issuesReported ? 'var(--color-danger)' : undefined }}>
-                  {p.issuesReported}
-                  {p.issuePieces > 0 && <div style={{ fontSize: 11 }}>หัก {p.issuePieces} ชิ้น</div>}
-                </td>
-                <td style={{ fontSize: 12, overflowWrap: 'break-word' }}>{p.stations.join(', ')}</td>
-              </tr>
-            )
-          })}
+          {pageRows.map((p, i) => (
+            <tr key={p.picker_id}>
+              <td>{(current - 1) * PACKER_PAGE + i + 1}</td>
+              <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
+                {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.picker_id})</span>
+              </td>
+              <td style={{ overflowWrap: 'break-word' }}>{p.employmentType ?? <span style={{ color: '#9CA3AF' }}>—</span>}</td>
+              <td style={{ fontWeight: 700, color: pctColor(p.pcsPerHour, target) }}>{p.pcsPerHour?.toLocaleString() ?? '—'}</td>
+              <td>{p.orders.toLocaleString()}</td>
+              <td>{p.pieces.toLocaleString()}</td>
+              <td>{dur(p.avgSecondsPerOrder)}</td>
+              <td style={{ color: p.issuesReported ? 'var(--color-danger)' : undefined }}>
+                {p.issuesReported}
+                {p.issuePieces > 0 && <div style={{ fontSize: 11 }}>หัก {p.issuePieces} ชิ้น</div>}
+              </td>
+            </tr>
+          ))}
           {pageRows.length === 0 && (
             <tr>
-              <td colSpan={9} style={{ color: 'var(--color-text-secondary)' }}>
+              <td colSpan={8} style={{ color: 'var(--color-text-secondary)' }}>
                 {packers.length ? 'ไม่พบพนักงานที่ค้นหา' : 'ไม่มีงานแพ็กที่ปิดในวันนี้'}
               </td>
             </tr>
@@ -163,62 +137,143 @@ export function PackerProductivityTable({ packers, target }: { packers: PackerPr
   )
 }
 
-type StationKey = 'station_code' | 'orders' | 'pieces' | 'seconds' | 'pcsPerHour' | 'issuesReported'
-
-export function StationProductivityTable({ stations }: { stations: StationRow[] }) {
-  const [page, setPage] = useState(1)
-  const [sort, toggle] = useSort<StationKey>({ key: 'station_code', dir: 'asc' }, ['station_code'])
-  const rows = useMemo(() => [...stations].sort((a, b) => compare(a[sort.key], b[sort.key], sort.dir)), [stations, sort])
-  const totalPages = Math.max(1, Math.ceil(rows.length / STATION_PAGE))
-  const current = Math.min(page, totalPages)
-  const pageRows = rows.slice((current - 1) * STATION_PAGE, current * STATION_PAGE)
-  const onSort = (k: StationKey) => {
-    toggle(k)
-    setPage(1)
-  }
-
+/** Search box with name suggestions, shared by Picker and Packer productivity tables. */
+export function PeopleSearch({ id, query, onChange, options, shown, total }: { id: string; query: string; onChange: (q: string) => void; options: string[]; shown: number; total: number }) {
   return (
-    <>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+      <input
+        className="field-input"
+        list={id}
+        value={query}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="ค้นหารหัส หรือชื่อพนักงาน"
+        style={{ border: '1px solid var(--color-border)', width: 320, maxWidth: '100%' }}
+        autoComplete="off"
+      />
+      <datalist id={id}>
+        {options.map((o) => (
+          <option key={o} value={o} />
+        ))}
+      </datalist>
+      {query && (
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => onChange('')}>
+          ล้าง
+        </button>
+      )}
+      <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+        {shown.toLocaleString()} / {total.toLocaleString()} คน
+      </span>
+    </div>
+  )
+}
+
+/** Top 10 / Bottom 10 packers -- same card as Picking Productivity's leaderboards. */
+export function PackLeaderboard({ title, subtitle, rows, valueColor, emptyText }: { title: string; subtitle: string; rows: PackerProductivityRow[]; valueColor: string; emptyText: string }) {
+  return (
+    <div className="card">
+      <div className="card-header" style={{ marginBottom: 10 }}>
+        <span className="card-title">{title}</span>
+        <span className="card-subtitle">{subtitle}</span>
+      </div>
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <colgroup>
-          <col style={{ width: '20%' }} />
-          <col style={{ width: '15%' }} />
-          <col style={{ width: '16%' }} />
-          <col style={{ width: '18%' }} />
-          <col style={{ width: '16%' }} />
-          <col style={{ width: '15%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '38%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '14%' }} />
         </colgroup>
         <thead>
           <tr>
-            <SortHeader label="STATION" sortKey="station_code" sort={sort} onSort={onSort} />
-            <SortHeader label="ORDERS" sortKey="orders" sort={sort} onSort={onSort} />
-            <SortHeader label="PIECES" sortKey="pieces" sort={sort} onSort={onSort} />
-            <SortHeader label={<>PACK<br />TIME</>} sortKey="seconds" sort={sort} onSort={onSort} />
-            <SortHeader label={<>PCS<br />/ HOUR</>} sortKey="pcsPerHour" sort={sort} onSort={onSort} />
-            <SortHeader label="ISSUES" sortKey="issuesReported" sort={sort} onSort={onSort} />
+            <th>#</th>
+            <th>PACKER</th>
+            <th>PCS / HR</th>
+            <th>ORDERS</th>
+            <th>PIECES</th>
+            <th>AVG / ORDER</th>
           </tr>
         </thead>
         <tbody>
-          {pageRows.map((s) => (
-            <tr key={s.station_code}>
-              <td style={{ fontWeight: 700 }}>{s.station_code}</td>
-              <td>{s.orders.toLocaleString()}</td>
-              <td>{s.pieces.toLocaleString()}</td>
-              <td>{dur(s.seconds)}</td>
-              <td style={{ fontWeight: 700 }}>{s.pcsPerHour?.toLocaleString() ?? '—'}</td>
-              <td style={{ color: s.issuesReported ? 'var(--color-danger)' : undefined }}>{s.issuesReported}</td>
+          {rows.map((p, i) => (
+            <tr key={p.picker_id}>
+              <td>{i + 1}</td>
+              <td style={{ fontWeight: 700, overflowWrap: 'break-word' }}>
+                {p.name} <span style={{ fontWeight: 400, color: '#6B7280' }}>({p.picker_id})</span>
+                {p.employmentType && <div style={{ fontSize: 11, fontWeight: 400, color: '#6B7280' }}>{p.employmentType}</div>}
+              </td>
+              <td style={{ fontWeight: 700, color: valueColor }}>{p.pcsPerHour?.toLocaleString() ?? '—'}</td>
+              <td>{p.orders.toLocaleString()}</td>
+              <td>{p.pieces.toLocaleString()}</td>
+              <td>{dur(p.avgSecondsPerOrder)}</td>
             </tr>
           ))}
-          {pageRows.length === 0 && (
+          {rows.length === 0 && (
             <tr>
               <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
-                —
+                {emptyText}
               </td>
             </tr>
           )}
         </tbody>
       </table>
-      {rows.length > STATION_PAGE && <Pagination page={current} totalPages={totalPages} onChange={setPage} />}
-    </>
+    </div>
+  )
+}
+
+type DailyKey = 'date' | 'orders' | 'pieces' | 'pcsPerHour' | 'issues' | 'issuePieces'
+
+/** Month-to-date daily rollup -- same as Picking Productivity's Daily Productivity table. */
+export function DailyPackingHistory({ rows, selectedDate, target }: { rows: DailyPackingSummary[]; selectedDate: string; target: number }) {
+  const [page, setPage] = useState(1)
+  const [sort, toggle] = useSort<DailyKey>({ key: 'date', dir: 'desc' }, [])
+  const sorted = useMemo(() => [...rows].sort((a, b) => compare(a[sort.key], b[sort.key], sort.dir)), [rows, sort])
+  const totalPages = Math.max(1, Math.ceil(sorted.length / DAILY_PAGE))
+  const current = Math.min(page, totalPages)
+  const pageRows = sorted.slice((current - 1) * DAILY_PAGE, current * DAILY_PAGE)
+  const onSort = (k: DailyKey) => {
+    toggle(k)
+    setPage(1)
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header" style={{ marginBottom: 10 }}>
+        <span className="card-title">Daily Productivity</span>
+        <span className="card-subtitle">ประสิทธิผลรายวัน · เดือนนี้</span>
+      </div>
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <thead>
+          <tr>
+            <SortHeader label="DATE" sortKey="date" sort={sort} onSort={onSort} />
+            <SortHeader label={<>ORDERS<br />COMPLETED</>} sortKey="orders" sort={sort} onSort={onSort} />
+            <SortHeader label={<>PIECES<br />COMPLETED</>} sortKey="pieces" sort={sort} onSort={onSort} />
+            <SortHeader label={<>AVG<br />PCS/HOUR</>} sortKey="pcsPerHour" sort={sort} onSort={onSort} />
+            <SortHeader label={<>ISSUES<br />(ORDER)</>} sortKey="issues" sort={sort} onSort={onSort} />
+            <SortHeader label={<>ISSUE<br />(PCS)</>} sortKey="issuePieces" sort={sort} onSort={onSort} />
+          </tr>
+        </thead>
+        <tbody>
+          {pageRows.map((r) => (
+            <tr key={r.date} style={r.date === selectedDate ? { background: 'var(--color-surface-muted)', boxShadow: 'inset 2px 0 0 var(--color-primary)' } : undefined}>
+              <td style={{ fontWeight: 700 }}>{formatDate(r.date)}</td>
+              <td>{r.orders.toLocaleString()}</td>
+              <td>{r.pieces.toLocaleString()}</td>
+              <td style={{ fontWeight: 700, color: pctColor(r.pcsPerHour, target) }}>{r.pcsPerHour?.toLocaleString() ?? '—'}</td>
+              <td style={{ color: r.issues ? 'var(--color-danger)' : undefined }}>{r.issues.toLocaleString()}</td>
+              <td>{r.issuePieces.toLocaleString()}</td>
+            </tr>
+          ))}
+          {pageRows.length === 0 && (
+            <tr>
+              <td colSpan={6} style={{ color: 'var(--color-text-secondary)' }}>
+                ยังไม่มีงานแพ็กที่เสร็จในเดือนนี้
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+      {sorted.length > DAILY_PAGE && <Pagination page={current} totalPages={totalPages} onChange={setPage} />}
+    </div>
   )
 }

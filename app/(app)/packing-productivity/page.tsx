@@ -5,11 +5,11 @@ import { ExportExcelButton } from '@/components/ExportExcelButton'
 import { Legend } from '@/components/Legend'
 import { PackDateFilter } from '@/components/packing/PackDateFilter'
 import { HourBars } from '@/components/packing/BarList'
-import { PackerProductivityTable, StationProductivityTable } from '@/components/packing/PackProductivityTables'
+import { DailyPackingHistory, PackLeaderboard, PackerProductivityTable } from '@/components/packing/PackProductivityTables'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireMenuAccess } from '@/lib/pageAccess'
-import { getPackingProductivity } from '@/lib/queries/packing'
+import { getMonthlyPackingHistory, getPackingProductivity } from '@/lib/queries/packing'
 import { getPackingSettings } from '@/lib/packing'
 import { bangkokDateKey, formatDate } from '@/lib/formatDate'
 
@@ -28,17 +28,20 @@ export default async function PackingProductivityPage({ searchParams }: { search
   const warehouseCode = user.warehouse_code ?? 'DC002'
   const date = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date ?? '') ? searchParams.date! : bangkokDateKey(new Date()) ?? new Date().toISOString().slice(0, 10)
   const admin = createAdminClient()
-  const [d, settings] = await Promise.all([getPackingProductivity(admin, warehouseCode, date), getPackingSettings(admin)])
+  const [d, settings, monthly] = await Promise.all([getPackingProductivity(admin, warehouseCode, date), getPackingSettings(admin), getMonthlyPackingHistory(admin, warehouseCode)])
   const target = settings.targetPcsPerHour
   const pctOfTarget = (rate: number | null) => (rate !== null && target > 0 ? Math.round((rate / target) * 100) : null)
   const pctColor = (pct: number | null) => (pct === null ? undefined : pct >= 100 ? 'var(--color-success-dark)' : pct >= 80 ? 'var(--color-warning-dark)' : 'var(--color-danger-dark)')
   const totalPct = pctOfTarget(d.totals.pcsPerHour)
+  // Top 10 above target / Bottom 10 -- same rule as Picking Productivity.
+  const worked = d.packers.filter((p) => p.pcsPerHour !== null)
+  const topAboveTarget = worked.filter((p) => p.pcsPerHour! > target).sort((a, b) => b.pcsPerHour! - a.pcsPerHour!).slice(0, 10)
+  const bottomPerformers = [...worked].sort((a, b) => a.pcsPerHour! - b.pcsPerHour!).slice(0, 10)
 
   return (
     <>
       <TopBar title="Packing Productivity" subtitle={`ประสิทธิผลงานแพ็กรายวัน · ${formatDate(date)} · ${warehouseCode}`}>
         <PackDateFilter basePath="/packing-productivity" date={date} />
-        <ExportExcelButton href={`/api/packing-productivity/export?date=${date}`} />
       </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
@@ -49,10 +52,28 @@ export default async function PackingProductivityPage({ searchParams }: { search
           <KpiCard label="AVG TIME / ORDER" labelTh="เวลาเฉลี่ยต่อ order (นาที)" value={d.totals.orders ? (d.totals.seconds / d.totals.orders / 60).toLocaleString(undefined, { maximumFractionDigits: 1 }) : '—'} sub={d.totals.orders ? dur(Math.round(d.totals.seconds / d.totals.orders)) : undefined} compact style={{ padding: 14 }} />
         </div>
 
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <PackLeaderboard
+            title="Top 10 Above Target"
+            subtitle={`Packer ที่เกินเป้า · ${formatDate(date)} · เป้า ${target.toLocaleString()} ชิ้น/ชม.`}
+            rows={topAboveTarget}
+            valueColor="#16A34A"
+            emptyText="ไม่มี Packer ที่เกินเป้าในวันนี้"
+          />
+          <PackLeaderboard
+            title="Bottom 10 Packers"
+            subtitle={`Packer ที่อัตราแพ็กต่ำสุด · ${formatDate(date)}`}
+            rows={bottomPerformers}
+            valueColor="#DC2626"
+            emptyText="ยังไม่มีงานแพ็กที่เสร็จในวันนี้"
+          />
+        </div>
+
         <div className="card">
-          <div className="card-title">Packer productivity</div>
-          <div className="card-subtitle" style={{ marginBottom: 10 }}>
-            ประสิทธิผลราย Packer
+          <div className="card-header" style={{ marginBottom: 10 }}>
+            <span className="card-title">Packer Productivity</span>
+            <span className="card-subtitle">ประสิทธิผลผู้แพ็กสินค้า · {formatDate(date)}</span>
+            <ExportExcelButton href={`/api/packing-productivity/export?date=${date}`} style={{ marginLeft: 'auto' }} />
           </div>
           <PackerProductivityTable packers={d.packers} target={target} />
           <Legend
@@ -75,13 +96,7 @@ export default async function PackingProductivityPage({ searchParams }: { search
           <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}>นับตามเวลาที่ปิดงาน</div>
         </div>
 
-        <div className="card">
-          <div className="card-title">By station</div>
-          <div className="card-subtitle" style={{ marginBottom: 10 }}>
-            ประสิทธิผลราย Station
-          </div>
-          <StationProductivityTable stations={d.stations} />
-        </div>
+        <DailyPackingHistory rows={monthly} selectedDate={date} target={target} />
       </div>
     </>
   )

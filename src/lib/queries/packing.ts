@@ -3,6 +3,7 @@ import { bangkokDateKey, bangkokDayRange } from '../formatDate'
 import { CREDITED_RESULTS, ISSUE_RESULTS, creditedPieces, sessionSeconds } from '../packing'
 import { BACKLOG_STATUSES, type BacklogStatus } from '../packBacklog'
 import { dailyThroughput } from '../throughput'
+import { fetchAllRows } from './fetchAllRows'
 
 export { BACKLOG_STATUSES, type BacklogStatus }
 
@@ -25,6 +26,16 @@ async function inChunks<T>(ids: string[], fetchChunk: (chunk: string[]) => Promi
 async function pickerNames(db: SupabaseClient, ids: string[]) {
   const rows = await inChunks<{ picker_id: string; name_en: string; name_th: string | null }>(ids, (c) => db.from('pickers').select('picker_id, name_en, name_th').in('picker_id', c))
   return new Map(rows.map((p) => [p.picker_id, p.name_th || p.name_en]))
+}
+
+/** Employment type label (Picker master) per picker_id -- same source as Picking Productivity's TYPE. */
+async function pickerTypes(db: SupabaseClient, ids: string[]) {
+  const [rows, types] = await Promise.all([
+    inChunks<{ picker_id: string; employment_type: string | null }>(ids, (c) => db.from('pickers').select('picker_id, employment_type').in('picker_id', c)),
+    db.from('picker_employment_types').select('type_code, label_en'),
+  ])
+  const label = new Map((types.data ?? []).map((t) => [t.type_code as string, t.label_en as string]))
+  return new Map(rows.map((p) => [p.picker_id, p.employment_type ? label.get(p.employment_type) ?? p.employment_type : null]))
 }
 
 async function userNames(db: SupabaseClient, ids: string[]) {
@@ -198,23 +209,25 @@ export interface PackerProductivityRow {
   issuesReported: number
   issuePieces: number
   stations: string[]
+  employmentType: string | null
 }
 
 export async function getPackingProductivity(db: SupabaseClient, warehouseCode: string, dateKey: string) {
   const { sinceIso, untilIso } = bangkokDayRange(dateKey)
-  const { data } = await db
-    .from('pack_sessions')
-    .select('picker_id, station_code, started_at, finished_at, result, pieces, issue_pieces, short_pieces, carried_seconds')
-    .eq('warehouse_code', warehouseCode)
-    .gte('finished_at', sinceIso)
-    .lt('finished_at', untilIso)
-    .neq('result', 'cancelled')
-    .limit(20000)
-  const sessions = data ?? []
-  const names = await pickerNames(
-    db,
-    sessions.map((s) => s.picker_id),
+  // Paged: PostgREST's Max Rows cap would otherwise silently cut a busy day short.
+  const sessions = await fetchAllRows((from, to) =>
+    db
+      .from('pack_sessions')
+      .select('session_id, picker_id, station_code, started_at, finished_at, result, pieces, issue_pieces, short_pieces, carried_seconds')
+      .eq('warehouse_code', warehouseCode)
+      .gte('finished_at', sinceIso)
+      .lt('finished_at', untilIso)
+      .neq('result', 'cancelled')
+      .order('session_id')
+      .range(from, to),
   )
+  const packerIds = sessions.map((s) => s.picker_id)
+  const [names, types] = await Promise.all([pickerNames(db, packerIds), pickerTypes(db, packerIds)])
 
   type Acc = { orders: number; pieces: number; seconds: number; issues: number; issuePieces: number; stations: Set<string> }
   const blank = (): Acc => ({ orders: 0, pieces: 0, seconds: 0, issues: 0, issuePieces: 0, stations: new Set() })
@@ -263,6 +276,7 @@ export async function getPackingProductivity(db: SupabaseClient, warehouseCode: 
       issuesReported: a.issues,
       issuePieces: a.issuePieces,
       stations: [...a.stations].sort(),
+      employmentType: types.get(id) ?? null,
     }))
     .sort((a, b) => (b.pcsPerHour ?? -1) - (a.pcsPerHour ?? -1))
   const stations = [...byStation.entries()]
@@ -274,6 +288,54 @@ export async function getPackingProductivity(db: SupabaseClient, warehouseCode: 
     hourly: hourly.map((h, i) => ({ hour: i, ...h })),
     totals: { orders: total.orders, pieces: total.pieces, seconds: Math.round(total.seconds), pcsPerHour: rate(total), issues: total.issues, issuePieces: total.issuePieces, packers: byPacker.size },
   }
+}
+
+export interface DailyPackingSummary {
+  date: string
+  orders: number
+  pieces: number
+  pcsPerHour: number | null
+  issues: number
+  issuePieces: number
+}
+
+/** Month-to-date, every packer combined, one row per day -- today left out (it is the KPI cards
+ * above), same as Picking Productivity's Daily Productivity table. */
+export async function getMonthlyPackingHistory(db: SupabaseClient, warehouseCode: string): Promise<DailyPackingSummary[]> {
+  const today = todayKey()
+  const monthStart = `${today.slice(0, 7)}-01`
+  if (monthStart === today) return []
+  const { sinceIso } = bangkokDayRange(monthStart)
+  const { sinceIso: untilIso } = bangkokDayRange(today)
+  const sessions = await fetchAllRows((from, to) =>
+    db
+      .from('pack_sessions')
+      .select('session_id, started_at, finished_at, result, pieces, issue_pieces, short_pieces, carried_seconds')
+      .eq('warehouse_code', warehouseCode)
+      .gte('finished_at', sinceIso)
+      .lt('finished_at', untilIso)
+      .neq('result', 'cancelled')
+      .order('session_id')
+      .range(from, to),
+  )
+  const byDay = new Map<string, { orders: number; pieces: number; seconds: number; issues: number; issuePieces: number }>()
+  for (const s of sessions) {
+    const key = bangkokDateKey(s.finished_at)
+    if (!key) continue
+    const d = byDay.get(key) ?? byDay.set(key, { orders: 0, pieces: 0, seconds: 0, issues: 0, issuePieces: 0 }).get(key)!
+    if (CREDITED_RESULTS.includes(s.result ?? '')) {
+      d.orders++
+      d.pieces += creditedPieces(s)
+      d.seconds += sessionSeconds(s)
+    }
+    if (ISSUE_RESULTS.has(s.result ?? '')) {
+      d.issues++
+      if (s.result === 'issue_closed') d.issuePieces += Number(s.issue_pieces)
+    }
+  }
+  return [...byDay.entries()]
+    .map(([date, d]) => ({ date, orders: d.orders, pieces: d.pieces, pcsPerHour: d.seconds > 0 ? Math.round((d.pieces / d.seconds) * 3600) : null, issues: d.issues, issuePieces: d.issuePieces }))
+    .sort((a, b) => b.date.localeCompare(a.date))
 }
 
 // ---------------------------------------------------------------- Pack issues

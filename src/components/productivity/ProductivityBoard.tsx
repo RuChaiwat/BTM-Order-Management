@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { formatDate } from '@/lib/formatDate'
 import { Pagination } from '@/components/Pagination'
 import { ExportExcelButton } from '@/components/ExportExcelButton'
+import { PeopleSearch } from '@/components/packing/PackProductivityTables'
 
 interface PickerRow {
   user_id: string
@@ -126,20 +127,27 @@ export function ProductivityBoard({
 }) {
   const [pickerSort, setPickerSort] = useState<{ key: PickerSortKey; dir: 'asc' | 'desc' }>({ key: 'pcsPerHour', dir: 'desc' })
   const [pickerPage, setPickerPage] = useState(1)
+  const [query, setQuery] = useState('')
 
   function togglePickerSort(key: PickerSortKey) {
     setPickerSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' || key === 'employmentType' ? 'asc' : 'desc' }))
     setPickerPage(1)
   }
 
+  // Same search as Packing Productivity: a suggestion fills "ID · name", either part matches.
+  const filteredPickers = useMemo(() => {
+    const terms = query.trim().toLowerCase().split('·').map((t) => t.trim()).filter(Boolean)
+    if (!terms.length) return pickerRows
+    return pickerRows.filter((p) => terms.every((t) => p.user_id.toLowerCase().includes(t) || p.name.toLowerCase().includes(t)))
+  }, [pickerRows, query])
   const sortedPickers = useMemo(
     () =>
-      sortRows(pickerRows, pickerSort.key, pickerSort.dir, (row, key) => {
+      sortRows(filteredPickers, pickerSort.key, pickerSort.dir, (row, key) => {
         if (key === 'name') return row.name
         if (key === 'employmentType') return row.employmentType
         return row[key]
       }),
-    [pickerRows, pickerSort],
+    [filteredPickers, pickerSort],
   )
   const pickerTotalPages = Math.max(1, Math.ceil(sortedPickers.length / PAGE_SIZE))
   const pickerPageRows = sortedPickers.slice((pickerPage - 1) * PAGE_SIZE, pickerPage * PAGE_SIZE)
@@ -170,6 +178,17 @@ export function ProductivityBoard({
           <span className="card-subtitle">ประสิทธิผลผู้หยิบสินค้า · {formatDate(date)}</span>
           <ExportExcelButton href={productivityExportHref} style={{ marginLeft: 'auto' }} />
         </div>
+        <PeopleSearch
+          id="picker-suggest"
+          query={query}
+          onChange={(q) => {
+            setQuery(q)
+            setPickerPage(1)
+          }}
+          options={pickerRows.map((p) => `${p.user_id} · ${p.name}`)}
+          shown={filteredPickers.length}
+          total={pickerRows.length}
+        />
         <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             <col style={{ width: '3%' }} />
@@ -261,7 +280,7 @@ export function ProductivityBoard({
             {pickerPageRows.length === 0 && (
               <tr>
                 <td colSpan={10} style={{ color: 'var(--color-text-secondary)' }}>
-                  ไม่พบ Picker ที่ใช้งานอยู่ใน {warehouseCode}
+                  {pickerRows.length ? 'ไม่พบพนักงานที่ค้นหา' : `ไม่พบ Picker ที่ใช้งานอยู่ใน ${warehouseCode}`}
                 </td>
               </tr>
             )}

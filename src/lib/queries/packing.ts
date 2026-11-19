@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { bangkokDateKey, bangkokDayRange } from '../formatDate'
 import { CREDITED_RESULTS, ISSUE_RESULTS, creditedPieces, sessionSeconds } from '../packing'
 import { BACKLOG_STATUSES, type BacklogStatus } from '../packBacklog'
+import { dailyThroughput } from '../throughput'
 
 export { BACKLOG_STATUSES, type BacklogStatus }
 
@@ -99,7 +100,9 @@ export interface BacklogDateRow {
 export async function getPackingDashboardData(db: SupabaseClient, warehouseCode: string) {
   const count = (status: string) => db.from('orders').select('order_id', { count: 'exact', head: true }).eq('warehouse_code', warehouseCode).eq('pack_status', status)
   const { sinceIso, untilIso } = bangkokDayRange(todayKey())
-  const [pending, packing, packed, issue, openIssues, pendingAges, todaySessions, confirmedToday, fixedToday] = await Promise.all([
+  // Forecast fallback: the last working day's pack rate, looked up to 14 days back.
+  const prevSinceIso = new Date(new Date(sinceIso).getTime() - 14 * 86400000).toISOString()
+  const [pending, packing, packed, issue, openIssues, pendingAges, todaySessions, confirmedToday, fixedToday, prevSessions] = await Promise.all([
     count('pending'),
     count('packing'),
     count('packed'),
@@ -110,6 +113,7 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
     db.from('pack_verifications').select('order_id', { count: 'exact', head: true }).gte('verified_time', sinceIso).lt('verified_time', untilIso),
     // Admin's time to fix a reported problem (reported -> resolved), kept apart from packer productivity.
     db.from('pack_issues').select('reported_at, resolved_at').eq('warehouse_code', warehouseCode).eq('status', 'resolved').gte('resolved_at', sinceIso).lt('resolved_at', untilIso).limit(5000),
+    db.from('pack_sessions').select('finished_at, result, pieces, issue_pieces, short_pieces').eq('warehouse_code', warehouseCode).gte('finished_at', prevSinceIso).lt('finished_at', sinceIso).in('result', CREDITED_RESULTS).order('finished_at', { ascending: false }).limit(5000),
   ])
   const fixed = fixedToday.data ?? []
   const fixMinutes = fixed.reduce((sum, i) => sum + Math.max(0, (new Date(i.resolved_at!).getTime() - new Date(i.reported_at).getTime()) / 60000), 0)
@@ -156,14 +160,7 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
   const hourly = Array.from({ length: 24 }, (_, h) => ({ hour: h, pieces: 0, orders: 0 }))
   let piecesToday = 0
   const packers = new Set<string>()
-  // Credited pieces finished in the last 60 minutes (whole team) and today's first finish -- the
-  // Operations Dashboard forecast only shows once a full hour of work exists.
-  let lastHourPieces = 0
-  let firstFinishMs: number | null = null
   for (const s of todaySessions.data ?? []) {
-    const t = new Date(s.finished_at!).getTime()
-    firstFinishMs = firstFinishMs === null ? t : Math.min(firstFinishMs, t)
-    if (now - t <= 3600000) lastHourPieces += creditedPieces(s)
     const h = Number(new Date(s.finished_at!).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false }).slice(0, 2)) % 24
     const pcs = creditedPieces(s)
     hourly[h].pieces += pcs
@@ -180,7 +177,11 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
     backlogTotal,
     oldestMinutes: Math.round(oldestMinutes),
     hourly,
-    lastHour: { pieces: lastHourPieces, firstAt: firstFinishMs === null ? null : new Date(firstFinishMs).toISOString() },
+    // Operations Dashboard forecast: today's average pack rate, or the last working day's.
+    throughput: dailyThroughput(
+      [...(prevSessions.data ?? []), ...(todaySessions.data ?? [])].map((s) => ({ at: s.finished_at!, pieces: creditedPieces(s) })),
+      now,
+    ),
   }
 }
 

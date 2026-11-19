@@ -4,6 +4,7 @@ import { fetchScopedByOrderIds } from './scopedFetch'
 import { bangkokDateKey } from '../formatDate'
 import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
 import { PICK_STAGES, pickStageOf, type PickStage } from '../pickBacklog'
+import { dailyThroughput } from '../throughput'
 
 const TERMINAL_CLOSED_STATUSES = new Set(['final_closed_100', 'final_closed_short'])
 // assignment_batches.status is not a reliable "is this picker still working" signal: nothing in
@@ -160,17 +161,14 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     if (a) pickInProgress[a]++
   }
 
-  // Pieces pickers actually submitted in the last 60 minutes (whole team), and when today's first
-  // submission happened -- the forecast only shows once a full hour of work exists.
-  const todayBangkok = todayKey
-  let pickLastHourPieces = 0
-  let pickFirstTodayMs: number | null = null
-  for (const c of completions) {
-    if (!c.picker_completed_time || bangkokDateKey(c.picker_completed_time) !== todayBangkok) continue
-    const t = new Date(c.picker_completed_time).getTime()
-    pickFirstTodayMs = pickFirstTodayMs === null ? t : Math.min(pickFirstTodayMs, t)
-    if (nowMs - t <= 3600000) pickLastHourPieces += c.actual_pieces ?? 0
-  }
+  // Pick output rate for the forecast: ordered (planned) pieces of every order a picker submitted
+  // -- same unit as the remaining pick work, and a short completion counts right away instead of
+  // waiting for Admin to enter its real count. Today's average, or the last working day's.
+  const plannedByOrderId = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
+  const pickThroughput = dailyThroughput(
+    completions.filter((c) => c.picker_completed_time).map((c) => ({ at: c.picker_completed_time, pieces: plannedByOrderId.get(c.order_id) ?? 0 })),
+    Date.now(),
+  )
 
   return {
     kpis: {
@@ -193,7 +191,7 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     pickBacklog,
     pickBacklogTotal,
     pickInProgress,
-    pickLastHour: { pieces: pickLastHourPieces, firstAt: pickFirstTodayMs === null ? null : new Date(pickFirstTodayMs).toISOString() },
+    pickThroughput,
     pickThresholds: { warning: thresholds.pickWarningMinutes, overdue: thresholds.pickOverdueMinutes, critical: thresholds.pickCriticalMinutes },
     actionRequired: {
       critical,

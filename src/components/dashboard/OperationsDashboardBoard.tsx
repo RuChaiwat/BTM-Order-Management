@@ -7,6 +7,7 @@ import { PICK_STAGES, PICK_STAGE_META } from '../../lib/pickBacklog'
 import { BACKLOG_META, BACKLOG_STATUSES } from '../../lib/packBacklog'
 import type { getDashboardData } from '../../lib/queries/dashboard'
 import type { getPackingDashboardData } from '../../lib/queries/packing'
+import type { Throughput } from '../../lib/throughput'
 
 export interface OperationsDashboardProps {
   pick: Awaited<ReturnType<typeof getDashboardData>>
@@ -120,17 +121,23 @@ function ActionBox({
   )
 }
 
-/** Forecast for one side: remaining pieces / pieces actually finished in the last 60 minutes.
- * Shows nothing until today's work has run a full hour. */
-function forecast(remaining: number, lastHour: { pieces: number; firstAt: string | null }, nowMs: number) {
-  if (remaining <= 0) return { rate: null as number | null, text: 'ไม่มีงานค้าง', color: C.green }
-  if (!lastHour.firstAt) return { rate: null, text: 'ยังไม่มีงานเสร็จวันนี้', color: undefined }
-  const elapsed = (nowMs - new Date(lastHour.firstAt).getTime()) / 60000
-  if (elapsed < 60) return { rate: null, text: `รอข้อมูลครบ 60 นาที (อีก ${Math.ceil(60 - elapsed)} นาที)`, color: undefined }
-  if (lastHour.pieces <= 0) return { rate: 0, text: 'ไม่มีงานเสร็จใน 60 นาทีล่าสุด', color: C.red }
-  const mins = (remaining / lastHour.pieces) * 60
-  const at = new Date(nowMs + mins * 60000).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
-  return { rate: lastHour.pieces, text: mins >= 1440 ? `~${hm(mins)}` : `~${hm(mins)} · เสร็จประมาณ ${at} น.`, color: undefined }
+const clock = (ms: number) => new Date(ms).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
+
+/** Forecast for one side: remaining pieces / average rate (today's, or the last working day's
+ * until today has run 60 minutes -- see src/lib/throughput.ts). */
+function forecast(remaining: number, tp: Throughput, nowMs: number) {
+  // Where the rate came from, shown under it.
+  let basis = 'ยังไม่มีข้อมูลย้อนหลัง'
+  if (tp.source === 'today' && tp.todayFirstAt) basis = `เฉลี่ยวันนี้ ตั้งแต่ ${clock(new Date(tp.todayFirstAt).getTime())} น.`
+  else if (tp.source === 'prev' && tp.date) {
+    const [, m, d] = tp.date.split('-')
+    const why = tp.todayFirstAt ? `วันนี้ทำงานยังไม่ครบ 60 นาที (อีก ${Math.max(1, Math.ceil(60 - (nowMs - new Date(tp.todayFirstAt).getTime()) / 60000))} นาที)` : 'วันนี้ยังไม่มีงานเสร็จ'
+    basis = `เฉลี่ยวันที่ ${d}/${m} · ${why}`
+  }
+  if (remaining <= 0) return { rate: tp.rate, basis, text: 'ไม่มีงานค้าง', color: C.green }
+  if (!tp.rate) return { rate: tp.rate, basis, text: 'ยังคำนวณไม่ได้', color: undefined }
+  const mins = (remaining / tp.rate) * 60
+  return { rate: tp.rate, basis, text: mins >= 1440 ? `~${hm(mins)}` : `~${hm(mins)} · เสร็จประมาณ ${clock(nowMs + mins * 60000)} น.`, color: undefined }
 }
 
 export function OperationsDashboardBoard(p: OperationsDashboardProps) {
@@ -143,8 +150,8 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
   // Forecast: work left for pickers / packers themselves (Admin's confirm steps are not counted).
   const pickRemaining = pick.pickBacklogTotal.byStage.waiting.pieces + pick.pickBacklogTotal.byStage.picking.pieces
   const packRemaining = bs.pending.pieces + bs.packing.pieces
-  const pickFc = forecast(pickRemaining, pick.pickLastHour, p.nowMs)
-  const packFc = forecast(packRemaining, pack.lastHour, p.nowMs)
+  const pickFc = forecast(pickRemaining, pick.pickThroughput, p.nowMs)
+  const packFc = forecast(packRemaining, pack.throughput, p.nowMs)
   const packSlower = pickFc.rate !== null && packFc.rate !== null && pickFc.rate > packFc.rate ? pickFc.rate - packFc.rate : 0
 
   const t = pick.pickThresholds
@@ -275,7 +282,7 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
       </div>
 
       {/* 5. Capacity and forecast */}
-      <Section title="Capacity and forecast" subtitle="คาดว่าจะเคลียร์งานคงค้างเสร็จเมื่อไร · อ้างอิงงานที่ทำเสร็จจริงใน 60 นาทีล่าสุด">
+      <Section title="Capacity and forecast" subtitle="คาดว่าจะเคลียร์งานคงค้างเสร็จเมื่อไร · อ้างอิงอัตราเฉลี่ยของวันนี้">
         <table className="table" style={{ tableLayout: 'fixed', width: '100%', fontSize: 13 }}>
           <colgroup>
             <col style={{ width: '10%' }} />
@@ -288,7 +295,7 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
             <tr>
               <th />
               <th>งานที่เหลือ (ชิ้น)</th>
-              <th>ทำได้ 60 นาทีล่าสุด (ชิ้น/ชม.)</th>
+              <th>อัตราทำได้ (ชิ้น/ชม.)</th>
               <th>คน / Station</th>
               <th>คาดว่าเสร็จ</th>
             </tr>
@@ -300,7 +307,10 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
                 <b>{pickRemaining.toLocaleString()}</b>
                 <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>รอหยิบ + กำลังหยิบ</div>
               </td>
-              <td style={{ fontWeight: 700 }}>{pickFc.rate?.toLocaleString() ?? '—'}</td>
+              <td>
+                <b>{pickFc.rate?.toLocaleString() ?? '—'}</b>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{pickFc.basis}</div>
+              </td>
               <td>{k.activePickers.toLocaleString()} คน</td>
               <td style={{ fontWeight: 700, color: pickFc.color }}>{pickFc.text}</td>
             </tr>
@@ -310,7 +320,10 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
                 <b>{packRemaining.toLocaleString()}</b>
                 <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>รอแพ็ก + กำลังแพ็ก</div>
               </td>
-              <td style={{ fontWeight: 700 }}>{packFc.rate?.toLocaleString() ?? '—'}</td>
+              <td>
+                <b>{packFc.rate?.toLocaleString() ?? '—'}</b>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{packFc.basis}</div>
+              </td>
               <td>{p.activeStations.toLocaleString()} Station</td>
               <td style={{ fontWeight: 700, color: packFc.color }}>{packFc.text}</td>
             </tr>
@@ -322,7 +335,7 @@ export function OperationsDashboardBoard(p: OperationsDashboardProps) {
           </div>
         )}
         <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          ไม่นับงานรอ Admin ยืนยัน · ตัวเลขจะแสดงเมื่อเริ่มงานวันนี้ครบ 60 นาที
+          อัตราทำได้ = ชิ้นที่ทำเสร็จวันนี้ ÷ ชั่วโมงตั้งแต่งานแรกที่เสร็จวันนี้ · ก่อนทำงานครบ 60 นาทีใช้อัตราเฉลี่ยของวันทำงานก่อนหน้า · Pick นับชิ้นตามใบสั่ง · ไม่นับงานรอ Admin ยืนยัน
         </div>
       </Section>
 

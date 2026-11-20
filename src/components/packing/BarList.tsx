@@ -1,12 +1,12 @@
 /** Horizontal bar list -- label, bar scaled to the largest value, value. Used by the Packing
  * dashboards; plain divs so it renders server-side with no chart library. */
-export function BarList({ rows, color = 'var(--color-info)', unit = '', empty = '—' }: { rows: { label: string; value: number; sub?: string }[]; color?: string; unit?: string; empty?: string }) {
+export function BarList({ rows, color = 'var(--color-info)', unit = '', empty = '—', labelWidth = '38%' }: { rows: { label: string; value: number; sub?: string }[]; color?: string; unit?: string; empty?: string; labelWidth?: string }) {
   const max = Math.max(1, ...rows.map((r) => r.value))
   if (rows.length === 0) return <div style={{ color: 'var(--color-text-secondary)', fontSize: 12.5 }}>{empty}</div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {rows.map((r) => (
-        <div key={r.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 38%) minmax(0, 1fr) auto', gap: 10, alignItems: 'center', fontSize: 12.5 }}>
+        <div key={r.label} style={{ display: 'grid', gridTemplateColumns: `minmax(0, ${labelWidth}) minmax(0, 1fr) auto`, gap: 10, alignItems: 'center', fontSize: 12.5 }}>
           <span style={{ overflowWrap: 'break-word' }} title={r.label}>
             {r.label}
           </span>

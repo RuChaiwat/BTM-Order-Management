@@ -119,14 +119,20 @@ export async function previousPackIssue(db: SupabaseClient, pausedSessionId: str
   const { data: issue } = await db.from('pack_issues').select('issue_id, root_cause, resolution_note').eq('session_id', pausedSessionId).limit(1).maybeSingle()
   if (!issue) return null
   const [{ data: lines }, { data: reasons }] = await Promise.all([
-    db.from('pack_issue_lines').select('barcode, sku, item_description, reason_code, qty').eq('issue_id', issue.issue_id),
+    db.from('pack_issue_lines').select('barcode, sku, item_description, reason_code, qty, root_cause').eq('issue_id', issue.issue_id),
     db.from('pack_issue_reasons').select('reason_code, label_en, label_th'),
   ])
   const label = new Map((reasons ?? []).map((r) => [r.reason_code, r.label_th || r.label_en]))
   return {
     root_cause: PACK_ROOT_CAUSES.find((r) => r.code === issue.root_cause)?.th ?? issue.root_cause ?? null,
     note: issue.resolution_note ?? null,
-    lines: (lines ?? []).map((l) => ({ barcode: l.barcode || l.sku, description: l.item_description, reason: label.get(l.reason_code) ?? l.reason_code, qty: Number(l.qty) })),
+    lines: (lines ?? []).map((l) => ({
+      barcode: l.barcode || l.sku,
+      description: l.item_description,
+      // Admin's per-item cause (migration 0040) next to what the packer reported.
+      reason: [label.get(l.reason_code) ?? l.reason_code, l.root_cause ? `Admin: ${PACK_ROOT_CAUSES.find((r) => r.code === l.root_cause)?.th ?? l.root_cause}` : null].filter(Boolean).join(' · '),
+      qty: Number(l.qty),
+    })),
   }
 }
 

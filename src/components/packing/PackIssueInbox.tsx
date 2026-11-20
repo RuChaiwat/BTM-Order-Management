@@ -26,7 +26,7 @@ type Detail = {
     resolvedByName: string | null
     resolved_at: string | null
   }
-  issueLines: { id: string; line_id: string | null; sku: string; barcode: string; item_description: string | null; bin_code: string | null; reason_code: string; reasonLabel: string; qty: number; remark: string | null }[]
+  issueLines: { id: string; line_id: string | null; sku: string; barcode: string; item_description: string | null; bin_code: string | null; reason_code: string; reasonLabel: string; qty: number; remark: string | null; root_cause: string | null }[]
   order: { order_no: string; store_code: string; pack_status: string | null } | null
   pick: {
     pickerId: string | null
@@ -54,6 +54,24 @@ const RESULT_TH: Record<string, string> = {
   issue_closed: 'แจ้งปัญหา → Admin ปิดเอง',
   issue_returned: 'แจ้งปัญหา → ส่งกลับไปแพ็ก (เวลานับต่อ)',
   cancelled: 'ยกเลิก',
+}
+
+const causeTh = (code: string | null | undefined) => (code ? PACK_ROOT_CAUSES.find((r) => r.code === code)?.th ?? code : '—')
+
+/** Section heading with a triangle that folds / unfolds the section. */
+function Fold({ open, onToggle, title, note }: { open: boolean; onToggle: () => void; title: string; note?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, marginBottom: open ? 6 : 0, cursor: 'pointer', fontWeight: 700, fontSize: 'inherit', color: 'inherit', fontFamily: 'inherit' }}
+    >
+      <span style={{ display: 'inline-block', width: 12, fontSize: 11 }}>{open ? '▼' : '▶'}</span>
+      {title}
+      {note && <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--color-text-secondary)' }}>{note}</span>}
+    </button>
+  )
 }
 
 /** Minutes between two timestamps as "X ชม. Y นาที". */
@@ -86,7 +104,11 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [rootCause, setRootCause] = useState('')
+  // Real cause per reported item (pack_issue_lines.id -> root cause code).
+  const [lineCause, setLineCause] = useState<Record<string, string>>({})
+  // Pick / Pack history start folded; the triangle opens them.
+  const [showPick, setShowPick] = useState(false)
+  const [showPack, setShowPack] = useState(false)
   const [resolution, setResolution] = useState<'closed_by_admin' | 'returned_to_pack' | ''>('')
   const [note, setNote] = useState('')
   const [lineQty, setLineQty] = useState<Record<string, string>>({})
@@ -114,7 +136,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
       const body = await res.json()
       if (!res.ok) throw new Error(body.error)
       setDetail(body)
-      setRootCause(body.issue.root_cause ?? '')
+      setLineCause(Object.fromEntries((body.issueLines as Detail['issueLines']).map((l) => [l.id, l.root_cause ?? ''])))
       setResolution(body.issue.resolution ?? '')
       setNote(body.issue.resolution_note ?? '')
       setLineQty(Object.fromEntries((body.issueLines as Detail['issueLines']).map((l) => [l.id, String(l.qty)])))
@@ -156,7 +178,8 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
 
   function resolve() {
     if (!detail) return
-    if (!rootCause) return setError('เลือกสาเหตุจริง')
+    const missing = detail.issueLines.find((l) => !lineCause[l.id])
+    if (missing) return setError(`เลือกสาเหตุจริงของ ${missing.barcode}`)
     if (!resolution) return setError('เลือกวิธีปิดเรื่อง')
     const changed: Record<string, number> = {}
     for (const l of detail.issueLines) {
@@ -164,7 +187,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
       if (!Number.isInteger(q) || q < 1) return setError(`จำนวนของ ${l.barcode} ต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป`)
       if (q !== l.qty) changed[l.id] = q
     }
-    act({ action: 'resolve', root_cause: rootCause, resolution, note, line_qty: changed })
+    act({ action: 'resolve', resolution, note, line_qty: changed, line_root_cause: lineCause })
   }
 
   const working = busy || isRefreshing
@@ -260,10 +283,11 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
               <div style={{ fontWeight: 700, marginBottom: 6 }}>1. ปัญหาที่แจ้ง</div>
               <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
-                  <col style={{ width: '40%' }} />
+                  <col style={{ width: '30%' }} />
+                  <col style={{ width: '14%' }} />
                   <col style={{ width: '20%' }} />
+                  <col style={{ width: '12%' }} />
                   <col style={{ width: '24%' }} />
-                  <col style={{ width: '16%' }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -271,6 +295,7 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                     <th>BIN</th>
                     <th>ปัญหา</th>
                     <th>จำนวน</th>
+                    <th>สาเหตุจริง</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -292,6 +317,25 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                           <input className="control" type="number" min={1} step={1} style={{ width: 70 }} value={lineQty[l.id] ?? ''} onChange={(e) => setLineQty((p) => ({ ...p, [l.id]: e.target.value }))} />
                         )}
                       </td>
+                      <td>
+                        {resolved ? (
+                          <b>{causeTh(l.root_cause ?? detail.issue.root_cause)}</b>
+                        ) : (
+                          <select
+                            className="field-input"
+                            style={{ border: `1px solid ${lineCause[l.id] ? 'var(--color-border)' : 'var(--color-warning)'}`, width: '100%' }}
+                            value={lineCause[l.id] ?? ''}
+                            onChange={(e) => setLineCause((p) => ({ ...p, [l.id]: e.target.value }))}
+                          >
+                            <option value="">— เลือก —</option>
+                            {PACK_ROOT_CAUSES.map((r) => (
+                              <option key={r.code} value={r.code}>
+                                {r.th}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -299,8 +343,45 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
               {detail.issue.remark && <div style={{ fontSize: 12.5, marginTop: 6 }}>หมายเหตุจาก Packer: “{detail.issue.remark}”</div>}
             </section>
 
+            <section style={{ borderTop: '1px dashed var(--color-border)', paddingTop: 12 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>2. ผลการตรวจสอบ</div>
+              {resolved ? (
+                <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div>การปิดเรื่อง: <b>{detail.issue.resolution === 'closed_by_admin' ? 'Admin ปิดเอง → ส่งไป Admin Pack Verify' : 'ส่งกลับไปรอแพ็ก'}</b></div>
+                  {detail.issue.resolution_note && <div>หมายเหตุ: {detail.issue.resolution_note}</div>}
+                  <div style={{ color: 'var(--color-text-secondary)' }}>
+                    ปิดโดย {detail.issue.resolvedByName} · {dt(detail.issue.resolved_at)} · ใช้เวลาแก้ {span(detail.issue.reported_at, detail.issue.resolved_at)}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>เลือกสาเหตุจริงของแต่ละรายการในข้อ 1 ให้ครบ แล้วเลือกวิธีปิดเรื่อง</div>
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13 }}>
+                    <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                      <input type="radio" checked={resolution === 'closed_by_admin'} onChange={() => setResolution('closed_by_admin')} />
+                      Admin ปิดเอง → ส่งไป Admin Pack Verify (นับเวลาแพ็กถึงตอนแจ้งปัญหา)
+                    </label>
+                    <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                      <input type="radio" checked={resolution === 'returned_to_pack'} onChange={() => setResolution('returned_to_pack')} />
+                      ส่งกลับไปรอแพ็ก (ใครก็ได้ scan แพ็กต่อ · เวลานับต่อจากเดิม)
+                    </label>
+                  </div>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="หมายเหตุผลการตรวจสอบ (ไม่บังคับ)"
+                    style={{ width: '100%', minHeight: 60, border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }}
+                  />
+                  <button className="btn btn-success" style={{ alignSelf: 'flex-start', minWidth: 180 }} disabled={working} onClick={resolve}>
+                    {working && <Spinner />} บันทึกผลและปิดเรื่อง
+                  </button>
+                </div>
+              )}
+            </section>
             <section>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>2. ประวัติงาน Pick</div>
+              <Fold open={showPick} onToggle={() => setShowPick((v) => !v)} title="3. ประวัติงาน Pick" />
+              {showPick && (
+                <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, fontSize: 12.5, marginBottom: 8 }}>
                 {[
                   ['Picker', detail.pick.pickerName ? `${detail.pick.pickerName} (${detail.pick.pickerId})` : '—'],
@@ -360,11 +441,15 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                   ))}
                 </tbody>
               </table>
+                </>
+              )}
             </section>
 
             <section>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>3. ประวัติงาน Pack</div>
+              <Fold open={showPack} onToggle={() => setShowPack((v) => !v)} title="4. ประวัติงาน Pack" note={`7 วันล่าสุด · ${detail.packSessions.length} ครั้ง`} />
+              {showPack && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5 }}>
+                {detail.packSessions.length === 0 && <span style={{ color: 'var(--color-text-secondary)' }}>ไม่มีการแพ็กใน 7 วันล่าสุด</span>}
                 {detail.packSessions.map((s) => (
                   <div key={s.session_id}>
                     {dt(s.started_at)} → {dt(s.finished_at)} · {s.pickerName} ({s.picker_id}) · Station {s.station_code} · <b>{s.result ? RESULT_TH[s.result] ?? s.result : 'กำลังแพ็ก'}</b>
@@ -372,49 +457,6 @@ export function PackIssueInbox({ issues, initialIssueId }: { issues: PackIssueLi
                   </div>
                 ))}
               </div>
-            </section>
-
-            <section style={{ borderTop: '1px dashed var(--color-border)', paddingTop: 12 }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>4. ผลการตรวจสอบ</div>
-              {resolved ? (
-                <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div>สาเหตุจริง: <b>{PACK_ROOT_CAUSES.find((r) => r.code === detail.issue.root_cause)?.th ?? detail.issue.root_cause}</b></div>
-                  <div>การปิดเรื่อง: <b>{detail.issue.resolution === 'closed_by_admin' ? 'Admin ปิดเอง → ส่งไป Admin Pack Verify' : 'ส่งกลับไปรอแพ็ก'}</b></div>
-                  {detail.issue.resolution_note && <div>หมายเหตุ: {detail.issue.resolution_note}</div>}
-                  <div style={{ color: 'var(--color-text-secondary)' }}>
-                    ปิดโดย {detail.issue.resolvedByName} · {dt(detail.issue.resolved_at)} · ใช้เวลาแก้ {span(detail.issue.reported_at, detail.issue.resolved_at)}
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <select className="field-input" style={{ border: '1px solid var(--color-border)' }} value={rootCause} onChange={(e) => setRootCause(e.target.value)}>
-                    <option value="">— สาเหตุจริง —</option>
-                    {PACK_ROOT_CAUSES.map((r) => (
-                      <option key={r.code} value={r.code}>
-                        {r.th}
-                      </option>
-                    ))}
-                  </select>
-                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13 }}>
-                    <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-                      <input type="radio" checked={resolution === 'closed_by_admin'} onChange={() => setResolution('closed_by_admin')} />
-                      Admin ปิดเอง → ส่งไป Admin Pack Verify (นับเวลาแพ็กถึงตอนแจ้งปัญหา)
-                    </label>
-                    <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-                      <input type="radio" checked={resolution === 'returned_to_pack'} onChange={() => setResolution('returned_to_pack')} />
-                      ส่งกลับไปรอแพ็ก (ใครก็ได้ scan แพ็กต่อ · เวลานับต่อจากเดิม)
-                    </label>
-                  </div>
-                  <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="หมายเหตุผลการตรวจสอบ (ไม่บังคับ)"
-                    style={{ width: '100%', minHeight: 60, border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }}
-                  />
-                  <button className="btn btn-success" style={{ alignSelf: 'flex-start', minWidth: 180 }} disabled={working} onClick={resolve}>
-                    {working && <Spinner />} บันทึกผลและปิดเรื่อง
-                  </button>
-                </div>
               )}
             </section>
           </div>

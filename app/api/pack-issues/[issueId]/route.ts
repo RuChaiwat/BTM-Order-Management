@@ -21,7 +21,7 @@ export async function GET(_request: Request, { params }: { params: { issueId: st
 /**
  * action 'acknowledge' -- "รับเรื่อง": open -> investigating, records who took it (clears the
  *   pop-up for every other supervisor).
- * action 'resolve' -- records root cause + note, optionally corrects the reported quantities, and
+ * action 'resolve' -- records the real cause of every reported item (line_root_cause) + note, optionally corrects the reported quantities, and
  *   either closes it by admin (order -> packed, i.e. on to Admin Pack Verify; the packer keeps the
  *   productivity credit minus the problem pieces) or returns the order to the pack queue (pending)
  *   for anyone to pack again.
@@ -39,6 +39,8 @@ export async function POST(request: Request, { params }: { params: { issueId: st
     resolution?: 'closed_by_admin' | 'returned_to_pack'
     note?: string
     line_qty?: Record<string, number>
+    /** pack_issue_lines.id -> root cause code, one for every reported item. */
+    line_root_cause?: Record<string, string>
   }
   const admin = createAdminClient()
   const { data: issue } = await admin.from('pack_issues').select('*').eq('issue_id', params.issueId).maybeSingle()
@@ -62,7 +64,6 @@ export async function POST(request: Request, { params }: { params: { issueId: st
 
   if (body.action !== 'resolve') return NextResponse.json({ error: 'คำสั่งไม่ถูกต้อง' }, { status: 400 })
   if (issue.status === 'resolved') return NextResponse.json({ error: 'เรื่องนี้ปิดไปแล้ว' }, { status: 409 })
-  if (!body.root_cause || !PACK_ROOT_CAUSES.some((r) => r.code === body.root_cause)) return NextResponse.json({ error: 'เลือกสาเหตุจริง' }, { status: 400 })
   if (body.resolution !== 'closed_by_admin' && body.resolution !== 'returned_to_pack') return NextResponse.json({ error: 'กรุณาเลือกผลการตรวจสอบ' }, { status: 400 })
 
   // Optional quantity corrections, validated before anything is written.
@@ -73,12 +74,31 @@ export async function POST(request: Request, { params }: { params: { issueId: st
     if (!lineIds.has(id)) return NextResponse.json({ error: 'ไม่พบรายการสินค้าในเรื่องนี้ กรุณารีเฟรชแล้วลองใหม่' }, { status: 400 })
     if (!Number.isInteger(qty) || qty < 1) return NextResponse.json({ error: 'จำนวนที่มีปัญหาต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป' }, { status: 400 })
   }
+  // Every reported item needs its own real cause.
+  const causes = body.line_root_cause ?? {}
+  for (const l of lines ?? []) {
+    const c = causes[l.id]
+    if (!c || !PACK_ROOT_CAUSES.some((r) => r.code === c)) return NextResponse.json({ error: 'เลือกสาเหตุจริงให้ครบทุกรายการ' }, { status: 400 })
+  }
+  // Main cause for the issue itself (Handheld note, older reports) = the cause with the most pieces.
+  const piecesByCause = new Map<string, number>()
+  for (const l of lines ?? []) {
+    const qty = body.line_qty?.[l.id] ?? Number(l.qty)
+    piecesByCause.set(causes[l.id], (piecesByCause.get(causes[l.id]) ?? 0) + qty)
+  }
+  const mainCause = [...piecesByCause.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
 
   const newPackStatus = body.resolution === 'closed_by_admin' ? 'packed' : 'pending'
   const { data: flipped } = await admin.from('orders').update({ pack_status: newPackStatus }).eq('order_id', issue.order_id).eq('pack_status', 'issue').select('order_id').maybeSingle()
   if (!flipped) return NextResponse.json({ error: 'สถานะ order เปลี่ยนไปแล้ว รีเฟรชแล้วลองใหม่' }, { status: 409 })
 
-  for (const [id, qty] of corrections) await admin.from('pack_issue_lines').update({ qty }).eq('id', id)
+  for (const l of lines ?? []) {
+    const qty = body.line_qty?.[l.id]
+    await admin
+      .from('pack_issue_lines')
+      .update(qty !== undefined ? { qty, root_cause: causes[l.id] } : { root_cause: causes[l.id] })
+      .eq('id', l.id)
+  }
   if (issue.session_id) {
     const [{ data: fresh }, { lines: packLines }] = await Promise.all([
       admin.from('pack_issue_lines').select('line_id, reason_code, qty').eq('issue_id', issue.issue_id),
@@ -101,7 +121,7 @@ export async function POST(request: Request, { params }: { params: { issueId: st
     .from('pack_issues')
     .update({
       status: 'resolved',
-      root_cause: body.root_cause,
+      root_cause: mainCause,
       resolution: body.resolution,
       resolution_note: body.note?.trim() || null,
       resolved_by: caller.user_id,
@@ -111,7 +131,7 @@ export async function POST(request: Request, { params }: { params: { issueId: st
     })
     .eq('issue_id', issue.issue_id)
 
-  await writeStatusHistory(admin, { entityType: 'order_pack', entityId: issue.order_id, oldStatus: 'issue', newStatus: newPackStatus, changedBy: caller.user_id, reason: `${body.resolution}: ${body.root_cause}` })
-  await writeAudit(admin, { userId: caller.user_id, action: 'pack_issue.resolve', entityType: 'pack_issues', entityId: issue.issue_id, before: issue, after: { root_cause: body.root_cause, resolution: body.resolution, note: body.note, line_qty: body.line_qty } })
+  await writeStatusHistory(admin, { entityType: 'order_pack', entityId: issue.order_id, oldStatus: 'issue', newStatus: newPackStatus, changedBy: caller.user_id, reason: `${body.resolution}: ${mainCause}` })
+  await writeAudit(admin, { userId: caller.user_id, action: 'pack_issue.resolve', entityType: 'pack_issues', entityId: issue.issue_id, before: issue, after: { root_cause: mainCause, line_root_cause: causes, resolution: body.resolution, note: body.note, line_qty: body.line_qty } })
   return NextResponse.json({ pack_status: newPackStatus })
 }

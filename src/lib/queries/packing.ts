@@ -416,12 +416,18 @@ export async function getPackIssueDetail(db: SupabaseClient, issueId: string) {
 
   const [{ data: order }, { data: issueLines }, reasons, { data: orderLines }, { data: completion }, { data: verifications }, { data: sessions }, { data: station }] = await Promise.all([
     db.from('orders').select('order_id, order_no, store_code, status, pack_status, assignment_batch_id, original_order_date').eq('order_id', orderId).maybeSingle(),
-    db.from('pack_issue_lines').select('id, line_id, sku, barcode, item_description, bin_code, reason_code, qty, remark').eq('issue_id', issueId),
+    db.from('pack_issue_lines').select('id, line_id, sku, barcode, item_description, bin_code, reason_code, qty, remark, root_cause').eq('issue_id', issueId),
     getReasonLabels(db),
     db.from('order_lines').select('line_id, sku, sku_barcode, item_description, bin_code, zone_code, qty').eq('order_id', orderId).order('pick_sequence'),
     db.from('picker_completions').select('completion_id, picker_completed_time, actual_pieces, result').eq('order_id', orderId).maybeSingle(),
     db.from('admin_verifications').select('admin_id, decision, verified_time, reject_reason').eq('order_id', orderId).order('verified_time'),
-    db.from('pack_sessions').select('session_id, picker_id, station_code, started_at, finished_at, result, pieces, issue_pieces, cancel_reason, cancelled_by').eq('order_id', orderId).order('started_at'),
+    // Pack history: the last 7 days only.
+    db
+      .from('pack_sessions')
+      .select('session_id, picker_id, station_code, started_at, finished_at, result, pieces, issue_pieces, cancel_reason, cancelled_by')
+      .eq('order_id', orderId)
+      .gte('started_at', new Date(Date.now() - 7 * 86400000).toISOString())
+      .order('started_at'),
     issue.station_code ? db.from('pack_stations').select('name').eq('station_code', issue.station_code).maybeSingle() : Promise.resolve({ data: null }),
   ])
 
@@ -483,9 +489,9 @@ export async function getPackIssueDashboard(db: SupabaseClient, warehouseCode: s
   ])
   const issues = issueRows ?? []
   const [lines, reasons, orders] = await Promise.all([
-    inChunks<{ issue_id: string; line_id: string | null; reason_code: string; qty: number }>(
+    inChunks<{ issue_id: string; line_id: string | null; reason_code: string; qty: number; root_cause: string | null }>(
       issues.map((i) => i.issue_id),
-      (c) => db.from('pack_issue_lines').select('issue_id, line_id, reason_code, qty').in('issue_id', c),
+      (c) => db.from('pack_issue_lines').select('issue_id, line_id, reason_code, qty, root_cause').in('issue_id', c),
     ),
     getReasonLabels(db),
     inChunks<{ order_id: string; assignment_batch_id: string | null }>(
@@ -527,8 +533,18 @@ export async function getPackIssueDashboard(db: SupabaseClient, warehouseCode: s
   const byDay = new Map<string, number>()
   let totalPieces = 0
   const issuePiecesById = new Map<string, number>()
+  const causeSeen = new Set<string>()
+  const issueRootCause = new Map(issues.map((i) => [i.issue_id, i.root_cause as string | null]))
   for (const l of lines) {
     const qty = Number(l.qty)
+    // Root cause is recorded per item (migration 0040); older issues only have the issue's own.
+    const cause = l.root_cause ?? issueRootCause.get(l.issue_id)
+    // count = issues with this cause (once per issue), pieces = that cause's items
+    if (cause) {
+      const k = `${l.issue_id}|${cause}`
+      add(byRootCause, cause, qty, !causeSeen.has(k))
+      causeSeen.add(k)
+    }
     totalPieces += qty
     issuePiecesById.set(l.issue_id, (issuePiecesById.get(l.issue_id) ?? 0) + qty)
     add(byReason, label.get(l.reason_code) ?? l.reason_code, qty)
@@ -542,7 +558,6 @@ export async function getPackIssueDashboard(db: SupabaseClient, warehouseCode: s
     const batchId = batchOfOrder.get(i.order_id)
     const pickerId = batchId ? pickerOfBatch.get(batchId) : null
     add(byPicker, pickerId ? `${pNames.get(pickerId) ?? pickerId} (${pickerId})` : 'ไม่ระบุ', pcs)
-    if (i.root_cause) add(byRootCause, i.root_cause, pcs)
     const day = bangkokDateKey(i.reported_at) ?? ''
     byDay.set(day, (byDay.get(day) ?? 0) + 1)
     if (i.status === 'resolved' && i.resolved_at) {

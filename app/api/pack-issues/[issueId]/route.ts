@@ -88,17 +88,23 @@ export async function POST(request: Request, { params }: { params: { issueId: st
   }
   const mainCause = [...piecesByCause.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
 
+  // Save each item's cause (and any corrected qty) first -- if that fails nothing else changes.
+  for (const l of lines ?? []) {
+    const qty = body.line_qty?.[l.id]
+    const { error: lineError } = await admin
+      .from('pack_issue_lines')
+      .update(qty !== undefined ? { qty, root_cause: causes[l.id] } : { root_cause: causes[l.id] })
+      .eq('id', l.id)
+    if (lineError) {
+      console.error('[pack-issues resolve] line update failed', lineError.message)
+      return NextResponse.json({ error: 'บันทึกสาเหตุของรายการไม่สำเร็จ กรุณาแจ้งผู้ดูแลระบบ' }, { status: 500 })
+    }
+  }
+
   const newPackStatus = body.resolution === 'closed_by_admin' ? 'packed' : 'pending'
   const { data: flipped } = await admin.from('orders').update({ pack_status: newPackStatus }).eq('order_id', issue.order_id).eq('pack_status', 'issue').select('order_id').maybeSingle()
   if (!flipped) return NextResponse.json({ error: 'สถานะ order เปลี่ยนไปแล้ว รีเฟรชแล้วลองใหม่' }, { status: 409 })
 
-  for (const l of lines ?? []) {
-    const qty = body.line_qty?.[l.id]
-    await admin
-      .from('pack_issue_lines')
-      .update(qty !== undefined ? { qty, root_cause: causes[l.id] } : { root_cause: causes[l.id] })
-      .eq('id', l.id)
-  }
   if (issue.session_id) {
     const [{ data: fresh }, { lines: packLines }] = await Promise.all([
       admin.from('pack_issue_lines').select('line_id, reason_code, qty').eq('issue_id', issue.issue_id),

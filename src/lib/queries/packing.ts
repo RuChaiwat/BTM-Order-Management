@@ -407,6 +407,18 @@ function names(map: Map<string, string>, id: string) {
   return map.get(id) ?? id
 }
 
+/** Reported items of one issue with Admin's per-item cause (migration 0040). If that column is
+ * not visible yet (migration not run / PostgREST schema cache not reloaded) the items still load,
+ * just without the cause, instead of the whole list silently coming back empty. */
+async function issueLinesWithCause(db: SupabaseClient, issueId: string) {
+  const base = 'id, line_id, sku, barcode, item_description, bin_code, reason_code, qty, remark'
+  const res = await db.from('pack_issue_lines').select(`${base}, root_cause`).eq('issue_id', issueId)
+  if (!res.error) return res
+  console.error('[pack_issue_lines] root_cause not readable, falling back:', res.error.message)
+  const plain = await db.from('pack_issue_lines').select(base).eq('issue_id', issueId)
+  return { data: (plain.data ?? []).map((l) => ({ ...l, root_cause: null as string | null })), error: plain.error }
+}
+
 /** Everything the Investigation detail panel shows for one issue: what was reported, the order's
  * full Pick history (who picked, from which bin/zone, who verified) and every pack attempt. */
 export async function getPackIssueDetail(db: SupabaseClient, issueId: string) {
@@ -416,7 +428,7 @@ export async function getPackIssueDetail(db: SupabaseClient, issueId: string) {
 
   const [{ data: order }, { data: issueLines }, reasons, { data: orderLines }, { data: completion }, { data: verifications }, { data: sessions }, { data: station }] = await Promise.all([
     db.from('orders').select('order_id, order_no, store_code, status, pack_status, assignment_batch_id, original_order_date').eq('order_id', orderId).maybeSingle(),
-    db.from('pack_issue_lines').select('id, line_id, sku, barcode, item_description, bin_code, reason_code, qty, remark, root_cause').eq('issue_id', issueId),
+    issueLinesWithCause(db, issueId),
     getReasonLabels(db),
     db.from('order_lines').select('line_id, sku, sku_barcode, item_description, bin_code, zone_code, qty').eq('order_id', orderId).order('pick_sequence'),
     db.from('picker_completions').select('completion_id, picker_completed_time, actual_pieces, result').eq('order_id', orderId).maybeSingle(),

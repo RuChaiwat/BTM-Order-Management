@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildXlsxBuffer } from '@/lib/xlsxExport'
-import { getShortPickMonitorData } from '@/lib/queries/shortPickMonitor'
+import { getPickingIssueDashboard } from '@/lib/queries/shortPickMonitor'
 import { formatDateTime } from '@/lib/formatDate'
 import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
 
@@ -15,13 +15,17 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
+  // from/to range (Picking Issue Dashboard); ?date= still works for one day.
   const date = searchParams.get('date')
-  if (!date) return NextResponse.json({ error: 'กรุณาเลือกวันที่' }, { status: 400 })
+  const from = searchParams.get('from') ?? date
+  const to = searchParams.get('to') ?? date
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/
+  if (!from || !to || !dateRe.test(from) || !dateRe.test(to)) return NextResponse.json({ error: 'กรุณาเลือกวันที่' }, { status: 400 })
   const zone = searchParams.get('zone')
 
   const admin = createAdminClient()
   const warehouseCode = user.warehouse_code ?? 'DC002'
-  const data = await getShortPickMonitorData(admin, warehouseCode, date)
+  const data = await getPickingIssueDashboard(admin, warehouseCode, from <= to ? from : to, from <= to ? to : from)
   const rows = zone ? data.rows.filter((r) => r.zoneCode === zone) : data.rows
 
   const header = ['Order No', 'Store', 'Zone', 'SKU', 'Item Description', 'Bin', 'Reason (EN)', 'Reason (TH)', 'Ordered Qty', 'Picked Qty', 'Short Qty', 'Remark', 'Recorded At']
@@ -42,7 +46,7 @@ export async function GET(request: Request) {
   ])
   const buffer = buildXlsxBuffer([{ name: 'Short-Damage-Expired', rows: [header, ...sheetRows] }])
 
-  const fileName = `BTM_ShortDamageExpired_${date}${zone ? `_${zone}` : ''}.xlsx`
+  const fileName = `BTM_ShortDamageExpired_${from === to ? from : `${from}_${to}`}${zone ? `_${zone}` : ''}.xlsx`
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

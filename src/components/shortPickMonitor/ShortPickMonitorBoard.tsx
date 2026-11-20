@@ -47,7 +47,7 @@ function SortHeader({ label, sortKey, sort, onSort }: { label: React.ReactNode; 
 
 const PAGE_SIZE = 30
 
-export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { rows: DetailRow[]; zones: string[]; date: string; warehouseCode: string }) {
+export function ShortPickMonitorBoard({ rows, zones, from, to, warehouseCode }: { rows: DetailRow[]; zones: string[]; from: string; to: string; warehouseCode: string }) {
   const [zoneFilter, setZoneFilter] = useState('ALL')
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'shortQty', dir: 'desc' })
   const [page, setPage] = useState(1)
@@ -67,7 +67,7 @@ export function ShortPickMonitorBoard({ rows, zones, date, warehouseCode }: { ro
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const pageRows = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const exportHref = `/api/short-pick-monitor/export?date=${encodeURIComponent(date)}${zoneFilter === 'ALL' ? '' : `&zone=${encodeURIComponent(zoneFilter)}`}`
+  const exportHref = `/api/short-pick-monitor/export?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${zoneFilter === 'ALL' ? '' : `&zone=${encodeURIComponent(zoneFilter)}`}`
 
   return (
     <div className="card" style={{ flex: 1 }}>

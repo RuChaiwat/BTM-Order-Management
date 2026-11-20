@@ -3,6 +3,19 @@ import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds } from './scopedFetch'
 import { bangkokDateKey } from '../formatDate'
 
+const CHUNK = 150
+
+/** `.in()` lookups in chunks so no PostgREST URL grows past its limit. */
+async function inChunks<T>(ids: string[], fetchChunk: (chunk: string[]) => PromiseLike<{ data: T[] | null }>): Promise<T[]> {
+  const out: T[] = []
+  const unique = [...new Set(ids.filter(Boolean))]
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const { data } = await fetchChunk(unique.slice(i, i + CHUNK))
+    out.push(...(data ?? []))
+  }
+  return out
+}
+
 export interface ShortPickDetailRow {
   lineId: string
   orderId: string
@@ -21,29 +34,6 @@ export interface ShortPickDetailRow {
   shortQty: number
   remark: string | null
   recordedAt: string
-}
-
-export interface ReasonKpi {
-  code: string
-  labelEn: string
-  labelTh: string
-  count: number
-  shortQty: number
-}
-
-export interface ShortPickMonitorData {
-  date: string
-  rows: ShortPickDetailRow[]
-  reasonKpis: ReasonKpi[]
-  zones: string[]
-}
-
-/** reason_master's active short_pick codes -- the KPI boxes are driven by this, not a hardcoded
- * Short/Damage/Expired list, so a reason Admin adds/retires in Reason Master shows up here too
- * without a code change (same catalog ReasonMasterManager edits). */
-export async function getActiveShortPickReasons(db: SupabaseClient): Promise<{ reason_code: string; label_en: string; label_th: string }[]> {
-  const { data } = await db.from('reason_master').select('reason_code, label_en, label_th').eq('reason_type', 'short_pick').eq('active', true).order('label_en')
-  return data ?? []
 }
 
 /**
@@ -66,23 +56,23 @@ export async function getShortPickDetailRows(
   const orderIdByCompletion = new Map(completions.map((c) => [c.completion_id, c.order_id]))
   const completionIds = completions.map((c) => c.completion_id)
 
-  const { data: lines } = await db
-    .from('picker_completion_lines')
-    .select('line_id, completion_id, ordered_qty, picked_qty, short_reason_code, remark, created_at')
-    .in('completion_id', completionIds)
-    .eq('is_short', true)
-  const shortLines = lines ?? []
+  const shortLines = await inChunks<{ line_id: string; completion_id: string; ordered_qty: number; picked_qty: number; short_reason_code: string | null; remark: string | null; created_at: string }>(
+    completionIds,
+    (c) => db.from('picker_completion_lines').select('line_id, completion_id, ordered_qty, picked_qty, short_reason_code, remark, created_at').in('completion_id', c).eq('is_short', true),
+  )
   if (shortLines.length === 0) return []
 
-  const lineIds = shortLines.map((l) => l.line_id)
-  const { data: orderLines } = await db.from('order_lines').select('line_id, sku, item_description, bin_code, zone_code').in('line_id', lineIds)
-  const orderLineByLineId = new Map((orderLines ?? []).map((ol) => [ol.line_id, ol]))
+  const orderLines = await inChunks<{ line_id: string; sku: string; item_description: string | null; bin_code: string; zone_code: string | null }>(
+    shortLines.map((l) => l.line_id),
+    (c) => db.from('order_lines').select('line_id, sku, item_description, bin_code, zone_code').in('line_id', c),
+  )
+  const orderLineByLineId = new Map(orderLines.map((ol) => [ol.line_id, ol]))
 
-  const orderIds = [...new Set(completions.map((c) => c.order_id))]
-  const { data: orders } = orderIds.length
-    ? await db.from('orders').select('order_id, order_no, store_code, warehouse_code').in('order_id', orderIds)
-    : { data: [] as { order_id: string; order_no: string; store_code: string; warehouse_code: string }[] }
-  const orderById = new Map((orders ?? []).map((o) => [o.order_id, o]))
+  const orders = await inChunks<{ order_id: string; order_no: string; store_code: string; warehouse_code: string }>(
+    [...new Set(shortLines.map((l) => orderIdByCompletion.get(l.completion_id) ?? ''))],
+    (c) => db.from('orders').select('order_id, order_no, store_code, warehouse_code').in('order_id', c),
+  )
+  const orderById = new Map(orders.map((o) => [o.order_id, o]))
 
   const reasonCodes = [...new Set(shortLines.map((l) => l.short_reason_code).filter(Boolean))] as string[]
   const { data: reasons } = reasonCodes.length
@@ -121,39 +111,104 @@ export async function getShortPickDetailRows(
   return rows
 }
 
-/** §Item 5 (Purge review follow-up): Short/Damage/Expired Monitor -- a single (Bangkok-calendar)
- * day's short-pick detail, keyed off the picker's own confirm date exactly like Productivity's page
- * (picker_completed_time), so "which day" means the same thing across both screens. */
-export async function getShortPickMonitorData(db: SupabaseClient, warehouseCode: string, date: string): Promise<ShortPickMonitorData> {
-  const orders = await fetchAllRows((from, to) => db.from('orders').select('order_id').eq('warehouse_code', warehouseCode).range(from, to))
-  const orderIds = orders.map((o) => o.order_id)
+type Bar = { key: string; count: number; pieces: number }
 
+export interface PickingIssueDashboardData {
+  from: string
+  to: string
+  rows: ShortPickDetailRow[]
+  zones: string[]
+  kpis: {
+    pickedOrders: number
+    pickedPieces: number
+    shortOrders: number
+    shortPieces: number
+    shortOrderRatePct: number | null
+    shortPieceRatePct: number | null
+  }
+  byReason: Bar[]
+  byZone: Bar[]
+  byPicker: Bar[]
+  bySku: Bar[]
+  byLocation: Bar[]
+}
+
+/** Picking Issue Dashboard -- short picks for a date range (Bangkok calendar), keyed off the
+ * picker's own confirm date (picker_completed_time) like Picking Productivity. Short detail only
+ * exists once Admin has Final Closed the order (see getShortPickDetailRows).
+ *   Short order rate  = orders with a short item / orders the pickers completed in the range
+ *   Short pieces rate = short pieces / ordered pieces of those orders */
+export async function getPickingIssueDashboard(db: SupabaseClient, warehouseCode: string, from: string, to: string): Promise<PickingIssueDashboardData> {
+  const orders = await fetchAllRows((f, t) => db.from('orders').select('order_id, planned_pieces, assignment_batch_id').eq('warehouse_code', warehouseCode).range(f, t))
   const completions = await fetchScopedByOrderIds<{ completion_id: string; order_id: string; picker_completed_time: string }>(
     db,
     'get_picker_completions_by_ids',
     'completion_id, order_id, picker_completed_time',
-    orderIds,
+    orders.map((o) => o.order_id),
   )
-  const dayCompletions = completions.filter((c) => bangkokDateKey(c.picker_completed_time) === date)
+  const inRange = completions.filter((c) => {
+    const k = bangkokDateKey(c.picker_completed_time)
+    return k !== null && k >= from && k <= to
+  })
+  const rows = await getShortPickDetailRows(db, warehouseCode, inRange)
 
-  const [rows, activeReasons] = await Promise.all([getShortPickDetailRows(db, warehouseCode, dayCompletions), getActiveShortPickReasons(db)])
+  const orderById = new Map(orders.map((o) => [o.order_id, o]))
+  const pickedPieces = inRange.reduce((s, c) => s + (orderById.get(c.order_id)?.planned_pieces ?? 0), 0)
+  const shortOrderIds = new Set(rows.map((r) => r.orderId))
+  const shortPieces = rows.reduce((s, r) => s + r.shortQty, 0)
+  const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null)
 
-  const totalsByCode = new Map<string, { count: number; shortQty: number }>()
-  for (const r of rows) {
-    const entry = totalsByCode.get(r.reasonCode) ?? { count: 0, shortQty: 0 }
-    entry.count += 1
-    entry.shortQty += r.shortQty
-    totalsByCode.set(r.reasonCode, entry)
+  // Picker of each short order (assignment batch -> picker).
+  const batchIds = [...new Set([...shortOrderIds].map((id) => orderById.get(id)?.assignment_batch_id ?? ''))]
+  const batches = await inChunks<{ assignment_batch_id: string; picker_id: string | null }>(batchIds, (c) =>
+    db.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', c),
+  )
+  const pickerOfBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
+  const pickers = await inChunks<{ picker_id: string; name_en: string; name_th: string | null }>(
+    batches.map((b) => b.picker_id ?? ''),
+    (c) => db.from('pickers').select('picker_id, name_en, name_th').in('picker_id', c),
+  )
+  const pickerName = new Map(pickers.map((p) => [p.picker_id, p.name_th || p.name_en]))
+  const pickerLabel = (orderId: string) => {
+    const batchId = orderById.get(orderId)?.assignment_batch_id
+    const id = batchId ? pickerOfBatch.get(batchId) : null
+    return id ? `${pickerName.get(id) ?? id} (${id})` : 'ไม่ระบุ'
   }
-  const reasonKpis: ReasonKpi[] = activeReasons.map((r) => ({
-    code: r.reason_code,
-    labelEn: r.label_en,
-    labelTh: r.label_th,
-    count: totalsByCode.get(r.reason_code)?.count ?? 0,
-    shortQty: totalsByCode.get(r.reason_code)?.shortQty ?? 0,
-  }))
 
-  const zones = [...new Set(rows.map((r) => r.zoneCode))].sort()
+  // count = items (lines), or orders for By picker; pieces = short pieces.
+  const tally = (keyOf: (r: ShortPickDetailRow) => string, countOrders = false, top?: number) => {
+    const m = new Map<string, { count: number; pieces: number; orders: Set<string> }>()
+    for (const r of rows) {
+      const k = keyOf(r)
+      const cur = m.get(k) ?? { count: 0, pieces: 0, orders: new Set<string>() }
+      cur.count++
+      cur.pieces += r.shortQty
+      cur.orders.add(r.orderId)
+      m.set(k, cur)
+    }
+    const list = [...m.entries()]
+      .map(([key, v]) => ({ key, count: countOrders ? v.orders.size : v.count, pieces: v.pieces }))
+      .sort((a, b) => b.count - a.count || b.pieces - a.pieces)
+    return top ? list.slice(0, top) : list
+  }
 
-  return { date, rows, reasonKpis, zones }
+  return {
+    from,
+    to,
+    rows,
+    zones: [...new Set(rows.map((r) => r.zoneCode))].sort(),
+    kpis: {
+      pickedOrders: inRange.length,
+      pickedPieces,
+      shortOrders: shortOrderIds.size,
+      shortPieces,
+      shortOrderRatePct: pct(shortOrderIds.size, inRange.length),
+      shortPieceRatePct: pct(shortPieces, pickedPieces),
+    },
+    byReason: tally((r) => r.reasonLabelTh),
+    byZone: tally((r) => r.zoneCode),
+    byPicker: tally((r) => pickerLabel(r.orderId), true, 15),
+    bySku: tally((r) => (r.itemDescription ? `${r.sku} · ${r.itemDescription}` : r.sku), false, 15),
+    byLocation: tally((r) => r.binCode, false, 15),
+  }
 }

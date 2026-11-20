@@ -24,6 +24,7 @@ export interface ShortPickDetailRow {
   warehouseCode: string
   zoneCode: string
   sku: string
+  barcode: string | null
   itemDescription: string | null
   binCode: string
   reasonCode: string
@@ -62,9 +63,9 @@ export async function getShortPickDetailRows(
   )
   if (shortLines.length === 0) return []
 
-  const orderLines = await inChunks<{ line_id: string; sku: string; item_description: string | null; bin_code: string; zone_code: string | null }>(
+  const orderLines = await inChunks<{ line_id: string; sku: string; sku_barcode: string | null; item_description: string | null; bin_code: string; zone_code: string | null }>(
     shortLines.map((l) => l.line_id),
-    (c) => db.from('order_lines').select('line_id, sku, item_description, bin_code, zone_code').in('line_id', c),
+    (c) => db.from('order_lines').select('line_id, sku, sku_barcode, item_description, bin_code, zone_code').in('line_id', c),
   )
   const orderLineByLineId = new Map(orderLines.map((ol) => [ol.line_id, ol]))
 
@@ -96,6 +97,7 @@ export async function getShortPickDetailRows(
       warehouseCode: order.warehouse_code,
       zoneCode: ol?.zone_code ?? '—',
       sku: ol?.sku ?? '—',
+      barcode: ol?.sku_barcode ?? null,
       itemDescription: ol?.item_description ?? null,
       binCode: ol?.bin_code ?? '—',
       reasonCode: l.short_reason_code ?? 'UNSPECIFIED',
@@ -208,7 +210,7 @@ export async function getPickingIssueDashboard(db: SupabaseClient, warehouseCode
     byReason: tally((r) => r.reasonLabelTh),
     byZone: tally((r) => r.zoneCode),
     byPicker: tally((r) => pickerLabel(r.orderId), true, 15),
-    bySku: tally((r) => (r.itemDescription ? `${r.sku} · ${r.itemDescription}` : r.sku), false, 15),
+    bySku: tally((r) => { const code = r.barcode || `SKU ${r.sku}`; return r.itemDescription ? `${code} · ${r.itemDescription}` : code }, false, 15),
     byLocation: tally((r) => r.binCode, false, 15),
   }
 }

@@ -92,9 +92,9 @@ export default async function PickingIssueDashboardPage({ searchParams }: { sear
           {card('By reason', 'แยกตามเหตุผล (รายการ · ชิ้น)', <BarList rows={bars(d.byReason)} color="var(--color-danger)" />)}
           {card('By zone', 'แยกตาม Zone (รายการ · ชิ้น)', <BarList rows={bars(d.byZone)} color="var(--color-info)" />)}
           {card('By picker', 'แยกตาม Picker · Top 15 (order · ชิ้น)', <BarList rows={bars(d.byPicker)} color="var(--color-warning)" />)}
-          {card('By SKU', 'สินค้าที่หยิบไม่ครบบ่อย · Top 15 (รายการ · ชิ้น)', <BarList rows={bars(d.bySku)} color="var(--color-warning)" />)}
           {card('By location', 'Location ที่หยิบไม่ครบบ่อย · Top 15 (รายการ · ชิ้น)', <BarList rows={bars(d.byLocation, (k) => formatLocationDisplay(k))} color="var(--color-success)" />)}
         </div>
+        {card('By barcode', 'สินค้าที่หยิบไม่ครบบ่อย · Top 15 (รายการ · ชิ้น)', <BarList rows={bars(d.bySku)} color="var(--color-warning)" />)}
 
         <ShortPickMonitorBoard rows={d.rows} zones={d.zones} from={from} to={to} warehouseCode={warehouseCode} />
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>นับตามวันที่ Picker ปิดงาน · รายการ Short จะแสดงหลัง Admin ยืนยัน (Final Close) แล้ว</div>

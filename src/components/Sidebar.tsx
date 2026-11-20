@@ -16,6 +16,22 @@ interface SidebarProps {
 }
 
 const COLLAPSE_KEY = 'btm.sidebar.collapsed'
+const PIN_KEY = 'btm.sidebar.pinned'
+
+/** Push-pin icon -- solid when the menu is pinned open, outline (tilted) when it is not. */
+function PinIcon({ pinned }: { pinned: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden style={{ transform: pinned ? 'none' : 'rotate(45deg)', transition: 'transform .15s' }}>
+      <path
+        d="M16 3l5 5-2 1-3 3 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 3-3z"
+        fill={pinned ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 export function Sidebar({ user, badges }: SidebarProps) {
   const pathname = usePathname()
@@ -24,14 +40,36 @@ export function Sidebar({ user, badges }: SidebarProps) {
   // browser (localStorage; falls back to all-expanded if storage is unavailable). The group holding
   // the current page is always shown open so the highlighted item is never hidden.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // Pinned = the menu stays open beside the page (default). Unpinned = a narrow rail (logo + ☰);
+  // ☰ slides the menu out over the page, and it slides back on picking a page / clicking outside.
+  const [pinned, setPinned] = useState(true)
+  const [open, setOpen] = useState(false)
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(COLLAPSE_KEY)
       if (raw) setCollapsed(new Set(JSON.parse(raw) as string[]))
+      if (window.localStorage.getItem(PIN_KEY) === '0') setPinned(false)
     } catch {
       /* storage unavailable */
     }
   }, [])
+  useEffect(() => setOpen(false), [pathname])
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+  function togglePin() {
+    const next = !pinned
+    setPinned(next)
+    setOpen(false)
+    try {
+      window.localStorage.setItem(PIN_KEY, next ? '1' : '0')
+    } catch {
+      /* storage unavailable */
+    }
+  }
   function toggleGroup(label: string) {
     setCollapsed((prev) => {
       const next = new Set(prev)
@@ -66,14 +104,17 @@ export function Sidebar({ user, badges }: SidebarProps) {
     }
   }
 
-  return (
-    <div className="sidebar">
+  const panel = (
+    <div className={`sidebar${pinned ? '' : ' sidebar-overlay'}`}>
       <div className="sidebar-brand">
         <div className="sidebar-brand-mark">B</div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="sidebar-brand-name">BEAUTRIUM</div>
           <div className="sidebar-brand-sub">Order Management</div>
         </div>
+        <button type="button" className={`sidebar-pin${pinned ? ' is-pinned' : ''}`} onClick={togglePin} title={pinned ? 'เลิกปักหมุด (หุบเมนู)' : 'ปักหมุดเมนู'} aria-pressed={pinned}>
+          <PinIcon pinned={pinned} />
+        </button>
       </div>
 
       <nav className="sidebar-nav">
@@ -135,5 +176,23 @@ export function Sidebar({ user, badges }: SidebarProps) {
         <span className="sidebar-status-dot" />
       </button>
     </div>
+  )
+
+  if (pinned) return panel
+  return (
+    <>
+      <div className="sidebar-rail">
+        <div className="sidebar-brand-mark">B</div>
+        <button type="button" className="sidebar-rail-toggle" onClick={() => setOpen((v) => !v)} title="เปิดเมนู" aria-expanded={open}>
+          ☰
+        </button>
+      </div>
+      {open && (
+        <>
+          <div className="sidebar-backdrop" onClick={() => setOpen(false)} />
+          {panel}
+        </>
+      )}
+    </>
   )
 }

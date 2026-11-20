@@ -40,7 +40,7 @@ export default async function PackIssueDashboardPage({ searchParams }: { searchP
 
   return (
     <>
-      <TopBar title="Pack Issue Dashboard" subtitle={`แดชบอร์ดปัญหาการแพ็ก · ${formatDate(from)} – ${formatDate(to)} · ${warehouseCode}`}>
+      <TopBar title="Packing Issue Dashboard" subtitle={`แดชบอร์ดปัญหาการแพ็ก · ${formatDate(from)} – ${formatDate(to)} · ${warehouseCode}`}>
         <PackDateFilter basePath="/pack-issue-dashboard" from={from} to={to} />
       </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>

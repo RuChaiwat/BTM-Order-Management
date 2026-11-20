@@ -49,16 +49,16 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 22, en: 'Live Packing Monitor', th: 'ติดตามการแพ็กแบบเรียลไทม์', path: '/pack-monitor' },
       { id: 23, en: 'Admin Pack Verify', th: 'ยืนยันการแพ็ก (แอดมิน)', path: '/pack-verification' },
       { id: 24, en: 'Pack Issue Investigation', th: 'ตรวจสอบปัญหาจากการแพ็ก', path: '/pack-issues' },
-      { id: 25, en: 'Packing Productivity', th: 'ประสิทธิผลงานแพ็กรายวัน', path: '/packing-productivity' },
-      { id: 26, en: 'Pack Issue Dashboard', th: 'แดชบอร์ดปัญหาการแพ็ก', path: '/pack-issue-dashboard' },
       { id: 27, en: 'Pack Settings', th: 'ตั้งค่างานแพ็ก (Station / ปัญหา)', path: '/pack-settings' },
     ],
   },
   {
     label: 'Analytics',
     items: [
-      { id: 12, en: 'Productivity & SLA', th: 'ประสิทธิผล / คุณภาพการให้บริการ', path: '/productivity' },
-      { id: 19, en: 'Product Issue List', th: 'รายการสินค้ามีปัญหา', path: '/short-pick-monitor' },
+      { id: 12, en: 'Picking Productivity', th: 'ประสิทธิผลงานหยิบรายวัน', path: '/productivity' },
+      { id: 25, en: 'Packing Productivity', th: 'ประสิทธิผลงานแพ็กรายวัน', path: '/packing-productivity' },
+      { id: 19, en: 'Picking Issue Dashboard', th: 'แดชบอร์ดปัญหาการหยิบ', path: '/short-pick-monitor' },
+      { id: 26, en: 'Packing Issue Dashboard', th: 'แดชบอร์ดปัญหาการแพ็ก', path: '/pack-issue-dashboard' },
     ],
   },
   {

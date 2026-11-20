@@ -29,7 +29,7 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
   return (
     <>
       <AutoRefresh />
-      <TopBar title="Productivity & SLA" subtitle={`ประสิทธิผล / คุณภาพการให้บริการ · ${formatDate(date)} · ${warehouseCode}`}>
+      <TopBar title="Picking Productivity" subtitle={`ประสิทธิผลงานหยิบรายวัน · ${formatDate(date)} · ${warehouseCode}`}>
         <ProductivityDateFilter date={date} />
       </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>

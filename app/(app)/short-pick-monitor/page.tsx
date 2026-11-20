@@ -24,7 +24,7 @@ export default async function ShortPickMonitorPage({ searchParams }: { searchPar
   return (
     <>
       <AutoRefresh />
-      <TopBar title="Product Issue List" subtitle={`รายการสินค้ามีปัญหา · ${formatDate(date)} · ${warehouseCode}`}>
+      <TopBar title="Picking Issue Dashboard" subtitle={`แดชบอร์ดปัญหาการหยิบ · ${formatDate(date)} · ${warehouseCode}`}>
         <ShortPickMonitorDateFilter date={date} />
       </TopBar>
       <div className="page-body" style={{ padding: '18px 24px', gap: 14 }}>

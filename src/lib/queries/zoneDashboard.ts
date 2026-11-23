@@ -2,9 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
-import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
+import { fetchScopedByOrderIds } from './scopedFetch'
+import { inChunks, openOrSinceFilter } from './rangeFetch'
 import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
-import { bangkokDateKey } from '../formatDate'
+import { bangkokDateKey, bangkokDayRange } from '../formatDate'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
 // 'in_progress' (no "picker started scanning" event exists) -- every live order/batch just sits
@@ -37,15 +38,25 @@ export interface ZoneShortPickRow {
 /** §12/§13 Zone Dashboard — a zone-level drill-down of Control Tower's zone overview: which
  * orders touch each zone, who is actively picking there, and each zone's backlog/SLA. */
 export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: string) {
-  const [zoneTouches, orders, batches, zones] = await Promise.all([
-    // order_lines is by far the largest table in this schema (many lines per order) -- a lightweight
-    // RPC (migration 0023) returns only the DISTINCT (order_id, zone_code) pairs this needs for the
-    // "which zone(s) does this order touch" map below, instead of pulling every line.
-    fetchOrderZoneTouches(db, warehouseCode),
-    fetchAllRows((from, to) => db.from('orders').select('order_id, order_no, status, assignment_batch_id, planned_pieces, created_at, pack_ready_at').eq('warehouse_code', warehouseCode).range(from, to)),
-    fetchAllRows((from, to) => db.from('assignment_batches').select('assignment_batch_id, picker_id, zone_code, status').eq('warehouse_code', warehouseCode).range(from, to)),
+  // Today's scope only (same as Operations Dashboard): orders still in the workflow + orders
+  // closed/imported today -- never the whole kept history.
+  const todaySinceIso = bangkokDayRange(bangkokDateKey(new Date()) ?? new Date().toISOString().slice(0, 10)).sinceIso
+  const [orders, zones] = await Promise.all([
+    fetchAllRows((from, to) =>
+      db
+        .from('orders')
+        .select('order_id, order_no, status, assignment_batch_id, planned_pieces, created_at, pack_ready_at')
+        .eq('warehouse_code', warehouseCode)
+        .or(openOrSinceFilter(todaySinceIso))
+        .order('order_id')
+        .range(from, to),
+    ),
     getActiveZoneCodes(db, warehouseCode),
   ])
+  const batches = await inChunks<{ assignment_batch_id: string; picker_id: string | null; zone_code: string | null; status: string }>(
+    orders.map((o) => o.assignment_batch_id ?? ''),
+    (c) => db.from('assignment_batches').select('assignment_batch_id, picker_id, zone_code, status').in('assignment_batch_id', c),
+  )
 
   // How many of an order's pieces are REALLY in a given zone, not its whole planned_pieces
   // repeated in every zone it merely touches -- an order split A1=8/R1=2 must contribute 8 to A1
@@ -68,6 +79,8 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
     piecesByOrderZone.get(r.order_id)!.set(r.zone_code, Number(r.pieces))
   }
   const piecesForOrderInZone = (orderId: string, zone: string): number => piecesByOrderZone.get(orderId)?.get(zone) ?? 0
+  // Which zones each order touches -- from the same scoped per-(order, zone) rows.
+  const zoneTouches = zonePiecesRows
 
   const orderById = new Map(orders.map((o) => [o.order_id, o]))
 
@@ -89,7 +102,7 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
   // whole (its own row count is bounded by how many lines were ever short-picked, not by total
   // order volume) and matched back to an order via completionById below, which is itself already
   // scoped to this warehouse.
-  const [alerts, completions, allShortLines, reasonRows, thresholds] = await Promise.all([
+  const [alerts, completions, reasonRows, thresholds] = await Promise.all([
     fetchScopedByOrderIds<{ order_id: string; elapsed_minutes: number; is_picking_backlog: boolean; is_verification_backlog: boolean }>(
       db,
       'get_order_alerts_by_ids',
@@ -97,22 +110,24 @@ export async function getZoneDashboardData(db: SupabaseClient, warehouseCode: st
       orderIds,
     ),
     fetchScopedByOrderIds<{ completion_id: string; order_id: string; actual_pieces: number | null }>(db, 'get_picker_completions_by_ids', 'completion_id, order_id, actual_pieces', orderIds),
-    fetchAllRows((from, to) => db.from('picker_completion_lines').select('completion_id, line_id, ordered_qty, picked_qty, short_reason_code').eq('is_short', true).range(from, to)),
     db.from('reason_master').select('reason_code, label_en').eq('reason_type', 'short_pick'),
     getSlaThresholds(db),
   ])
   const alertByOrder = new Map(alerts.map((a) => [a.order_id, { ...a, time_alert: computeTimeAlert(orderById.get(a.order_id)?.status ?? '', a.elapsed_minutes, thresholds) }]))
   const completionById = new Map(completions.map((c) => [c.completion_id, c]))
+  // Short lines of just these completions (not the whole table).
+  const allShortLines = await inChunks<{ completion_id: string; line_id: string; ordered_qty: number; picked_qty: number; short_reason_code: string | null }>(
+    completions.map((c) => c.completion_id),
+    (c) => db.from('picker_completion_lines').select('completion_id, line_id, ordered_qty, picked_qty, short_reason_code').eq('is_short', true).in('completion_id', c),
+  )
   const reasonLabelByCode = new Map(unwrap(reasonRows).map((r) => [r.reason_code, r.label_en]))
 
   // lineById only ever needs to resolve the specific lines that were actually short-picked (a
   // small fraction of all lines), not every order_line in the warehouse -- fetched by exact
   // line_id instead of pulling the whole table.
   const shortLineIds = [...new Set(allShortLines.map((l) => l.line_id))]
-  const lineDetailRes = shortLineIds.length
-    ? await db.from('order_lines').select('line_id, sku, zone_code').in('line_id', shortLineIds)
-    : { data: [] as { line_id: string; sku: string; zone_code: string | null }[] }
-  const lineById = new Map(unwrap(lineDetailRes).map((l) => [l.line_id, l]))
+  const lineDetail = await inChunks<{ line_id: string; sku: string; zone_code: string | null }>(shortLineIds, (c) => db.from('order_lines').select('line_id, sku, zone_code').in('line_id', c))
+  const lineById = new Map(lineDetail.map((l) => [l.line_id, l]))
 
   const pickerIds = [...new Set(batches.map((b) => b.picker_id).filter(Boolean))] as string[]
   const [pickersRes, employmentTypeRows] = await Promise.all([

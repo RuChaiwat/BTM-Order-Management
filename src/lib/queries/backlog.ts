@@ -1,24 +1,28 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
 import { fetchAllRows } from './fetchAllRows'
-import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
+import { fetchScopedByOrderIds } from './scopedFetch'
+import { inChunks } from './rangeFetch'
 import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
 
 /** §13 Backlog Monitor — orders flagged by order_alerts as Picking Backlog (still open past
  * original_order_date) or Verification Backlog (picker done, waiting on Admin), sorted by how
  * long they've been sitting. */
 export async function getBacklogData(db: SupabaseClient, warehouseCode: string) {
-  const [orders, lines, thresholds] = await Promise.all([
+  // Only these statuses can ever be backlog (order_alerts view), so finished orders are not read.
+  const [orders, thresholds] = await Promise.all([
     fetchAllRows((from, to) =>
       db
         .from('orders')
         .select('order_id, order_no, store_code, status, original_order_date, planned_pieces, assignment_batch_id')
         .eq('warehouse_code', warehouseCode)
+        .in('status', ['assigned', 'in_progress', 'picker_completed_100', 'picker_completed_short'])
+        .order('order_id')
         .range(from, to),
     ),
-    fetchOrderZoneTouches(db, warehouseCode),
     getSlaThresholds(db),
   ])
+  const lines = await fetchScopedByOrderIds<{ order_id: string; zone_code: string }>(db, 'get_order_line_zone_pieces_by_order', 'order_id, zone_code', orders.map((o) => o.order_id))
 
   // order_alerts has no warehouse_code column, so it's fetched via an RPC scoped to exactly this
   // warehouse's order_ids (migration 0022) instead of the whole table. time_alert itself is
@@ -43,11 +47,11 @@ export async function getBacklogData(db: SupabaseClient, warehouseCode: string) 
     .map((o) => ({ ...o, alert: alertByOrder.get(o.order_id), zones: [...(zonesByOrder.get(o.order_id) ?? new Set())] }))
     .filter((o) => o.alert?.is_picking_backlog || o.alert?.is_verification_backlog)
 
-  const batchIds = [...new Set(backlogOrders.map((o) => o.assignment_batch_id).filter(Boolean))] as string[]
-  const batchesRes = batchIds.length
-    ? await db.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', batchIds)
-    : { data: [] as { assignment_batch_id: string; picker_id: string | null }[] }
-  const pickerIdByBatch = new Map(unwrap(batchesRes).map((b) => [b.assignment_batch_id, b.picker_id]))
+  const batches = await inChunks<{ assignment_batch_id: string; picker_id: string | null }>(
+    backlogOrders.map((o) => o.assignment_batch_id ?? ''),
+    (c) => db.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', c),
+  )
+  const pickerIdByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
   const pickerIds = [...new Set([...pickerIdByBatch.values()].filter(Boolean))] as string[]
   const pickersRes = pickerIds.length
     ? await db.from('pickers').select('picker_id, name_en, name_th').in('picker_id', pickerIds)

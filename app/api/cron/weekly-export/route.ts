@@ -4,6 +4,8 @@ import { buildXlsxBuffer } from '@/lib/xlsxExport'
 import { getSessionUser } from '@/lib/auth'
 import { bangkokDateKey, formatDate, formatDateTime } from '@/lib/formatDate'
 import { getShortPickDetailRows } from '@/lib/queries/shortPickMonitor'
+import { fetchAllRows } from '@/lib/queries/fetchAllRows'
+import { inChunks } from '@/lib/queries/rangeFetch'
 import { MIN_CYCLE_MINUTES_FOR_RATE, computeRoundBasedRate, type RoundCompletion } from '@/lib/pickerProductivity'
 import { formatLocationDisplay } from '@/lib/locations/locationDisplay'
 
@@ -47,42 +49,47 @@ export async function GET(request: Request) {
     .single()
 
   try {
-    const { data: completions } = await admin
-      .from('picker_completions')
-      .select('completion_id, order_id, actual_pieces, result, picker_completed_time, short_reason_code')
-      .gte('picker_completed_time', periodStart.toISOString())
-      .lt('picker_completed_time', periodEnd.toISOString())
+    // A week is ~18,000 completions at full volume: page past the Max Rows cap, and look the
+    // related rows up in chunks so no request URL grows past its limit.
+    const completions = await fetchAllRows<{ completion_id: string; order_id: string; actual_pieces: number | null; result: string; picker_completed_time: string; short_reason_code: string | null }>(
+      (from, to) =>
+        admin
+          .from('picker_completions')
+          .select('completion_id, order_id, actual_pieces, result, picker_completed_time, short_reason_code')
+          .gte('picker_completed_time', periodStart.toISOString())
+          .lt('picker_completed_time', periodEnd.toISOString())
+          .order('completion_id')
+          .range(from, to),
+    )
 
-    const orderIds = (completions ?? []).map((c) => c.order_id)
-    const { data: orders } = orderIds.length
-      ? await admin
-          .from('orders')
-          .select('order_id, order_no, original_order_date, store_code, warehouse_code, planned_pieces, assigned_time, assignment_batch_id, consolidation_batch_id')
-          .in('order_id', orderIds)
-      : {
-          data: [] as {
-            order_id: string
-            order_no: string
-            original_order_date: string
-            store_code: string
-            warehouse_code: string
-            planned_pieces: number
-            assigned_time: string | null
-            assignment_batch_id: string | null
-            consolidation_batch_id: string | null
-          }[],
-        }
-    const orderById = new Map((orders ?? []).map((o) => [o.order_id, o]))
+    const orderIds = completions.map((c) => c.order_id)
+    const orders = await inChunks<{
+      order_id: string
+      order_no: string
+      original_order_date: string
+      store_code: string
+      warehouse_code: string
+      planned_pieces: number
+      assigned_time: string | null
+      assignment_batch_id: string | null
+      consolidation_batch_id: string | null
+    }>(orderIds, (c) =>
+      admin.from('orders').select('order_id, order_no, original_order_date, store_code, warehouse_code, planned_pieces, assigned_time, assignment_batch_id, consolidation_batch_id').in('order_id', c),
+    )
+    const orderById = new Map(orders.map((o) => [o.order_id, o]))
 
-    const batchIds = [...new Set((orders ?? []).map((o) => o.assignment_batch_id).filter(Boolean))] as string[]
-    const { data: batches } = batchIds.length
-      ? await admin.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', batchIds)
-      : { data: [] as { assignment_batch_id: string; picker_id: string | null }[] }
-    const pickerByBatch = new Map((batches ?? []).map((b) => [b.assignment_batch_id, b.picker_id]))
+    const batches = await inChunks<{ assignment_batch_id: string; picker_id: string | null }>(
+      orders.map((o) => o.assignment_batch_id ?? ''),
+      (c) => admin.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', c),
+    )
+    const pickerByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
 
-    const orderLinesRes = orderIds.length ? await admin.from('order_lines').select('order_id, zone_code, qty').in('order_id', orderIds) : { data: [] as { order_id: string; zone_code: string | null; qty: number }[] }
+    // Zones per order, summed server-side per (order, zone) instead of reading every line.
+    const orderZones = await inChunks<{ order_id: string; zone_code: string | null }>(orderIds, (c) =>
+      admin.rpc('get_order_line_zone_pieces_by_order', { p_order_ids: c }).select('order_id, zone_code') as unknown as PromiseLike<{ data: { order_id: string; zone_code: string | null }[] | null }>,
+    )
     const zonesByOrder = new Map<string, Set<string>>()
-    for (const l of orderLinesRes.data ?? []) {
+    for (const l of orderZones) {
       if (!l.zone_code) continue
       if (!zonesByOrder.has(l.order_id)) zonesByOrder.set(l.order_id, new Set())
       zonesByOrder.get(l.order_id)!.add(l.zone_code)
@@ -96,12 +103,12 @@ export async function GET(request: Request) {
     // within seconds of being assigned (test data, or a rushed confirm) can't produce a
     // thousands-per-hour rate that isn't a meaningful throughput number -- same fix as
     // Productivity's own page, kept consistent so the two never disagree.
-    const enriched = (completions ?? []).map((c) => {
+    const enriched = completions.map((c) => {
       const order = orderById.get(c.order_id)
       const pickerId = order?.assignment_batch_id ? pickerByBatch.get(order.assignment_batch_id) : null
       const cycleMinutes = order?.assigned_time ? (new Date(c.picker_completed_time).getTime() - new Date(order.assigned_time).getTime()) / 60000 : 0
       const rateMinutes = Math.max(MIN_CYCLE_MINUTES_FOR_RATE, cycleMinutes)
-      const pcsPerHour = cycleMinutes > 0 ? Math.round((c.actual_pieces / rateMinutes) * 60) : 0
+      const pcsPerHour = cycleMinutes > 0 ? Math.round(((c.actual_pieces ?? 0) / rateMinutes) * 60) : 0
       return { c, order, pickerId, cycleMinutes, rateMinutes, pcsPerHour }
     })
 
@@ -198,7 +205,7 @@ export async function GET(request: Request) {
     // source and warehouse-agnostic scope as the rest of this export. Reason detail only exists
     // once Admin has Final Closed the order (see getShortPickDetailRows), so this naturally lists
     // fewer rows than "Order Detail"'s short-result orders until Admin catches up on verification.
-    const shortDetailRows = await getShortPickDetailRows(admin, undefined, completions ?? [])
+    const shortDetailRows = await getShortPickDetailRows(admin, undefined, completions)
     const shortDetailHeader = ['Order No', 'Store', 'Warehouse Code', 'Zone', 'SKU', 'Item Description', 'Bin', 'Reason (EN)', 'Reason (TH)', 'Ordered Qty', 'Picked Qty', 'Short Qty', 'Remark', 'Recorded At']
     const shortDetailSheetRows = shortDetailRows.map((r) => [
       r.orderNo,

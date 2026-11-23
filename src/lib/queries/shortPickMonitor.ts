@@ -1,20 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchAllRows } from './fetchAllRows'
-import { fetchScopedByOrderIds } from './scopedFetch'
-import { bangkokDateKey } from '../formatDate'
-
-const CHUNK = 150
-
-/** `.in()` lookups in chunks so no PostgREST URL grows past its limit. */
-async function inChunks<T>(ids: string[], fetchChunk: (chunk: string[]) => PromiseLike<{ data: T[] | null }>): Promise<T[]> {
-  const out: T[] = []
-  const unique = [...new Set(ids.filter(Boolean))]
-  for (let i = 0; i < unique.length; i += CHUNK) {
-    const { data } = await fetchChunk(unique.slice(i, i + CHUNK))
-    out.push(...(data ?? []))
-  }
-  return out
-}
+import { fetchCompletionsInRange, inChunks } from './rangeFetch'
+import { bangkokDayRange } from '../formatDate'
 
 export interface ShortPickDetailRow {
   lineId: string
@@ -141,17 +127,9 @@ export interface PickingIssueDashboardData {
  *   Short order rate  = orders with a short item / orders the pickers completed in the range
  *   Short pieces rate = short pieces / ordered pieces of those orders */
 export async function getPickingIssueDashboard(db: SupabaseClient, warehouseCode: string, from: string, to: string): Promise<PickingIssueDashboardData> {
-  const orders = await fetchAllRows((f, t) => db.from('orders').select('order_id, planned_pieces, assignment_batch_id').eq('warehouse_code', warehouseCode).range(f, t))
-  const completions = await fetchScopedByOrderIds<{ completion_id: string; order_id: string; picker_completed_time: string }>(
-    db,
-    'get_picker_completions_by_ids',
-    'completion_id, order_id, picker_completed_time',
-    orders.map((o) => o.order_id),
-  )
-  const inRange = completions.filter((c) => {
-    const k = bangkokDateKey(c.picker_completed_time)
-    return k !== null && k >= from && k <= to
-  })
+  // Only the range's completions, with their order fields (migration 0041).
+  const inRange = await fetchCompletionsInRange(db, warehouseCode, bangkokDayRange(from).sinceIso, bangkokDayRange(to).untilIso)
+  const orders = inRange
   const rows = await getShortPickDetailRows(db, warehouseCode, inRange)
 
   const orderById = new Map(orders.map((o) => [o.order_id, o]))

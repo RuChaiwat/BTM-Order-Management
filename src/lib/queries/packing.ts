@@ -119,12 +119,35 @@ export async function getPackingDashboardData(db: SupabaseClient, warehouseCode:
     count('packed'),
     count('issue'),
     db.from('pack_issues').select('issue_id', { count: 'exact', head: true }).eq('warehouse_code', warehouseCode).in('status', ['open', 'investigating']),
-    db.from('orders').select('order_id, original_order_date, pack_status, planned_pieces, pack_ready_at').eq('warehouse_code', warehouseCode).in('pack_status', BACKLOG_STATUSES).limit(10000),
-    db.from('pack_sessions').select('picker_id, finished_at, result, pieces, issue_pieces, short_pieces').eq('warehouse_code', warehouseCode).gte('finished_at', sinceIso).lt('finished_at', untilIso).in('result', CREDITED_RESULTS).limit(20000),
+    // Paged (fetchAllRows): PostgREST's Max Rows cap would cut a 3,000-order day short.
+    fetchAllRows((f, t) =>
+      db.from('orders').select('order_id, original_order_date, pack_status, planned_pieces, pack_ready_at').eq('warehouse_code', warehouseCode).in('pack_status', BACKLOG_STATUSES).order('order_id').range(f, t),
+    ).then((data) => ({ data })),
+    fetchAllRows((f, t) =>
+      db
+        .from('pack_sessions')
+        .select('picker_id, finished_at, result, pieces, issue_pieces, short_pieces')
+        .eq('warehouse_code', warehouseCode)
+        .gte('finished_at', sinceIso)
+        .lt('finished_at', untilIso)
+        .in('result', CREDITED_RESULTS)
+        .order('session_id')
+        .range(f, t),
+    ).then((data) => ({ data })),
     db.from('pack_verifications').select('order_id', { count: 'exact', head: true }).gte('verified_time', sinceIso).lt('verified_time', untilIso),
     // Admin's time to fix a reported problem (reported -> resolved), kept apart from packer productivity.
     db.from('pack_issues').select('reported_at, resolved_at').eq('warehouse_code', warehouseCode).eq('status', 'resolved').gte('resolved_at', sinceIso).lt('resolved_at', untilIso).limit(5000),
-    db.from('pack_sessions').select('finished_at, result, pieces, issue_pieces, short_pieces').eq('warehouse_code', warehouseCode).gte('finished_at', prevSinceIso).lt('finished_at', sinceIso).in('result', CREDITED_RESULTS).order('finished_at', { ascending: false }).limit(5000),
+    fetchAllRows((f, t) =>
+      db
+        .from('pack_sessions')
+        .select('finished_at, result, pieces, issue_pieces, short_pieces')
+        .eq('warehouse_code', warehouseCode)
+        .gte('finished_at', prevSinceIso)
+        .lt('finished_at', sinceIso)
+        .in('result', CREDITED_RESULTS)
+        .order('session_id')
+        .range(f, t),
+    ).then((data) => ({ data })),
   ])
   const fixed = fixedToday.data ?? []
   const fixMinutes = fixed.reduce((sum, i) => sum + Math.max(0, (new Date(i.resolved_at!).getTime() - new Date(i.reported_at).getTime()) / 60000), 0)
@@ -623,15 +646,17 @@ export interface PackQueueRow {
  * warehouse, longest-waiting first -- callers filter by pack status. Pieces are Admin
  * Verification's verified pieces (what will actually be packed). */
 export async function getPackQueue(db: SupabaseClient, warehouseCode: string): Promise<PackQueueRow[]> {
-  const { data, error } = await db
-    .from('orders')
-    .select('order_id, order_no, store_code, original_order_date, status, pack_status, planned_pieces, unique_sku_count, pack_ready_at')
-    .eq('warehouse_code', warehouseCode)
-    .in('pack_status', BACKLOG_STATUSES)
-    .order('pack_ready_at', { ascending: true })
-    .limit(10000)
-  if (error) throw new Error(error.message)
-  const orders = data ?? []
+  // Paged: the pack backlog can pass PostgREST's Max Rows cap at full volume.
+  const orders = await fetchAllRows((f, t) =>
+    db
+      .from('orders')
+      .select('order_id, order_no, store_code, original_order_date, status, pack_status, planned_pieces, unique_sku_count, pack_ready_at')
+      .eq('warehouse_code', warehouseCode)
+      .in('pack_status', BACKLOG_STATUSES)
+      .order('pack_ready_at', { ascending: true })
+      .order('order_id')
+      .range(f, t),
+  )
   const completions = await inChunks<{ order_id: string; actual_pieces: number | null }>(
     orders.map((o) => o.order_id),
     (c) => db.from('picker_completions').select('order_id, actual_pieces').in('order_id', c),

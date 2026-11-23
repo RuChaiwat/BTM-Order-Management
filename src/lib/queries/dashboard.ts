@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from './fetchAllRows'
 import { fetchScopedByOrderIds } from './scopedFetch'
-import { bangkokDateKey } from '../formatDate'
+import { fetchCompletionsInRange, inChunks, openOrSinceFilter } from './rangeFetch'
+import { bangkokDateKey, bangkokDayRange } from '../formatDate'
 import { getSlaThresholds, computeTimeAlert } from '../orderAlerts'
 import { PICK_STAGES, pickStageOf, type PickStage } from '../pickBacklog'
 import { dailyThroughput } from '../throughput'
@@ -21,15 +22,22 @@ const ACTIVE_ORDER_STATUSES = new Set(['assigned', 'in_progress', 'correction_in
  * function; flagged rather than silently left as a scaling trap.
  */
 export async function getDashboardData(db: SupabaseClient, warehouseCode: string) {
-  const [orders, assignmentBatches, invalidBinCount] = await Promise.all([
+  // Only what today's dashboard can show: orders still in the workflow + closed/imported today.
+  // Old finished orders (most of the kept history) are never read.
+  const todaySinceIso = bangkokDayRange(bangkokDateKey(new Date()) ?? new Date().toISOString().slice(0, 10)).sinceIso
+  const nowIso = new Date().toISOString()
+  const [orders, recentCompletions, invalidBinCount] = await Promise.all([
     fetchAllRows((from, to) =>
       db
         .from('orders')
         .select('order_id, status, planned_pieces, original_order_date, assignment_batch_id, created_at, pack_ready_at')
         .eq('warehouse_code', warehouseCode)
+        .or(openOrSinceFilter(todaySinceIso))
+        .order('order_id')
         .range(from, to),
     ),
-    fetchAllRows((from, to) => db.from('assignment_batches').select('assignment_batch_id, picker_id').eq('warehouse_code', warehouseCode).range(from, to)),
+    // Forecast rate: today's completions, or the last working day's (looks back up to 14 days).
+    fetchCompletionsInRange(db, warehouseCode, new Date(Date.parse(todaySinceIso) - 14 * 86400000).toISOString(), nowIso),
     // Only the count is used below -- a head request returns it via Content-Range without
     // transferring any rows, so it's naturally immune to the row cap rather than needing paging.
     db.from('import_errors').select('error_id', { count: 'exact', head: true }).ilike('error_reason', '%Invalid Bin Code%'),
@@ -55,6 +63,10 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
     getSlaThresholds(db),
   ])
   const completionByOrderId = new Map(completions.map((c) => [c.order_id, c]))
+  const assignmentBatches = await inChunks<{ assignment_batch_id: string; picker_id: string | null }>(
+    orders.filter((o) => ACTIVE_ORDER_STATUSES.has(o.status)).map((o) => o.assignment_batch_id ?? ''),
+    (c) => db.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', c),
+  )
   const statusByOrderId = new Map(orders.map((o) => [o.order_id, o.status]))
 
   // §management KPI funnel, scoped to TODAY (Bangkok) so it resets daily instead of piling up
@@ -164,9 +176,8 @@ export async function getDashboardData(db: SupabaseClient, warehouseCode: string
   // Pick output rate for the forecast: ordered (planned) pieces of every order a picker submitted
   // -- same unit as the remaining pick work, and a short completion counts right away instead of
   // waiting for Admin to enter its real count. Today's average, or the last working day's.
-  const plannedByOrderId = new Map(orders.map((o) => [o.order_id, o.planned_pieces ?? 0]))
   const pickThroughput = dailyThroughput(
-    completions.filter((c) => c.picker_completed_time).map((c) => ({ at: c.picker_completed_time, pieces: plannedByOrderId.get(c.order_id) ?? 0 })),
+    recentCompletions.map((c) => ({ at: c.picker_completed_time, pieces: c.planned_pieces ?? 0 })),
     Date.now(),
   )
 

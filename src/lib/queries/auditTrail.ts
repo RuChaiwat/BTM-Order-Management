@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from './fetchAllRows'
-import { bangkokDateKey } from '../formatDate'
+import { bangkokDayRange } from '../formatDate'
+import { inChunks } from './rangeFetch'
 import { actionMeta, auditDetail, type AuditLookups } from '../auditCatalog'
 
 interface RawAuditLogRow {
@@ -35,16 +36,24 @@ export interface AuditTrailRow {
  * page never has to show "configuration.update / configuration · 32a79a66-..." to an Admin who
  * has no reason to know what those mean. */
 export async function getAuditTrail(db: SupabaseClient, date: string): Promise<AuditTrailRow[]> {
-  const allRows = await fetchAllRows<RawAuditLogRow>((from, to) =>
-    db.from('audit_logs').select('id, user_id, action, entity_type, entity_id, before, after, created_at').order('created_at', { ascending: false }).range(from, to),
+  // Only the chosen day (indexed on created_at) -- not the whole log.
+  const { sinceIso, untilIso } = bangkokDayRange(date)
+  const rows = await fetchAllRows<RawAuditLogRow>((from, to) =>
+    db
+      .from('audit_logs')
+      .select('id, user_id, action, entity_type, entity_id, before, after, created_at')
+      .gte('created_at', sinceIso)
+      .lt('created_at', untilIso)
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to),
   )
-  const rows = allRows.filter((r) => bangkokDateKey(r.created_at) === date)
 
   const orderIds = [...new Set(rows.filter((r) => r.entity_type === 'orders' && r.entity_id).map((r) => r.entity_id as string))]
   const batchIds = [...new Set(rows.filter((r) => r.entity_type === 'consolidation_batches' && r.entity_id).map((r) => r.entity_id as string))]
 
   const [ordersRes, batchesRes] = await Promise.all([
-    orderIds.length ? db.from('orders').select('order_id, order_no').in('order_id', orderIds) : Promise.resolve({ data: [] as { order_id: string; order_no: string }[] }),
+    inChunks<{ order_id: string; order_no: string }>(orderIds, (c) => db.from('orders').select('order_id, order_no').in('order_id', c)).then((data) => ({ data })),
     batchIds.length
       ? db.from('consolidation_batches').select('consol_batch_id, batch_no').in('consol_batch_id', batchIds)
       : Promise.resolve({ data: [] as { consol_batch_id: string; batch_no: string }[] }),

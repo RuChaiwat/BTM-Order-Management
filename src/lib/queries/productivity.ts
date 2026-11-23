@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unwrap } from './unwrap'
-import { fetchAllRows } from './fetchAllRows'
-import { fetchScopedByOrderIds } from './scopedFetch'
+import { fetchCompletionsInRange, inChunks } from './rangeFetch'
 import { getActiveConfig } from './config'
 import { bangkokDateKey, bangkokDayRange } from '../formatDate'
 import { computeRoundBasedRate, computeAvgIdleMinutes, type RoundCompletion } from '../pickerProductivity'
@@ -29,8 +28,9 @@ const LEADERBOARD_SIZE = 10
  * is never a false exclusion of an order that's actually a plain direct assignment.) */
 export async function getProductivityData(db: SupabaseClient, warehouseCode: string, date: string) {
   const { sinceIso, untilIso } = bangkokDayRange(date)
-  const [orders, pickers, employmentTypeRows, cfg, roundBatches] = await Promise.all([
-    fetchAllRows((from, to) => db.from('orders').select('order_id, assigned_time, assignment_batch_id, consolidation_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).range(from, to)),
+  const [completions, pickers, employmentTypeRows, cfg, roundBatches] = await Promise.all([
+    // Only this day's completions (migration 0041) -- not every order the warehouse still keeps.
+    fetchCompletionsInRange(db, warehouseCode, sinceIso, untilIso),
     db.from('pickers').select('picker_id, name_en, name_th, employment_type').eq('warehouse_code', warehouseCode).eq('active', true).then(unwrap),
     db.from('picker_employment_types').select('type_code, label_en').then(unwrap),
     // Same target used by the weekly Picker Productivity rating (migration 0020) -- configurable
@@ -47,30 +47,14 @@ export async function getProductivityData(db: SupabaseClient, warehouseCode: str
   for (const b of roundBatches) {
     roundsByPicker.set(b.picker_id as string, (roundsByPicker.get(b.picker_id as string) ?? 0) + 1)
   }
-  const orderById = new Map(orders.map((o) => [o.order_id, o]))
-  const orderIds = orders.map((o) => o.order_id)
+  // Each row carries both the completion and its order's fields.
+  const completedRows = completions.filter((c) => !c.consolidation_batch_id).map((c) => ({ order: c, completion: c }))
 
-  // picker_completions has no warehouse_code column, so it's fetched via an RPC scoped to exactly
-  // this warehouse's order_ids (same pattern as dashboard.ts/backlog.ts) instead of a plain
-  // .gte() filter across every warehouse with no .range() paging -- past Supabase's default row
-  // cap that used to risk silently dropping this warehouse's own rows behind another warehouse's.
-  const completions = await fetchScopedByOrderIds<{ completion_id: string; order_id: string; actual_pieces: number | null; result: string; picker_completed_time: string }>(
-    db,
-    'get_picker_completions_by_ids',
-    'completion_id, order_id, actual_pieces, result, picker_completed_time',
-    orderIds,
+  const batches = await inChunks<{ assignment_batch_id: string; picker_id: string | null }>(
+    completedRows.map((r) => r.order.assignment_batch_id ?? ''),
+    (c) => db.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', c),
   )
-
-  const completedRows = completions
-    .filter((c) => bangkokDateKey(c.picker_completed_time) === date)
-    .map((completion) => ({ order: orderById.get(completion.order_id), completion }))
-    .filter((r): r is { order: NonNullable<typeof r.order>; completion: typeof r.completion } => !!r.order && !r.order.consolidation_batch_id)
-
-  const batchIds = [...new Set(completedRows.map((r) => r.order.assignment_batch_id).filter(Boolean))] as string[]
-  const batchesRes = batchIds.length
-    ? await db.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', batchIds)
-    : { data: [] as { assignment_batch_id: string; picker_id: string | null }[] }
-  const pickerIdByBatch = new Map(unwrap(batchesRes).map((b) => [b.assignment_batch_id, b.picker_id]))
+  const pickerIdByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
 
   const productivityByPicker = new Map<string, { completed: number; short: number; onTime: number; piecesCompleted: number; piecesShort: number }>()
   const roundRows: RoundCompletion[] = []
@@ -203,29 +187,14 @@ export async function getMonthlyProductivityHistory(db: SupabaseClient, warehous
   const { sinceIso: monthSinceIso } = bangkokDayRange(monthStart)
   const { sinceIso: todaySinceIso } = bangkokDayRange(todayKey) // exclusive upper bound -- start of today
 
-  const orders = await fetchAllRows((from, to) =>
-    db.from('orders').select('order_id, assigned_time, assignment_batch_id, consolidation_batch_id, planned_pieces').eq('warehouse_code', warehouseCode).range(from, to),
+  const completions = await fetchCompletionsInRange(db, warehouseCode, monthSinceIso, todaySinceIso)
+  const monthRows = completions.filter((c) => !c.consolidation_batch_id).map((c) => ({ order: c, completion: c }))
+
+  const batches = await inChunks<{ assignment_batch_id: string; picker_id: string | null }>(
+    monthRows.map((r) => r.order.assignment_batch_id ?? ''),
+    (c) => db.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', c),
   )
-  const orderById = new Map(orders.map((o) => [o.order_id, o]))
-  const orderIds = orders.map((o) => o.order_id)
-
-  const completions = await fetchScopedByOrderIds<{ order_id: string; actual_pieces: number | null; result: string; picker_completed_time: string }>(
-    db,
-    'get_picker_completions_by_ids',
-    'order_id, actual_pieces, result, picker_completed_time',
-    orderIds,
-  )
-
-  const monthRows = completions
-    .filter((c) => c.picker_completed_time >= monthSinceIso && c.picker_completed_time < todaySinceIso)
-    .map((completion) => ({ order: orderById.get(completion.order_id), completion }))
-    .filter((r): r is { order: NonNullable<typeof r.order>; completion: typeof r.completion } => !!r.order && !r.order.consolidation_batch_id)
-
-  const batchIds = [...new Set(monthRows.map((r) => r.order.assignment_batch_id).filter(Boolean))] as string[]
-  const batchesRes = batchIds.length
-    ? await db.from('assignment_batches').select('assignment_batch_id, picker_id').in('assignment_batch_id', batchIds)
-    : { data: [] as { assignment_batch_id: string; picker_id: string | null }[] }
-  const pickerIdByBatch = new Map(unwrap(batchesRes).map((b) => [b.assignment_batch_id, b.picker_id]))
+  const pickerIdByBatch = new Map(batches.map((b) => [b.assignment_batch_id, b.picker_id]))
 
   const byDay = new Map<string, { completed: number; totalPieces: number; shortPieces: number; onTime: number; cycleTimed: number; roundRows: RoundCompletion[] }>()
   for (const { order, completion } of monthRows) {

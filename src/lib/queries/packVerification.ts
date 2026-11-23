@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ISSUE_RESULTS, sessionSeconds } from '../packing'
+import { fetchAllRows } from './fetchAllRows'
 
 export interface PackVerifyQueueItem {
   order_id: string
@@ -21,9 +22,10 @@ export interface PackVerifyQueueItem {
 /** Admin Pack Verify queue: every order the packers finished (pack_status = 'packed') in this
  * warehouse, oldest-packed first, with who/where/how long from its latest pack session. */
 export async function getPackVerifyQueue(db: SupabaseClient, warehouseCode: string): Promise<PackVerifyQueueItem[]> {
-  const { data: orders, error } = await db.from('orders').select('order_id, order_no, store_code, planned_pieces').eq('warehouse_code', warehouseCode).eq('pack_status', 'packed').limit(2000)
-  if (error) throw new Error(error.message)
-  const list = orders ?? []
+  // Paged: the packed queue can pass PostgREST's Max Rows cap at full volume.
+  const list = await fetchAllRows((f, t) =>
+    db.from('orders').select('order_id, order_no, store_code, planned_pieces').eq('warehouse_code', warehouseCode).eq('pack_status', 'packed').order('order_id').range(f, t),
+  )
   if (list.length === 0) return []
 
   // Chunked so a long queue never builds an over-long ?order_id=in.(...) URL.

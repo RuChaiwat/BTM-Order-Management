@@ -3,7 +3,9 @@ import { getDashboardData } from './dashboard'
 import { unwrap } from './unwrap'
 import { getActiveZoneCodes } from './locations'
 import { fetchAllRows } from './fetchAllRows'
-import { fetchScopedByOrderIds, fetchOrderZoneTouches } from './scopedFetch'
+import { fetchScopedByOrderIds } from './scopedFetch'
+import { inChunks, openOrSinceFilter } from './rangeFetch'
+import { bangkokDateKey, bangkokDayRange } from '../formatDate'
 import { getSlaThresholds, computeTimeAlert, alertSeverityRank } from '../orderAlerts'
 
 // Same reality as dashboard.ts: this app never actually sets an order or assignment_batch to
@@ -26,15 +28,26 @@ const PICKING_ONLY_STATUSES = new Set(['assigned', 'in_progress'])
  * accidentally couple to the same shape and break each other when one is redesigned.
  */
 export async function getControlTowerData(db: SupabaseClient, warehouseCode: string) {
-  const [base, zones, orders, lines, assignmentBatches] = await Promise.all([
+  // Today's scope only (same as Operations Dashboard): orders still in the workflow + orders
+  // closed/imported today -- never the whole kept history.
+  const todaySinceIso = bangkokDayRange(bangkokDateKey(new Date()) ?? new Date().toISOString().slice(0, 10)).sinceIso
+  const [base, zones, orders] = await Promise.all([
     getDashboardData(db, warehouseCode),
     getActiveZoneCodes(db, warehouseCode),
     fetchAllRows((from, to) =>
-      db.from('orders').select('order_id, order_no, status, planned_pieces, assigned_time, warehouse_code, assignment_batch_id').eq('warehouse_code', warehouseCode).range(from, to),
+      db
+        .from('orders')
+        .select('order_id, order_no, status, planned_pieces, assigned_time, warehouse_code, assignment_batch_id')
+        .eq('warehouse_code', warehouseCode)
+        .or(openOrSinceFilter(todaySinceIso))
+        .order('order_id')
+        .range(from, to),
     ),
-    fetchOrderZoneTouches(db, warehouseCode),
-    fetchAllRows((from, to) => db.from('assignment_batches').select('assignment_batch_id, zone_code').eq('warehouse_code', warehouseCode).range(from, to)),
   ])
+  const assignmentBatches = await inChunks<{ assignment_batch_id: string; zone_code: string | null }>(
+    orders.map((o) => o.assignment_batch_id ?? ''),
+    (c) => db.from('assignment_batches').select('assignment_batch_id, zone_code').in('assignment_batch_id', c),
+  )
 
   // order_alerts/picker_completions have no warehouse_code column, so both are fetched via an RPC
   // scoped to exactly this warehouse's order_ids (migration 0022) instead of the whole table.
@@ -67,6 +80,8 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
     piecesByOrderZone.get(r.order_id)!.set(r.zone_code, Number(r.pieces))
   }
   const piecesForOrderInZone = (orderId: string, zone: string): number => piecesByOrderZone.get(orderId)?.get(zone) ?? 0
+  // Which zones each order touches -- from the same scoped per-(order, zone) rows.
+  const lines = zonePiecesRows
 
   const zoneOrders = new Map<string, Set<string>>()
   for (const l of lines) {
@@ -197,8 +212,9 @@ export async function getControlTowerData(db: SupabaseClient, warehouseCode: str
 
   return {
     kpis: {
-      totalOrders: orders.length,
-      totalPlannedPieces: orders.reduce((s, o) => s + (o.planned_pieces ?? 0), 0),
+      // Same funnel Total as Operations Dashboard: imported today + carried over + closed today.
+      totalOrders: base.kpis.totalOrders,
+      totalPlannedPieces: base.kpis.totalPieces,
       piecesPicked: completions.reduce((s, c) => s + (c.actual_pieces ?? 0), 0),
       pickerCompletedCount: completions.length,
       pickerCompleted100: completions.filter((c) => c.result === '100_percent').length,

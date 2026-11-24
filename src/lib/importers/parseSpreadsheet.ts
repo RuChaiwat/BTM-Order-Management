@@ -28,7 +28,7 @@ function formatCellDate(d: Date): string {
  * true date cell (cell.v is a Date, only possible because of cellDates above) is formatted from
  * its own value, while every other cell uses its formatted display text (cell.w -- the same text
  * SheetJS would show if you opened the file), matching what the user sees in Excel. */
-function sheetToRows(sheet: XLSX.WorkSheet): Record<string, string>[] {
+function sheetToRows(sheet: XLSX.WorkSheet, withRowNumber = false): Record<string, string>[] {
   const ref = sheet['!ref']
   if (!ref) return []
   const range = XLSX.utils.decode_range(ref)
@@ -54,10 +54,15 @@ function sheetToRows(sheet: XLSX.WorkSheet): Record<string, string>[] {
       }
       row[header] = text
     }
+    // The file's own Excel row number, so an import error points at the row the user sees.
+    if (withRowNumber) row[SOURCE_ROW] = String(r + 1)
     if (hasValue) rows.push(row)
   }
   return rows
 }
+
+/** Hidden key carrying a row's Excel row number in the Warehouse Pick Lines file. */
+export const SOURCE_ROW = '__row'
 
 /** Case/whitespace-insensitive column lookup — WMS exports vary column casing/spacing. */
 export function col(row: Record<string, string>, ...candidates: string[]): string {
@@ -109,7 +114,7 @@ const normalizeHeader = (s: string) => s.toLowerCase().replace(/[\s._-]/g, '')
  * sheet is often named something generic like "Sheet1". The required columns are then checked so
  * that picking the wrong file for a slot (e.g. the two files swapped) fails with a clear message
  * instead of silently importing nothing. */
-async function readWmsReport(file: File, sheetName: string, requiredColumns: string[][]): Promise<Record<string, string>[]> {
+async function readWmsReport(file: File, sheetName: string, requiredColumns: string[][], withRowNumber = false): Promise<Record<string, string>[]> {
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = findSheet(workbook, sheetName) ?? workbook.Sheets[workbook.SheetNames[0]]
@@ -122,7 +127,7 @@ async function readWmsReport(file: File, sheetName: string, requiredColumns: str
       `ไฟล์ "${file.name}" ไม่ใช่ "${sheetName}" ที่ export จาก WMS — ไม่พบคอลัมน์: ${missing.join(', ')} ตรวจว่าเลือกไฟล์ถูกช่อง (อาจสลับไฟล์กัน)`,
     )
   }
-  return sheetToRows(sheet)
+  return sheetToRows(sheet, withRowNumber)
 }
 
 /**
@@ -145,7 +150,7 @@ async function readWmsReport(file: File, sheetName: string, requiredColumns: str
 export async function parseWmsOrderFiles(transferFile: File, pickLinesFile: File): Promise<Record<string, string>[]> {
   const [transferRows, pickLineRows] = await Promise.all([
     readWmsReport(transferFile, 'Transfer List', [['BT Status'], ['No.', 'No'], ['Transfer-from Code'], ['Transfer-to Code']]),
-    readWmsReport(pickLinesFile, 'Warehouse Pick Lines', [['Source No.', 'Source No'], ['Item No.', 'Item No'], ['Bin Code'], ['Quantity']]),
+    readWmsReport(pickLinesFile, 'Warehouse Pick Lines', [['Source No.', 'Source No'], ['Item No.', 'Item No'], ['Bin Code'], ['Quantity']], true),
   ])
 
   const headerByOrderNo = new Map<string, { warehouseCode: string; storeCode: string; originalOrderDate: string }>()
@@ -178,6 +183,7 @@ export async function parseWmsOrderFiles(transferFile: File, pickLinesFile: File
       Quantity: col(row, 'Quantity'),
       'Unit of Measure Code': col(row, 'Unit of Measure Code', 'UOM'),
       Description: col(row, 'Description'),
+      [SOURCE_ROW]: row[SOURCE_ROW] ?? '',
     })
   }
   return rows

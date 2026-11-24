@@ -82,7 +82,8 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
     const skuBarcode = col(row, 'SKU Barcode', 'Supplier Barcode', 'Barcode')
     const binCode = col(row, 'Bin Code')
     const qtyRaw = col(row, 'Quantity', 'QTY')
-    const qty = Number(qtyRaw)
+    // Excel may display a quantity with a thousands separator ("1,200") -- read the number.
+    const qty = Number(qtyRaw.replace(/[,\s]/g, ''))
 
     const missing = [
       !orderNo && 'Order No',
@@ -92,7 +93,7 @@ export async function processOrderRowsBatch(admin: SupabaseClient, importId: str
       !sku && 'Item No.',
       !skuBarcode && 'SKU Barcode',
       !binCode && 'Bin Code',
-      (!qtyRaw || Number.isNaN(qty) || qty <= 0) && 'Quantity',
+      (!qtyRaw || Number.isNaN(qty) || qty <= 0) && `Quantity ("${qtyRaw}")`,
     ].filter(Boolean)
 
     if (missing.length > 0) {

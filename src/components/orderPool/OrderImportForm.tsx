@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { parseWmsOrderFiles, orderGroupKey } from '@/lib/importers/parseSpreadsheet'
+import { parseWmsOrderFiles, orderGroupKey, SOURCE_ROW } from '@/lib/importers/parseSpreadsheet'
 
 // processOrderRowsBatch now does a small constant number of DB round trips per HTTP call
 // (bulk order lookup/insert/line-upsert/re-aggregate) instead of one round trip per order or per
@@ -67,7 +67,8 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
     try {
       const rows = await parseWmsOrderFiles(transferFile, pickLinesFile)
       if (rows.length === 0) throw new Error('ไม่พบรายการ Order สถานะ Picking — ตรวจ BT Status ในไฟล์ Transfer List และดูว่าไฟล์ Warehouse Pick Lines มี Source No. ที่ตรงกัน')
-      const rawRows = rows.map((data, i) => ({ rowNumber: i + 2, data }))
+      // Row number = the row in the Warehouse Pick Lines file (not the position after filtering).
+      const rawRows = rows.map((data, i) => ({ rowNumber: Number(data[SOURCE_ROW]) || i + 2, data }))
 
       const groups = new Map<string, typeof rawRows>()
       for (const r of rawRows) {

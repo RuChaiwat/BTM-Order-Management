@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseWmsOrderFiles, orderGroupKey, SOURCE_ROW } from '@/lib/importers/parseSpreadsheet'
+import { Pagination } from '@/components/Pagination'
+import { formatDateTime } from '@/lib/formatDate'
 
 // processOrderRowsBatch now does a small constant number of DB round trips per HTTP call
 // (bulk order lookup/insert/line-upsert/re-aggregate) instead of one round trip per order or per
@@ -20,6 +22,10 @@ interface ErrorRow {
 }
 
 interface ImportSummary {
+  file_name: string
+  uploaded_at: string
+  total_rows: number
+  success_rows: number
   status: string
   orders_created: number
   orders_updated: number
@@ -29,7 +35,6 @@ interface ImportSummary {
   blocking_count: number
   warning_count: number
   errors: ErrorRow[]
-  errors_truncated: boolean
 }
 
 type Phase = 'idle' | 'parsing' | 'importing' | 'finishing' | 'done' | 'error'
@@ -151,6 +156,10 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
 
       const blockingCount = allErrors.filter((e) => e.severity === 'blocking').length
       setResult({
+        file_name: `${transferFile.name} + ${pickLinesFile.name}`,
+        uploaded_at: new Date().toISOString(),
+        total_rows: rows.length,
+        success_rows: finishBody.success_rows ?? rows.length - blockingCount,
         status: finishBody.status,
         orders_created: ordersCreated,
         orders_updated: ordersUpdated,
@@ -159,8 +168,8 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
         error_count: allErrors.length,
         blocking_count: blockingCount,
         warning_count: allErrors.length - blockingCount,
-        errors: allErrors.slice(0, 100),
-        errors_truncated: allErrors.length > 100,
+        // "ต้องแก้ไข" first, then by row in the file.
+        errors: [...allErrors].sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'blocking' ? -1 : 1) || a.row_number - b.row_number),
       })
       setPhase('done')
       setTransferFile(null)
@@ -237,74 +246,114 @@ export function OrderImportForm({ endpointBase, hint }: { endpointBase: string; 
         <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-danger)', background: 'var(--color-danger-bg)', borderRadius: 8, padding: '10px 12px' }}>{error}</div>
       )}
 
-      {result && phase === 'done' && (
-        <div style={{ marginTop: 14 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              color: result.blocking_count > 0 ? '#B45309' : '#16A34A',
-              background: result.blocking_count > 0 ? '#FFFBEB' : '#F0FDF4',
-              borderRadius: 8,
-              padding: '10px 12px',
-            }}
-          >
-            {result.blocking_count > 0 ? '⚠' : '✓'} นำเข้าสำเร็จ: ออเดอร์ใหม่ {result.orders_created.toLocaleString()} · ออเดอร์ซ้ำ {result.orders_updated.toLocaleString()} ·{' '}
-            {result.lines_upserted.toLocaleString()} รายการสินค้า
-          </div>
-          {result.orders_updated > 0 && (
-            <div style={{ marginTop: 8, fontSize: 12.5, color: '#B45309', background: '#FFFBEB', borderRadius: 8, padding: '8px 12px' }}>
-              {result.orders_created === 0
-                ? `ทุกออเดอร์ในไฟล์นี้ (${result.orders_updated.toLocaleString()} ออเดอร์) เคยนำเข้าแล้ว — ระบบไม่สร้างออเดอร์ใหม่ซ้ำ`
-                : `${result.orders_updated.toLocaleString()} ออเดอร์มีอยู่ในระบบแล้ว (Warehouse + Order No + วันที่ออเดอร์ ตรงกัน) — ไม่สร้างใหม่ซ้ำ`}
-              {result.orders_updated - result.orders_locked > 0 &&
-                ` · ${(result.orders_updated - result.orders_locked).toLocaleString()} ออเดอร์ที่ยังไม่มอบหมายงาน อัปเดตรายการสินค้าตามไฟล์ล่าสุด`}
-              {result.orders_locked > 0 && ` · ${result.orders_locked.toLocaleString()} ออเดอร์มอบหมายงานแล้ว ไม่อัปเดต (ล็อกไว้)`}
-            </div>
-          )}
+      {result && phase === 'done' && <UploadResult result={result} />}
+    </div>
+  )
+}
 
-          {result.error_count > 0 && (
-            <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
-                {result.blocking_count > 0 && (
-                  <div style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
-                    {result.blocking_count} แถวต้องแก้ไข — ยังไม่ถูกนำเข้า แก้ไขไฟล์แล้วอัปโหลดใหม่เฉพาะแถวเหล่านี้
-                  </div>
-                )}
-                {result.warning_count > 0 && <div style={{ color: '#B45309' }}>{result.warning_count} แถวเป็นคำเตือน — นำเข้าแล้ว แต่ควรตรวจสอบ (ปล่อยผ่านได้ ไม่บังคับแก้)</div>}
-              </div>
-              <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 8 }}>
-                <table className="table" style={{ margin: 0 }}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: 70 }}>แถว</th>
-                      <th style={{ width: 100 }}>ประเภท</th>
-                      <th>รายละเอียด</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.errors.map((e, i) => (
-                      <tr key={i}>
-                        <td>{e.row_number}</td>
-                        <td>
-                          <span className={`badge badge-${e.severity === 'blocking' ? 'danger' : 'warning'}`}>{e.severity === 'blocking' ? 'ต้องแก้ไข' : 'คำเตือน'}</span>
-                        </td>
-                        <td style={{ fontSize: 12 }}>{e.reason}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {result.errors_truncated && (
-                <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--color-text-secondary)' }}>
-                  แสดง {result.errors.length} จากทั้งหมด {result.error_count} รายการ — ดูรายการทั้งหมดได้จากตาราง Recent Imports ด้านล่าง
-                </div>
-              )}
-            </div>
-          )}
+const ERROR_PAGE_SIZE = 20
+const STATUS_TH: Record<string, string> = { completed: 'สำเร็จ', failed: 'ไม่สำเร็จ', completed_with_errors: 'สำเร็จบางส่วน' }
+
+/** Result of the upload just done -- same columns as Recent imports, then what got in, what did
+ * not and what to check. Lives only in this page view (gone on reload; Recent imports keeps it). */
+function UploadResult({ result }: { result: ImportSummary }) {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(result.errors.length / ERROR_PAGE_SIZE))
+  const pageErrors = result.errors.slice((page - 1) * ERROR_PAGE_SIZE, page * ERROR_PAGE_SIZE)
+  const badge = result.status === 'completed' ? 'success' : result.status === 'failed' ? 'danger' : 'warning'
+  return (
+    <div style={{ marginTop: 16, borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
+      <div style={{ fontWeight: 700, marginBottom: 8 }}>ผลการ Upload</div>
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <colgroup>
+          <col style={{ width: '30%' }} />
+          <col style={{ width: '13%' }} />
+          <col style={{ width: '13%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '8%' }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>FILE</th>
+            <th>UPLOADED</th>
+            <th>STATUS</th>
+            <th>
+              NEW
+              <br />
+              ORDERS
+            </th>
+            <th>
+              DUPLICATE
+              <br />
+              ORDERS
+            </th>
+            <th>ROWS</th>
+            <th>SUCCESS</th>
+            <th>ERRORS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ overflowWrap: 'break-word' }}>{result.file_name}</td>
+            <td>{formatDateTime(result.uploaded_at)}</td>
+            <td>
+              <span className={`badge badge-${badge}`}>{STATUS_TH[result.status] ?? result.status}</span>
+            </td>
+            <td style={{ fontWeight: 700 }}>{result.orders_created.toLocaleString()}</td>
+            <td>{result.orders_updated > 0 ? <span className="badge badge-warning">{result.orders_updated.toLocaleString()}</span> : 0}</td>
+            <td>{result.total_rows.toLocaleString()}</td>
+            <td>{result.success_rows.toLocaleString()}</td>
+            <td style={{ color: result.error_count ? 'var(--color-danger)' : undefined, fontWeight: result.error_count ? 700 : 400 }}>{result.error_count.toLocaleString()}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 10, fontSize: 13, fontWeight: 600 }}>
+        <span style={{ color: '#16A34A' }}>✓ นำเข้าได้ {result.success_rows.toLocaleString()} แถว</span>
+        <span style={{ color: result.blocking_count ? 'var(--color-danger)' : 'var(--color-text-secondary)' }}>✗ นำเข้าไม่ได้ {result.blocking_count.toLocaleString()} แถว</span>
+        <span style={{ color: result.warning_count ? '#B45309' : 'var(--color-text-secondary)' }}>⚠ คำเตือน {result.warning_count.toLocaleString()} แถว</span>
+      </div>
+
+      {result.orders_updated > 0 && (
+        <div style={{ marginTop: 8, fontSize: 12.5, color: '#B45309', background: '#FFFBEB', borderRadius: 8, padding: '8px 12px' }}>
+          {result.orders_created === 0
+            ? `ทุกออเดอร์ในไฟล์นี้ (${result.orders_updated.toLocaleString()} ออเดอร์) เคยนำเข้าแล้ว — ระบบไม่สร้างออเดอร์ใหม่ซ้ำ`
+            : `${result.orders_updated.toLocaleString()} ออเดอร์มีอยู่ในระบบแล้ว (Warehouse + Order No + วันที่ออเดอร์ ตรงกัน) — ไม่สร้างใหม่ซ้ำ`}
+          {result.orders_updated - result.orders_locked > 0 && ` · ${(result.orders_updated - result.orders_locked).toLocaleString()} ออเดอร์ที่ยังไม่มอบหมายงาน อัปเดตรายการสินค้าตามไฟล์ล่าสุด`}
+          {result.orders_locked > 0 && ` · ${result.orders_locked.toLocaleString()} ออเดอร์มอบหมายงานแล้ว ไม่อัปเดต (ล็อกไว้)`}
+        </div>
+      )}
+
+      {result.error_count > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12.5, marginBottom: 8 }}>
+            {result.blocking_count > 0 && <div style={{ color: 'var(--color-danger)', fontWeight: 600 }}>แถว "ต้องแก้ไข" ยังไม่ถูกนำเข้า — แก้ไขไฟล์แล้ว Upload ใหม่ (แถวอ้างอิงไฟล์ Warehouse Pick Lines)</div>}
+            {result.warning_count > 0 && <div style={{ color: '#B45309' }}>แถว "คำเตือน" นำเข้าแล้ว แต่ควรตรวจสอบ (ไม่บังคับแก้)</div>}
+          </div>
+          <table className="table" style={{ margin: 0 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 70 }}>แถว</th>
+                <th style={{ width: 100 }}>ประเภท</th>
+                <th>รายละเอียด</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageErrors.map((e, i) => (
+                <tr key={`${page}-${i}`}>
+                  <td>{e.row_number}</td>
+                  <td>
+                    <span className={`badge badge-${e.severity === 'blocking' ? 'danger' : 'warning'}`}>{e.severity === 'blocking' ? 'ต้องแก้ไข' : 'คำเตือน'}</span>
+                  </td>
+                  <td style={{ fontSize: 12 }}>{e.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
         </div>
       )}
     </div>

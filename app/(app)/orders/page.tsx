@@ -55,6 +55,10 @@ export default async function OrderPoolPage() {
           hint={'อัปโหลด 2 ไฟล์ (.xlsx) จาก WMS แยกกัน · "Transfer List" (หัว order — นำเข้าเฉพาะ BT Status = Picking) และ "Warehouse Pick Lines" (รายการสินค้าใน order — จับคู่ด้วย Source No.)'}
         />
 
+        <OrderPoolOverview totalOrders={overview.totalOrders} zoneDensity={overview.zoneDensity} bands={overview.bands} thresholds={overview.thresholds} />
+
+        <CancelOrderPanel reasons={cancelReasons ?? []} />
+
         <div className="card">
           <div className="card-title">Recent imports</div>
           <div className="card-subtitle" style={{ marginBottom: 12 }}>
@@ -62,10 +66,6 @@ export default async function OrderPoolPage() {
           </div>
           <RecentImportsTable rows={importRows} />
         </div>
-
-        <OrderPoolOverview totalOrders={overview.totalOrders} zoneDensity={overview.zoneDensity} bands={overview.bands} thresholds={overview.thresholds} />
-
-        <CancelOrderPanel reasons={cancelReasons ?? []} />
       </div>
     </>
   )
